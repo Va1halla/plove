@@ -1,0 +1,70 @@
+# Сгенерировано plove из райса «{{ name }}».
+# Этот файл перезаписывается при каждом `plove apply`.
+# Свои настройки пишите в ~/.config/hypr/user.conf, plove его не трогает.
+
+monitor = , preferred, auto, 1
+
+{% if apps.bar %}exec-once = {{ apps.bar }}
+{% endif %}
+general {
+    gaps_in = {{ geometry.gaps_in }}
+    gaps_out = {{ geometry.gaps }}
+    border_size = {{ geometry.border }}
+    col.active_border = rgb({{ colors.accent.raw }})
+    col.inactive_border = rgb({{ colors.surface.raw }})
+    layout = dwindle
+}
+
+decoration {
+    rounding = {{ geometry.radius }}
+    active_opacity = {{ geometry.opacity }}
+    inactive_opacity = {{ geometry.opacity_inactive }}
+
+    blur {
+        enabled = true
+        size = 6
+        passes = 2
+    }
+}
+
+animations {
+{%- if options.animations == "none" %}
+    enabled = false
+{%- else %}
+{%- if options.animations == "smooth" %}{% set speed = 6 %}{% else %}{% set speed = 3 %}{% endif %}
+    enabled = true
+    bezier = ease, 0.25, 0.1, 0.25, 1.0
+    animation = windows, 1, {{ speed }}, ease, popin 85%
+    animation = fade, 1, {{ speed }}, ease
+    animation = workspaces, 1, {{ speed }}, ease, slide
+{%- endif %}
+}
+
+input {
+    kb_layout = {{ options.kb_layout }}
+    kb_options = {{ options.kb_options }}
+    follow_mouse = 1
+}
+
+$mod = SUPER
+
+{% if apps.terminal %}bind = $mod, Return, exec, {{ apps.terminal }}
+{% endif -%}
+bind = $mod, Q, killactive,
+bind = $mod SHIFT, E, exit,
+bind = $mod, V, togglefloating,
+bind = $mod, F, fullscreen,
+
+bind = $mod, left, movefocus, l
+bind = $mod, right, movefocus, r
+bind = $mod, up, movefocus, u
+bind = $mod, down, movefocus, d
+{% for i in range(start=1, end=10) %}
+bind = $mod, {{ i }}, workspace, {{ i }}
+bind = $mod SHIFT, {{ i }}, movetoworkspace, {{ i }}
+{%- endfor %}
+
+bindm = $mod, mouse:272, movewindow
+bindm = $mod, mouse:273, resizewindow
+
+source = ~/.config/hypr/user.conf

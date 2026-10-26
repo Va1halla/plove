@@ -1,0 +1,17 @@
+[package]
+name = "plove-core"
+description = "Ядро plove: RiceSpec, модули, план и применение"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+tera.workspace = true
+include_dir.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

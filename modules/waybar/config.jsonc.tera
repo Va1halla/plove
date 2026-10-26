@@ -1,0 +1,32 @@
+// Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+{%- macro module_name(m) -%}
+{%- if m == "workspaces" -%}hyprland/workspaces{%- else -%}{{ m }}{%- endif -%}
+{%- endmacro module_name %}
+{%- macro module_list(list) -%}
+[{% for m in list %}"{{ self::module_name(m=m) }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{%- endmacro module_list %}
+{
+  "layer": "top",
+  "position": "{{ options.position }}",
+  "height": {{ options.height }},
+{%- if options.floating %}
+{%- if options.position == "bottom" %}
+  "margin": "0 {{ geometry.gaps }} {{ geometry.gaps }} {{ geometry.gaps }}",
+{%- else %}
+  "margin": "{{ geometry.gaps }} {{ geometry.gaps }} 0 {{ geometry.gaps }}",
+{%- endif %}
+{%- endif %}
+  "modules-left": {{ self::module_list(list=options.modules_left) }},
+  "modules-center": {{ self::module_list(list=options.modules_center) }},
+  "modules-right": {{ self::module_list(list=options.modules_right) }},
+
+  "hyprland/workspaces": { "format": "{id}" },
+  "clock": { "format": "{:%H:%M}", "tooltip-format": "{:%d.%m.%Y}" },
+  "battery": { "format": "{capacity}%" },
+  "network": {
+    "format-wifi": "{essid}",
+    "format-ethernet": "eth",
+    "format-disconnected": "offline"
+  },
+  "pulseaudio": { "format": "vol {volume}%", "format-muted": "muted" }
+}

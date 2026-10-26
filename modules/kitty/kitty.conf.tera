@@ -1,0 +1,20 @@
+# Сгенерировано plove из райса «{{ name }}».
+# Этот файл перезаписывается при каждом `plove apply`.
+# Свои настройки пишите в ~/.config/kitty/user.conf, plove его не трогает.
+
+font_family {{ fonts.mono }}
+font_size {{ fonts.size }}
+
+background {{ colors.bg.hex }}
+foreground {{ colors.fg.hex }}
+cursor {{ colors.accent.hex }}
+selection_background {{ colors.accent.hex }}
+selection_foreground {{ colors.bg.hex }}
+background_opacity {{ geometry.opacity }}
+window_padding_width {{ geometry.gaps }}
+confirm_os_window_close 0
+{% for color in ansi %}
+color{{ loop.index0 }} {{ color.hex }}
+{%- endfor %}
+
+include user.conf

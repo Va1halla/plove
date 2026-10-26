@@ -1,0 +1,12 @@
+# Модуль kitty: терминал с поддержкой GPU.
+id: kitty
+role: terminal
+exec: kitty
+packages: [kitty]
+templates:
+  - src: kitty.conf.tera
+    dest: ~/.config/kitty/kitty.conf
+user_files:
+  - ~/.config/kitty/user.conf
+# SIGUSR1 заставляет kitty перечитать конфиг во всех окнах.
+reload: pkill -SIGUSR1 kitty

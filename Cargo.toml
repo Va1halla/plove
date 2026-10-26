@@ -1,0 +1,25 @@
+# Рабочее пространство (workspace) — как solution (.sln) в C#:
+# несколько проектов, которые собираются вместе.
+[workspace]
+resolver = "2"
+members = ["crates/plove-core", "crates/plove-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+tera = { version = "1.20", default-features = false }
+include_dir = "0.7"
+clap = { version = "4.5", features = ["derive"] }
+tempfile = "3.10"
+
+[profile.release]
+# Меньше и быстрее бинарник: удобно скачивать на чистую систему.
+lto = true
+strip = true
