@@ -29,6 +29,9 @@ pub struct ApplyReport {
     pub files_written: usize,
     /// Команды перезагрузки, которые не сработали (обычно программа не запущена).
     pub failed_reloads: Vec<String>,
+    /// Перезагрузку пропустили: графическая сессия не запущена,
+    /// конфиги подхватятся при следующем старте Hyprland.
+    pub reloads_skipped: bool,
 }
 
 pub fn apply(plan: &Plan, env: &Env, options: &ApplyOptions) -> Result<ApplyReport> {
@@ -59,9 +62,12 @@ pub fn apply(plan: &Plan, env: &Env, options: &ApplyOptions) -> Result<ApplyRepo
         create_empty(path)?;
     }
 
-    // 4. Перезагрузка программ, только на живой системе и только если что-то поменялось.
+    // 4. Перезагрузка программ: только на живой системе, внутри графической
+    //    сессии и только если что-то поменялось.
     let mut failed_reloads = Vec::new();
-    if !env.sandbox && !changed.is_empty() {
+    let wants_reload = !env.sandbox && !changed.is_empty();
+    let reloads_skipped = wants_reload && !system::in_graphical_session();
+    if wants_reload && !reloads_skipped {
         for command in &plan.reloads {
             if !system::run_reload(command) {
                 failed_reloads.push(command.clone());
@@ -73,6 +79,7 @@ pub fn apply(plan: &Plan, env: &Env, options: &ApplyOptions) -> Result<ApplyRepo
         generation,
         files_written: changed.len(),
         failed_reloads,
+        reloads_skipped,
     })
 }
 

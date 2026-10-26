@@ -83,14 +83,18 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: Cli) -> Result<()> {
-    let env = match cli.root {
-        Some(root) => Env::sandbox(root),
-        None => Env::real()?,
+    // Окружение создаём только для команд, которые читают или меняют систему:
+    // `presets`, `modules` и `preview` работают и без него (в том числе от root).
+    let root = cli.root;
+    let system_env = || match &root {
+        Some(root) => Ok(Env::sandbox(root.clone())),
+        None => Env::real(),
     };
     let registry = Registry::builtin()?;
 
     match cli.command {
         Command::Plan { rice } => {
+            let env = system_env()?;
             let plan = plan::build(load_rice(&rice)?, &registry, &env)?;
             print_plan(&plan, &env);
         }
@@ -99,6 +103,7 @@ fn run(cli: Cli) -> Result<()> {
             yes,
             skip_packages,
         } => {
+            let env = system_env()?;
             let plan = plan::build(load_rice(&rice)?, &registry, &env)?;
             print_plan(&plan, &env);
             if plan.is_noop() || !(yes || confirm("Применить?")?) {
@@ -113,11 +118,15 @@ fn run(cli: Cli) -> Result<()> {
                 ),
                 None => println!("Готово."),
             }
+            if report.reloads_skipped {
+                println!("Графическая сессия не запущена: настройки подхватятся при старте Hyprland (start-hyprland).");
+            }
             for command in report.failed_reloads {
                 println!("  не сработало «{command}» (программа, скорее всего, не запущена)");
             }
         }
         Command::Rollback { yes } => {
+            let env = system_env()?;
             let Some(last) = state::list(&env)?.pop() else {
                 println!("Откатывать нечего: история пуста.");
                 return Ok(());
@@ -132,7 +141,7 @@ fn run(cli: Cli) -> Result<()> {
                 return Ok(());
             }
             if let Some(generation) = state::rollback(&env)? {
-                if !env.sandbox {
+                if !env.sandbox && plove_core::system::in_graphical_session() {
                     for command in &generation.record.reloads {
                         plove_core::system::run_reload(command);
                     }
@@ -141,6 +150,7 @@ fn run(cli: Cli) -> Result<()> {
             }
         }
         Command::History => {
+            let env = system_env()?;
             let generations = state::list(&env)?;
             if generations.is_empty() {
                 println!("История пуста.");
@@ -164,6 +174,9 @@ fn run(cli: Cli) -> Result<()> {
         Command::Preview { rice, output } => {
             let spec = load_rice(&rice)?;
             let output = output.unwrap_or_else(|| PathBuf::from(format!("{}.png", spec.name)));
+            // Превью только читает файлы, поэтому ему хватает «песочницы» в домашней папке.
+            let home = std::env::var_os("HOME").unwrap_or_default();
+            let env = Env::sandbox(home.into());
             let png = plove_preview::render_png(&spec, &registry, &env)?;
             std::fs::write(&output, png)?;
             println!("Превью сохранено в {}", output.display());
