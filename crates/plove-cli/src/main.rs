@@ -289,13 +289,24 @@ fn run(cli: Cli) -> Result<()> {
         Command::Modules { id: None } => {
             for module in registry.iter() {
                 let m = &module.manifest;
+                let packages: Vec<String> = m
+                    .packages
+                    .iter()
+                    .cloned()
+                    .chain(m.aur.iter().map(|p| format!("{p} (AUR)")))
+                    .collect();
+                let settings = match m.settings.len() {
+                    0 => String::new(),
+                    n => format!("  настроек: {n}"),
+                };
                 println!(
-                    "{:<12} {:<12} пакеты: {}",
+                    "{:<16} {:<15} {}{settings}",
                     m.id,
                     m.role,
-                    m.packages.join(", ")
+                    packages.join(", ")
                 );
             }
+            println!("\nНастройки модуля: plove modules <модуль>");
         }
     }
     Ok(())

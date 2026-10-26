@@ -3,11 +3,18 @@
 id: grim
 role: screenshot
 exec: >-
-  mkdir -p ~/Pictures/Screenshots &&
-  grim -g "$(slurp)" - | tee ~/Pictures/Screenshots/$(date +%F_%H-%M-%S).png | wl-copy
+  mkdir -p {{ options.folder }} &&
+  grim -g "$(slurp)" - | tee {{ options.folder }}/$(date +%F_%H-%M-%S).png | wl-copy
 packages: [grim, slurp, wl-clipboard]
 binds:
   - ", Print, exec, {{ exec }}"
   - "SHIFT, Print, exec, {{ exec | replace(from='-g \"$(slurp)\" ', to='') }}"
 compatible_with:
   compositor: [hyprland]
+# Настройки: мастер показывает их на экране «Тонкая настройка», `plove modules grim` — списком.
+settings:
+  - id: folder
+    group: Скриншоты
+    title: Папка для снимков
+    about: Без пробелов в пути. ~ — домашняя папка.
+    default: ~/Pictures/Screenshots

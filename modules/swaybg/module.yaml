@@ -4,7 +4,7 @@ id: swaybg
 role: wallpaper
 # Без обоев в райсе просто заливаем экран цветом фона.
 # Цвет пишем без «#»: в конфиге Hyprland «#» начинает комментарий.
-exec: "{% if wallpaper %}swaybg -m fill -i '{{ wallpaper }}'{% else %}swaybg -c {{ colors.bg.raw }}{% endif %}"
+exec: "{% if wallpaper %}swaybg -m {{ options.mode }} -i '{{ wallpaper }}'{% else %}swaybg -c {{ colors.bg.raw }}{% endif %}"
 packages: [swaybg]
 autostart: true
 # Двум программам обоев на одном экране не место.
@@ -15,3 +15,11 @@ compatible_with:
 reload: "pkill -x swaybg; setsid -f {{ exec }} >/dev/null 2>&1"
 # Фоновый процесс: plove остановит его, если модуль уберут из райса.
 process: "swaybg"
+# Настройки: мастер показывает их на экране «Тонкая настройка», `plove modules swaybg` — списком.
+settings:
+  - id: mode
+    group: Обои
+    title: Как вписать картинку
+    about: fill — заполнить экран с обрезкой краёв, fit — целиком с полями, center — как есть по центру, tile — плиткой.
+    choices: [fill, fit, center, tile, stretch]
+    default: fill

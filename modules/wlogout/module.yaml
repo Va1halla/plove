@@ -2,7 +2,7 @@
 # (Super+Shift+E). Альтернатива power-menu. Живёт в AUR.
 id: wlogout
 role: power
-exec: wlogout -b 4 -T 400 -B 400
+exec: wlogout -b {{ options.columns }} -T 400 -B 400
 aur: [wlogout]
 compatible_with:
   compositor: [hyprland]
@@ -13,3 +13,11 @@ templates:
     dest: ~/.config/wlogout/style.css
 binds:
   - "$mod SHIFT, E, exec, pidof wlogout || {{ exec }}"
+# Настройки: мастер показывает их на экране «Тонкая настройка», `plove modules wlogout` — списком.
+settings:
+  - id: columns
+    group: Меню выхода
+    title: Кнопок в ряд
+    about: 4 — все кнопки в одну строку, 2 — квадратом.
+    range: [1, 4]
+    default: 4

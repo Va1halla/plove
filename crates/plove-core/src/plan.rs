@@ -215,13 +215,26 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
     }
     base.insert("dmenu", &dmenu);
     base.insert("run_in", &run_in);
+    // Настройки каждого модуля (`options`): нужны и в шаблонах конфигов,
+    // и в командах запуска, клавишах, переменных окружения.
+    let mut module_opts: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+    for module in &modules {
+        let options = module_options(module, spec.overrides.get(&module.manifest.id))?;
+        check_items(module, &options, &spec)?;
+        module_opts.insert(&module.manifest.id, options);
+    }
+    let with_options = |module: &Module, context: &tera::Context| {
+        let mut context = context.clone();
+        context.insert("options", &module_opts[module.manifest.id.as_str()]);
+        context
+    };
     let mut apps: BTreeMap<String, String> = BTreeMap::new();
     for module in &modules {
         if let Some(exec) = &module.manifest.exec {
             let what = format!("{}/module.yaml (exec)", module.manifest.id);
             apps.insert(
                 module.manifest.role.clone(),
-                render::render_str(exec, &base, &what)?,
+                render::render_str(exec, &with_options(module, &base), &what)?,
             );
         }
     }
@@ -229,7 +242,17 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
     // Автозапуск и горячие клавиши всех модулей: их собирает конфиг Hyprland.
     let mut autostart = Vec::new();
     let mut binds = Vec::new();
-    let session_env: Vec<&String> = modules.iter().flat_map(|m| &m.manifest.env).collect();
+    let mut session_env = Vec::new();
+    for module in &modules {
+        for line in &module.manifest.env {
+            let what = format!("{}/module.yaml (env)", module.manifest.id);
+            session_env.push(render::render_str(
+                line,
+                &with_options(module, &base),
+                &what,
+            )?);
+        }
+    }
     // Клавиши, которые уже заняты самим конфигом Hyprland (см. hyprland.conf.tera).
     let mut taken_keys: BTreeMap<String, String> = ["Q", "V", "F"]
         .into_iter()
@@ -242,7 +265,7 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
                 autostart.push(exec.clone());
             }
         }
-        let mut context = base.clone();
+        let mut context = with_options(module, &base);
         context.insert("apps", &apps);
         context.insert("exec", &exec);
         for bind in &module.manifest.binds {
@@ -267,9 +290,8 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
 
     // 5. Рендерим конфиги и сравниваем с тем, что сейчас на диске.
     for module in &modules {
-        let options = module_options(module, spec.overrides.get(&module.manifest.id))?;
-        check_items(module, &options, &spec)?;
-        for rendered in render::render_module(module, &base, &apps, &options)? {
+        let options = &module_opts[module.manifest.id.as_str()];
+        for rendered in render::render_module(module, &base, &apps, options)? {
             let path = env.expand(&rendered.dest);
             if files.iter().any(|f| f.path == path) {
                 bail!("два модуля пишут в один файл {}", rendered.dest);
@@ -390,15 +412,17 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
     for module in &modules {
         for command in &module.manifest.on_apply {
             let what = format!("{}/module.yaml (on_apply)", module.manifest.id);
-            on_apply.push(render::render_str(command, &base, &what)?);
+            on_apply.push(render::render_str(
+                command,
+                &with_options(module, &base),
+                &what,
+            )?);
         }
     }
     for module in &modules {
         if let Some(reload) = &module.manifest.reload {
-            let mut context = base.clone();
+            let mut context = with_options(module, &base);
             context.insert("exec", &apps.get(&module.manifest.role));
-            let options = module_options(module, spec.overrides.get(&module.manifest.id))?;
-            context.insert("options", &options);
             let what = format!("{}/module.yaml (reload)", module.manifest.id);
             reloads.push(render::render_str(reload, &context, &what)?);
         }

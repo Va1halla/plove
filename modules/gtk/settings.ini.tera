@@ -2,7 +2,7 @@
 [Settings]
 gtk-theme-name=Adwaita-dark
 gtk-application-prefer-dark-theme=1
-gtk-icon-theme-name=Papirus-Dark
+gtk-icon-theme-name={{ options.icons }}
 gtk-cursor-theme-name=Adwaita
-gtk-cursor-theme-size=24
+gtk-cursor-theme-size={{ options.cursor_size }}
 gtk-font-name={{ fonts.ui }} {{ fonts.size }}

@@ -12,8 +12,10 @@ cursor-color = {{ colors.accent.hex }}
 selection-background = {{ colors.accent.hex }}
 selection-foreground = {{ colors.bg.hex }}
 background-opacity = {{ geometry.opacity }}
-window-padding-x = {{ geometry.gaps }}
-window-padding-y = {{ geometry.gaps }}
+window-padding-x = {{ options.padding }}
+window-padding-y = {{ options.padding }}
+cursor-style = {% if options.cursor_shape == "beam" %}bar{% else %}{{ options.cursor_shape }}{% endif %}
+cursor-style-blink = {{ options.cursor_blink }}
 window-decoration = false
 confirm-close-surface = false
 {% for color in ansi -%}

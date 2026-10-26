@@ -236,3 +236,36 @@ fn custom_widgets() {
     let error = plan::build(spec, &registry, &env).err().unwrap();
     assert!(error.to_string().contains("vnp"));
 }
+
+/// Настройки модулей попадают не только в конфиги, но и в команды,
+/// клавиши и переменные окружения.
+#[test]
+fn settings_reach_commands() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let mut spec = example_spec();
+    spec.components.insert("launcher".into(), "fuzzel".into());
+    for (module, options) in [
+        ("grim", "{folder: ~/Shots}"),
+        ("cliphist", "{max_items: 100}"),
+        ("gtk", "{cursor_size: 32}"),
+        ("recorder", "{audio: true}"),
+        ("fuzzel", "{width: 60}"),
+    ] {
+        spec.overrides
+            .insert(module.into(), serde_yaml::from_str(options).unwrap());
+    }
+    let plan = plan::build(spec, &registry, &env).unwrap();
+    let file = |name: &str| {
+        let f = plan.files.iter().find(|f| f.path.ends_with(name)).unwrap();
+        String::from_utf8(f.content.clone()).unwrap()
+    };
+    let hypr = file("hypr/hyprland.conf");
+    assert!(hypr.contains("tee ~/Shots/"), "{hypr}");
+    assert!(hypr.contains("cliphist -max-items 100 store"));
+    assert!(hypr.contains("env = XCURSOR_SIZE,32"));
+    assert!(hypr.contains("wf-recorder --audio"));
+    assert!(file("fuzzel/fuzzel.ini").contains("width=60"));
+    assert!(plan.on_apply.iter().any(|c| c.ends_with("cursor-size 32")));
+}

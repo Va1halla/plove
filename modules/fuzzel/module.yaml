@@ -13,3 +13,20 @@ templates:
   - src: fuzzel.ini.tera
     dest: ~/.config/fuzzel/fuzzel.ini
 # fuzzel читает конфиг при каждом запуске, перезагружать нечего.
+# Настройки: мастер показывает их на экране «Тонкая настройка», `plove modules fuzzel` — списком.
+settings:
+  - id: width
+    group: Лаунчер
+    title: Ширина окна, символов
+    range: [20, 80]
+    step: 2
+    default: 40
+  - id: lines
+    group: Лаунчер
+    title: Строк в списке
+    range: [4, 20]
+    default: 10
+  - id: icons
+    group: Лаунчер
+    title: Значки приложений
+    default: true

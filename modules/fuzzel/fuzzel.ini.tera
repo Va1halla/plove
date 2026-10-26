@@ -6,8 +6,9 @@ font={{ fonts.ui }}:size={{ fonts.size + 2 }}
 {% if apps.terminal %}terminal={{ apps.terminal }}
 {% endif -%}
 prompt="❯ "
-width=40
-lines=10
+width={{ options.width }}
+lines={{ options.lines }}
+icons-enabled={% if options.icons %}yes{% else %}no{% endif %}
 horizontal-pad=20
 vertical-pad=14
 inner-pad=8

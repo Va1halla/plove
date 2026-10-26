@@ -11,3 +11,23 @@ templates:
     dest: ~/.config/btop/btop.conf
 binds:
   - "CTRL SHIFT, Escape, exec, {{ exec }}"
+# Настройки: мастер показывает их на экране «Тонкая настройка», `plove modules btop` — списком.
+settings:
+  - id: update_ms
+    group: Монитор
+    title: Обновлять раз в, мс
+    about: Реже — меньше нагрузка на процессор от самого btop.
+    range: [500, 5000]
+    step: 250
+    default: 1500
+  - id: graph_symbol
+    group: Монитор
+    title: Чем рисовать графики
+    about: braille — самые подробные, block — крупнее, tty — простые символы для консоли.
+    choices: [braille, block, tty]
+    default: braille
+  - id: proc_tree
+    group: Монитор
+    title: Процессы деревом
+    about: Показывать, какой процесс какой запустил.
+    default: false

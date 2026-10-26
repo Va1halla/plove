@@ -27,8 +27,11 @@ local c = {
   cyan = "{{ cyan }}",
 }
 
+-- Фон окна: "NONE" — не закрашивать, тогда виден терминал под редактором.
+local fill = {% if options.transparent %}"NONE"{% else %}c.bg{% endif %}
+
 local groups = {
-  Normal = { fg = c.fg, bg = c.bg },
+  Normal = { fg = c.fg, bg = fill },
   NormalFloat = { fg = c.fg, bg = c.surface },
   FloatBorder = { fg = c.accent, bg = c.surface },
   CursorLine = { bg = c.surface },
@@ -43,7 +46,7 @@ local groups = {
   StatusLineNC = { fg = c.muted, bg = c.surface },
   WinSeparator = { fg = c.surface },
   VertSplit = { fg = c.surface },
-  SignColumn = { bg = c.bg },
+  SignColumn = { bg = fill },
   MatchParen = { fg = c.accent, bold = true },
   NonText = { fg = c.surface },
   Directory = { fg = c.accent },

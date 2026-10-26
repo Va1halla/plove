@@ -4,9 +4,21 @@
 id: recorder
 role: recorder
 exec: >-
-  pkill -INT -x wf-recorder && notify-send 'Запись сохранена' 'в ~/Videos' ||
-  { mkdir -p ~/Videos; notify-send 'Запись' 'Выделите область. Остановить — Super+Shift+R';
-  wf-recorder -g "$(slurp)" -f ~/Videos/$(date +%F_%H-%M-%S).mp4; }
+  pkill -INT -x wf-recorder && notify-send 'Запись сохранена' 'в {{ options.folder }}' ||
+  { mkdir -p {{ options.folder }}; notify-send 'Запись' 'Выделите область. Остановить — Super+Shift+R';
+  wf-recorder{% if options.audio %} --audio{% endif %} -g "$(slurp)" -f {{ options.folder }}/$(date +%F_%H-%M-%S).mp4; }
 packages: [wf-recorder, slurp, libnotify]
 binds:
   - "$mod SHIFT, R, exec, {{ exec }}"
+# Настройки: мастер показывает их на экране «Тонкая настройка», `plove modules recorder` — списком.
+settings:
+  - id: folder
+    group: Запись экрана
+    title: Папка для видео
+    about: Без пробелов в пути. ~ — домашняя папка.
+    default: ~/Videos
+  - id: audio
+    group: Запись экрана
+    title: Записывать звук
+    about: Звук с выхода по умолчанию (то, что слышно в колонках).
+    default: false

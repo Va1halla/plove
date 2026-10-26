@@ -7,3 +7,11 @@ packages: [fastfetch]
 templates:
   - src: config.jsonc.tera
     dest: ~/.config/fastfetch/config.jsonc
+# Настройки: мастер показывает их на экране «Тонкая настройка», `plove modules fastfetch` — списком.
+settings:
+  - id: logo
+    group: Сводка
+    title: Логотип
+    about: full — большой логотип дистрибутива, small — маленький, none — только текст.
+    choices: [full, small, none]
+    default: full

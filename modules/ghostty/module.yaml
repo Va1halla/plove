@@ -11,3 +11,20 @@ user_files:
   - ~/.config/ghostty/user.conf
 binds:
   - "$mod, Return, exec, {{ exec }}"
+# Настройки: мастер показывает их на экране «Тонкая настройка», `plove modules ghostty` — списком.
+settings:
+  - id: cursor_shape
+    group: Терминал
+    title: Форма курсора
+    choices: [block, beam, underline]
+    default: block
+  - id: cursor_blink
+    group: Терминал
+    title: Мигающий курсор
+    default: true
+  - id: padding
+    group: Терминал
+    title: Отступ текста от края, px
+    range: [0, 40]
+    step: 2
+    default: 8

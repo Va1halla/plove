@@ -12,3 +12,10 @@ ensure_lines:
     line: "pcall(vim.cmd.colorscheme, \"plove\")"
     # Neovim не запускается, если есть и init.vim, и init.lua.
     unless_exists: ~/.config/nvim/init.vim
+# Настройки: мастер показывает их на экране «Тонкая настройка», `plove modules neovim` — списком.
+settings:
+  - id: transparent
+    group: Редактор
+    title: Прозрачный фон
+    about: Фон редактора берётся из терминала, и сквозь него видно обои, как в остальных окнах.
+    default: false

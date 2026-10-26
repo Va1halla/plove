@@ -16,11 +16,26 @@ templates:
 on_apply:
   - "gsettings set org.gnome.desktop.interface color-scheme prefer-dark"
   - "gsettings set org.gnome.desktop.interface gtk-theme Adwaita-dark"
-  - "gsettings set org.gnome.desktop.interface icon-theme Papirus-Dark"
+  - "gsettings set org.gnome.desktop.interface icon-theme {{ options.icons }}"
   - "gsettings set org.gnome.desktop.interface font-name '{{ fonts.ui }} {{ fonts.size }}'"
   - "gsettings set org.gnome.desktop.interface cursor-theme Adwaita"
-  - "gsettings set org.gnome.desktop.interface cursor-size 24"
+  - "gsettings set org.gnome.desktop.interface cursor-size {{ options.cursor_size }}"
 # Один курсор везде: в Hyprland, GTK и старых X11-программах.
 env:
   - "XCURSOR_THEME,Adwaita"
-  - "XCURSOR_SIZE,24"
+  - "XCURSOR_SIZE,{{ options.cursor_size }}"
+# Настройки: мастер показывает их на экране «Тонкая настройка», `plove modules gtk` — списком.
+settings:
+  - id: cursor_size
+    group: Внешний вид
+    title: Размер курсора
+    about: 24 — обычный, 32–48 — для 4K или если курсор теряется.
+    range: [16, 64]
+    step: 8
+    default: 24
+  - id: icons
+    group: Внешний вид
+    title: Значки
+    about: Papirus — яркие и узнаваемые, Adwaita — стандартные значки GNOME.
+    choices: [Papirus-Dark, Adwaita]
+    default: Papirus-Dark

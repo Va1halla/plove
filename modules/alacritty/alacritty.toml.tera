@@ -12,9 +12,12 @@ program = "{{ apps.shell }}"
 
 {% endif -%}
 [window]
-padding = { x = {{ geometry.gaps }}, y = {{ geometry.gaps }} }
+padding = { x = {{ options.padding }}, y = {{ options.padding }} }
 opacity = {{ geometry.opacity }}
 decorations = "None"
+
+[cursor]
+style = { shape = "{{ options.cursor_shape | capitalize }}", blinking = "{% if options.cursor_blink %}On{% else %}Off{% endif %}" }
 
 [font]
 normal = { family = "{{ fonts.mono }}" }

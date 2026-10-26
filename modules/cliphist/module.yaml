@@ -1,7 +1,7 @@
 # Модуль cliphist: история буфера обмена. Super+Shift+V — выбрать из истории.
 id: cliphist
 role: clipboard
-exec: wl-paste --watch cliphist store
+exec: wl-paste --watch cliphist -max-items {{ options.max_items }} store
 packages: [cliphist, wl-clipboard]
 autostart: true
 binds:
@@ -10,6 +10,15 @@ compatible_with:
   compositor: [hyprland]
   launcher: [fuzzel, rofi]
 # Своего конфига нет; при первом применении запускаем сборщик истории.
-reload: "pgrep -f 'cliphist store' >/dev/null || setsid -f {{ exec }} >/dev/null 2>&1"
+reload: "pgrep -f 'wl-paste --watch cliphist' >/dev/null || setsid -f {{ exec }} >/dev/null 2>&1"
 # Фоновый процесс: plove остановит его, если модуль уберут из райса.
 process: "wl-paste --watch cliphist"
+# Настройки: мастер показывает их на экране «Тонкая настройка», `plove modules cliphist` — списком.
+settings:
+  - id: max_items
+    group: Буфер обмена
+    title: Сколько помнить
+    about: Сколько последних копирований хранится в истории.
+    range: [50, 1000]
+    step: 50
+    default: 750
