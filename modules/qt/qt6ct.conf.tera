@@ -1,0 +1,11 @@
+# Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+[Appearance]
+style=Fusion
+custom_palette=true
+color_scheme_path={{ home }}/.config/qt6ct/colors/plove.conf
+icon_theme=Papirus-Dark
+standard_dialogs=default
+
+[Fonts]
+general="{{ fonts.ui }},{{ fonts.size }},-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
+fixed="{{ fonts.mono }},{{ fonts.size }},-1,5,400,0,0,0,0,0,0,0,0,0,0,1"

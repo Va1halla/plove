@@ -53,6 +53,10 @@ pub struct Manifest {
     /// Запускать `exec` вместе с Hyprland (exec-once): панель, обои, демоны.
     #[serde(default)]
     pub autostart: bool,
+    /// Переменные окружения для всех программ сессии, в формате Hyprland
+    /// `ИМЯ,значение`, например `QT_QPA_PLATFORMTHEME,qt6ct`.
+    #[serde(default)]
+    pub env: Vec<String>,
     /// Горячие клавиши в формате Hyprland без `bind =`, например
     /// `$mod, D, exec, {{ exec }}`. Шаблоны: доступны `exec`, `apps`, цвета.
     #[serde(default)]

@@ -22,6 +22,10 @@ monitor = , preferred, auto, {{ options.scale }}
 # с «unknown object … attach»). Пусть они рисуют программно.
 env = LIBGL_ALWAYS_SOFTWARE,1
 {% endif %}
+# Переменные окружения от модулей: тема Qt, курсор и т. д.
+{% for line in session_env -%}
+env = {{ line }}
+{% endfor -%}
 # Фоновые программы: обои, панель, уведомления и т. д. (autostart в module.yaml).
 {% for command in autostart -%}
 exec-once = {{ command }}

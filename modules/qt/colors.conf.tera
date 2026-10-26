@@ -1,0 +1,10 @@
+# Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+# Порядок цветов — роли QPalette: WindowText, Button, Light, Midlight, Dark, Mid,
+# Text, BrightText, ButtonText, Base, Window, Shadow, Highlight, HighlightedText,
+# Link, LinkVisited, AlternateBase, NoRole, ToolTipBase, ToolTipText, PlaceholderText.
+{%- set fg = colors.fg.hex %}{% set bg = colors.bg.hex %}{% set surface = colors.surface.hex %}
+{%- set muted = colors.muted.hex %}{% set accent = colors.accent.hex %}
+[ColorScheme]
+active_colors={{ fg }}, {{ surface }}, {{ muted }}, {{ surface }}, {{ bg }}, {{ muted }}, {{ fg }}, #ffffff, {{ fg }}, {{ bg }}, {{ bg }}, #000000, {{ accent }}, {{ bg }}, {{ accent }}, {{ accent }}, {{ surface }}, #000000, {{ surface }}, {{ fg }}, {{ muted }}
+inactive_colors={{ fg }}, {{ surface }}, {{ muted }}, {{ surface }}, {{ bg }}, {{ muted }}, {{ fg }}, #ffffff, {{ fg }}, {{ bg }}, {{ bg }}, #000000, {{ accent }}, {{ bg }}, {{ accent }}, {{ accent }}, {{ surface }}, #000000, {{ surface }}, {{ fg }}, {{ muted }}
+disabled_colors={{ muted }}, {{ surface }}, {{ muted }}, {{ surface }}, {{ bg }}, {{ muted }}, {{ muted }}, #ffffff, {{ muted }}, {{ bg }}, {{ bg }}, #000000, {{ surface }}, {{ muted }}, {{ muted }}, {{ muted }}, {{ surface }}, #000000, {{ surface }}, {{ muted }}, {{ muted }}

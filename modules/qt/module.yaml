@@ -1,0 +1,16 @@
+# Модуль qt: цвета райса и иконки Papirus в Qt-программах (Telegram,
+# qBittorrent, KDE-программы), чтобы они не были светлыми и чужими.
+# Тему подхватывают через qt6ct: на это указывает переменная окружения.
+# Старые программы на Qt5 остаются как есть: почти все уже перешли на Qt6.
+id: qt
+role: qt
+packages: [qt6ct, papirus-icon-theme]
+templates:
+  - src: colors.conf.tera
+    dest: ~/.config/qt6ct/colors/plove.conf
+  - src: qt6ct.conf.tera
+    dest: ~/.config/qt6ct/qt6ct.conf
+env:
+  - "QT_QPA_PLATFORMTHEME,qt6ct"
+  # Без рамок от Qt: окна рисует Hyprland.
+  - "QT_WAYLAND_DISABLE_WINDOWDECORATION,1"

@@ -27,6 +27,7 @@ components:
   clipboard: cliphist
   polkit: hyprpolkitagent
   gtk: gtk
+  qt: qt
   files: thunar
   terminal_files: yazi
   images: imv

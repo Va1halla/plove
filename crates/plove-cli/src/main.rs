@@ -52,6 +52,12 @@ enum Command {
         #[arg(long)]
         skip_packages: bool,
     },
+    /// Быстро сменить райс: без вопросов и без установки пакетов.
+    /// Если райсу нужны программы, которых нет, подскажет `plove apply`
+    Switch {
+        /// Встроенный райс (см. `plove presets`) или путь к файлу .yaml
+        rice: String,
+    },
     /// Откатить последнее применение
     Rollback {
         /// Не спрашивать подтверждение
@@ -150,6 +156,32 @@ fn run(cli: Cli) -> Result<()> {
                 return Ok(());
             }
             apply_and_report(&plan, &env, skip_packages)?;
+        }
+        Command::Switch { rice } => {
+            let env = system_env()?;
+            let plan = plan::build(load_rice(&rice)?, &registry, &env)?;
+            // `Some(false)` — пакет точно не установлен; `None` (не Arch,
+            // песочница) не мешает: проверить нечем.
+            let missing: Vec<&str> = plan
+                .packages
+                .iter()
+                .filter(|p| p.installed == Some(false))
+                .map(|p| p.name.as_str())
+                .collect();
+            if !missing.is_empty() {
+                bail!(
+                    "для «{rice}» не хватает пакетов: {}. Поставьте их: plove apply {rice}",
+                    missing.join(", ")
+                );
+            }
+            for warning in &plan.warnings {
+                println!("! {warning}");
+            }
+            if plan.is_noop() {
+                println!("«{}» уже применён.", plan.spec.name);
+                return Ok(());
+            }
+            apply_and_report(&plan, &env, true)?;
         }
         Command::Rollback { yes } => {
             let env = system_env()?;

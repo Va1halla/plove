@@ -10,8 +10,8 @@ use anyhow::{anyhow, bail, Result};
 
 use crate::modules::{Module, Registry};
 use crate::render;
-use crate::state;
 use crate::spec::{RiceSpec, Wallpaper};
+use crate::state;
 use crate::system::{self, Env};
 use crate::theme::{font_package, theme_context};
 use crate::wallpaper;
@@ -177,6 +177,8 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         system::virtual_machine()
     };
     base.insert("vm", &vm);
+    // Домашняя папка: для программ, которые не понимают ~ в путях.
+    base.insert("home", &env.home.display().to_string());
     // Режим «выбрать из списка» у лаунчера. Нужен до команд запуска:
     // через него работает, например, меню выключения.
     // То же для «открыть программу в терминале».
@@ -207,6 +209,7 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
     // Автозапуск и горячие клавиши всех модулей: их собирает конфиг Hyprland.
     let mut autostart = Vec::new();
     let mut binds = Vec::new();
+    let session_env: Vec<&String> = modules.iter().flat_map(|m| &m.manifest.env).collect();
     // Клавиши, которые уже заняты самим конфигом Hyprland (см. hyprland.conf.tera).
     let mut taken_keys: BTreeMap<String, String> = ["Q", "V", "F"]
         .into_iter()
@@ -240,6 +243,7 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
     }
     base.insert("autostart", &autostart);
     base.insert("binds", &binds);
+    base.insert("session_env", &session_env);
 
     // 5. Рендерим конфиги и сравниваем с тем, что сейчас на диске.
     for module in &modules {

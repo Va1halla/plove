@@ -18,3 +18,9 @@ on_apply:
   - "gsettings set org.gnome.desktop.interface gtk-theme Adwaita-dark"
   - "gsettings set org.gnome.desktop.interface icon-theme Papirus-Dark"
   - "gsettings set org.gnome.desktop.interface font-name '{{ fonts.ui }} {{ fonts.size }}'"
+  - "gsettings set org.gnome.desktop.interface cursor-theme Adwaita"
+  - "gsettings set org.gnome.desktop.interface cursor-size 24"
+# Один курсор везде: в Hyprland, GTK и старых X11-программах.
+env:
+  - "XCURSOR_THEME,Adwaita"
+  - "XCURSOR_SIZE,24"
