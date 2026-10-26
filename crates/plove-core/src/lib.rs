@@ -16,6 +16,7 @@
 // `pub mod x;` подключает файл `x.rs` как модуль — примерно как
 // `import x` в Python или отдельный namespace в C#.
 pub mod apply;
+pub mod check;
 pub mod modules;
 pub mod plan;
 pub mod presets;

@@ -10,6 +10,7 @@ use std::process::ExitCode;
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use plove_core::apply::{self, ApplyOptions};
+use plove_core::check::{self, Check, Level, LiveProbe};
 use plove_core::modules::Registry;
 use plove_core::plan::{self, FileStatus, Plan};
 use plove_core::presets;
@@ -67,6 +68,12 @@ enum Command {
         #[arg(short, long, value_name = "ФАЙЛ")]
         output: Option<PathBuf>,
     },
+    /// Проверить, готова ли система к райсу
+    Doctor {
+        /// Исправить то, что можно исправить автоматически
+        #[arg(long)]
+        fix: bool,
+    },
     /// Показать встроенные модули
     Modules,
 }
@@ -104,6 +111,9 @@ fn run(cli: Cli) -> Result<()> {
             skip_packages,
         } => {
             let env = system_env()?;
+            if !env.sandbox {
+                preflight()?;
+            }
             let plan = plan::build(load_rice(&rice)?, &registry, &env)?;
             print_plan(&plan, &env);
             if plan.is_noop() || !(yes || confirm("Применить?")?) {
@@ -119,7 +129,10 @@ fn run(cli: Cli) -> Result<()> {
                 None => println!("Готово."),
             }
             if report.reloads_skipped {
-                println!("Графическая сессия не запущена: настройки подхватятся при старте Hyprland (start-hyprland).");
+                println!(
+                    "Графическая сессия не запущена: настройки подхватятся при старте Hyprland."
+                );
+                println!("Запустить: start-hyprland");
             }
             for command in report.failed_reloads {
                 println!("  не сработало «{command}» (программа, скорее всего, не запущена)");
@@ -181,6 +194,7 @@ fn run(cli: Cli) -> Result<()> {
             std::fs::write(&output, png)?;
             println!("Превью сохранено в {}", output.display());
         }
+        Command::Doctor { fix } => doctor(fix)?,
         Command::Modules => {
             for module in registry.iter() {
                 let m = &module.manifest;
@@ -194,6 +208,70 @@ fn run(cli: Cli) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// `plove doctor`: показать все проверки и, с `--fix`, починить что можно.
+fn doctor(fix: bool) -> Result<()> {
+    let checks = check::run_all(&LiveProbe);
+    for c in &checks {
+        print_check(c);
+    }
+    let fixable: Vec<&Check> = checks.iter().filter(|c| !c.fix.is_empty()).collect();
+    if fixable.is_empty() {
+        if !check::has_failures(&checks) {
+            println!("\nСистема готова.");
+        }
+        return Ok(());
+    }
+    if !fix {
+        println!("\nЧасть проблем можно исправить автоматически: plove doctor --fix");
+        return Ok(());
+    }
+    println!();
+    for c in &fixable {
+        println!("Исправляю: {}", c.title);
+        for command in &c.fix {
+            println!("  $ {}", command.join(" "));
+        }
+        check::apply_fix(c)?;
+    }
+    if fixable.iter().any(|c| c.needs_relogin) {
+        println!("\nГотово. Выйдите из системы (exit) и войдите заново, чтобы изменения групп вступили в силу.");
+    } else {
+        println!("\nГотово.");
+    }
+    Ok(())
+}
+
+/// Проверка системы перед `apply`: при серьёзных проблемах останавливаемся,
+/// о мелких предупреждаем.
+fn preflight() -> Result<()> {
+    let checks = check::run_all(&LiveProbe);
+    let problems: Vec<&Check> = checks.iter().filter(|c| c.level != Level::Ok).collect();
+    if problems.is_empty() {
+        return Ok(());
+    }
+    println!("Проверка системы:");
+    for c in &problems {
+        print_check(c);
+    }
+    if check::has_failures(&checks) {
+        bail!("система не готова. Подробнее: plove doctor");
+    }
+    if problems.iter().any(|c| !c.fix.is_empty()) {
+        println!("Исправить автоматически: plove doctor --fix");
+    }
+    println!();
+    Ok(())
+}
+
+fn print_check(c: &Check) {
+    let mark = match c.level {
+        Level::Ok => "✓",
+        Level::Warn => "!",
+        Level::Fail => "✗",
+    };
+    println!("  {mark} {:<24} {}", c.title, c.detail);
 }
 
 /// Райс по имени встроенного или по пути к файлу.
