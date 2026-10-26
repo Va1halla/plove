@@ -9,10 +9,14 @@ use std::path::PathBuf;
 use anyhow::{anyhow, bail, Result};
 
 use crate::modules::{Module, Registry};
-use crate::render::render_module;
-use crate::spec::RiceSpec;
+use crate::render;
+use crate::spec::{RiceSpec, Wallpaper};
 use crate::system::{self, Env};
 use crate::theme::{font_package, theme_context};
+use crate::wallpaper;
+
+/// Куда кладутся обои, нарисованные plove.
+pub const GENERATED_WALLPAPER: &str = "~/.local/share/plove/wallpaper.png";
 
 /// Что будет с файлом.
 // `enum` в Rust — как enum в C#, но варианты ещё и сравниваются через `==`
@@ -30,7 +34,8 @@ pub enum FileStatus {
 pub struct FileChange {
     pub path: PathBuf,
     pub status: FileStatus,
-    pub content: String,
+    /// Байты, а не текст: среди файлов бывают картинки (обои).
+    pub content: Vec<u8>,
 }
 
 pub struct PackageStatus {
@@ -119,37 +124,60 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         }
     }
 
-    // 3. Команды запуска по ролям, чтобы модули могли ссылаться друг на друга.
-    let apps: BTreeMap<String, String> = modules
-        .iter()
-        .filter_map(|m| Some((m.manifest.role.clone(), m.manifest.exec.clone()?)))
-        .collect();
-
-    // 4. Рендерим конфиги и сравниваем с тем, что сейчас на диске.
-    let theme = theme_context(&spec);
+    // 3. Обои: свой файл или нарисованные из палитры. Нужны, только если
+    //    в райсе есть компонент, который их показывает.
     let mut files: Vec<FileChange> = Vec::new();
+    let mut wallpaper_path = String::new();
+    match (
+        &spec.theme.wallpaper,
+        spec.components.contains_key("wallpaper"),
+    ) {
+        (None, _) => {}
+        (Some(_), false) => warnings.push(
+            "обои заданы, но в components нет wallpaper, поэтому они не применятся".to_string(),
+        ),
+        (Some(Wallpaper::File(file)), true) => {
+            let path = env.expand(file);
+            if !path.exists() {
+                warnings.push(format!("файл обоев {file} не найден"));
+            }
+            wallpaper_path = path.display().to_string();
+        }
+        (Some(Wallpaper::Generated { generate }), true) => {
+            let path = env.expand(GENERATED_WALLPAPER);
+            wallpaper_path = path.display().to_string();
+            let png = wallpaper::generate_png(*generate, &spec.theme.palette)?;
+            files.push(file_change(path, png));
+        }
+    }
+
+    // 4. Команды запуска по ролям, чтобы модули могли ссылаться друг на друга.
+    let theme = theme_context(&spec);
+    let base = render::base_context(&theme, &wallpaper_path)?;
+    let mut apps: BTreeMap<String, String> = BTreeMap::new();
+    for module in &modules {
+        if let Some(exec) = &module.manifest.exec {
+            let what = format!("{}/module.yaml (exec)", module.manifest.id);
+            apps.insert(
+                module.manifest.role.clone(),
+                render::render_str(exec, &base, &what)?,
+            );
+        }
+    }
+
+    // 5. Рендерим конфиги и сравниваем с тем, что сейчас на диске.
     for module in &modules {
         let options = module_options(module, spec.overrides.get(&module.manifest.id))?;
-        for rendered in render_module(module, &theme, &apps, &options)? {
+        for rendered in render::render_module(module, &base, &apps, &options)? {
             let path = env.expand(&rendered.dest);
             if files.iter().any(|f| f.path == path) {
                 bail!("два модуля пишут в один файл {}", rendered.dest);
             }
-            // read_to_string вернёт ошибку, если файла нет: `.ok()` превращает её в None.
-            let status = match std::fs::read_to_string(&path).ok() {
-                None => FileStatus::Create,
-                Some(current) if current == rendered.content => FileStatus::Unchanged,
-                Some(_) => FileStatus::Update,
-            };
-            files.push(FileChange {
-                path,
-                status,
-                content: rendered.content,
-            });
+            files.push(file_change(path, rendered.content.into_bytes()));
         }
     }
 
-    // 5. Пакеты: от модулей и от шрифтов. Без повторов, порядок сохраняем.
+    // 6. Пакеты: от модулей и от шрифтов. Без повторов, порядок сохраняем.
     let mut package_names: Vec<String> = Vec::new();
     for module in &modules {
         package_names.extend(module.manifest.packages.iter().cloned());
@@ -171,20 +199,21 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         }
     }
 
-    // 6. Файлы для ручных правок и команды перезагрузки.
+    // 7. Файлы для ручных правок и команды перезагрузки.
     let user_files = modules
         .iter()
         .flat_map(|m| &m.manifest.user_files)
         .map(|f| env.expand(f))
         .filter(|path| !path.exists())
         .collect();
-    let reloads = modules
-        .iter()
-        .filter_map(|m| m.manifest.reload.clone())
-        .collect();
-
-    if spec.theme.wallpaper.is_some() {
-        warnings.push("обои пока не применяются, это появится в следующей версии".to_string());
+    let mut reloads = Vec::new();
+    for module in &modules {
+        if let Some(reload) = &module.manifest.reload {
+            let mut context = base.clone();
+            context.insert("exec", &apps.get(&module.manifest.role));
+            let what = format!("{}/module.yaml (reload)", module.manifest.id);
+            reloads.push(render::render_str(reload, &context, &what)?);
+        }
     }
 
     Ok(Plan {
@@ -197,9 +226,24 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
     })
 }
 
+/// Сравнить новое содержимое файла с тем, что сейчас на диске.
+fn file_change(path: PathBuf, content: Vec<u8>) -> FileChange {
+    // fs::read вернёт ошибку, если файла нет: `.ok()` превращает её в None.
+    let status = match std::fs::read(&path).ok() {
+        None => FileStatus::Create,
+        Some(current) if current == content => FileStatus::Unchanged,
+        Some(_) => FileStatus::Update,
+    };
+    FileChange {
+        path,
+        status,
+        content,
+    }
+}
+
 /// Настройки модуля: его `defaults`, поверх которых наложены `overrides` из райса.
 /// Неизвестный ключ — ошибка, чтобы опечатка не терялась молча.
-fn module_options(
+pub fn module_options(
     module: &Module,
     overrides: Option<&serde_yaml::Mapping>,
 ) -> Result<serde_json::Value> {

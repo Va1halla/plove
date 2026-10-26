@@ -1,0 +1,22 @@
+# Nord: холодные северные тона, много воздуха между окнами.
+version: 1
+name: nord
+description: Холодные северные тона, большие отступы, спокойные холмы
+theme:
+  palette:
+    bg: "#2e3440"
+    fg: "#d8dee9"
+    accent: "#88c0d0"
+    ansi: ["#3b4252", "#bf616a", "#a3be8c", "#ebcb8b", "#81a1c1", "#b48ead", "#88c0d0", "#e5e9f0",
+           "#4c566a", "#bf616a", "#a3be8c", "#ebcb8b", "#81a1c1", "#b48ead", "#8fbcbb", "#eceff4"]
+  fonts: { ui: "Inter", mono: "Hack Nerd Font", size: 11 }
+  geometry: { gaps: 14, border: 2, radius: 12, opacity: 0.95 }
+  wallpaper: { generate: hills }
+components:
+  compositor: hyprland
+  bar: waybar
+  terminal: kitty
+  wallpaper: swaybg
+overrides:
+  hyprland: { animations: smooth, kb_layout: "us,ru" }
+  waybar: { floating: true, modules_center: [], modules_right: [pulseaudio, network, battery, clock] }

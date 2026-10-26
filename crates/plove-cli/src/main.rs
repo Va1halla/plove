@@ -7,11 +7,12 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use plove_core::apply::{self, ApplyOptions};
 use plove_core::modules::Registry;
 use plove_core::plan::{self, FileStatus, Plan};
+use plove_core::presets;
 use plove_core::spec::RiceSpec;
 use plove_core::state;
 use plove_core::system::Env;
@@ -34,13 +35,13 @@ struct Cli {
 enum Command {
     /// Показать, что изменит райс, ничего не меняя
     Plan {
-        /// Файл райса (.yaml)
-        spec: PathBuf,
+        /// Встроенный райс (см. `plove presets`) или путь к файлу .yaml
+        rice: String,
     },
     /// Применить райс
     Apply {
-        /// Файл райса (.yaml)
-        spec: PathBuf,
+        /// Встроенный райс (см. `plove presets`) или путь к файлу .yaml
+        rice: String,
         /// Не спрашивать подтверждение
         #[arg(short, long)]
         yes: bool,
@@ -56,6 +57,16 @@ enum Command {
     },
     /// Показать историю применений
     History,
+    /// Показать встроенные райсы
+    Presets,
+    /// Нарисовать превью райса в PNG
+    Preview {
+        /// Встроенный райс (см. `plove presets`) или путь к файлу .yaml
+        rice: String,
+        /// Куда сохранить картинку (по умолчанию <имя райса>.png)
+        #[arg(short, long, value_name = "ФАЙЛ")]
+        output: Option<PathBuf>,
+    },
     /// Показать встроенные модули
     Modules,
 }
@@ -79,16 +90,16 @@ fn run(cli: Cli) -> Result<()> {
     let registry = Registry::builtin()?;
 
     match cli.command {
-        Command::Plan { spec } => {
-            let plan = load_plan(&spec, &registry, &env)?;
+        Command::Plan { rice } => {
+            let plan = plan::build(load_rice(&rice)?, &registry, &env)?;
             print_plan(&plan, &env);
         }
         Command::Apply {
-            spec,
+            rice,
             yes,
             skip_packages,
         } => {
-            let plan = load_plan(&spec, &registry, &env)?;
+            let plan = plan::build(load_rice(&rice)?, &registry, &env)?;
             print_plan(&plan, &env);
             if plan.is_noop() || !(yes || confirm("Применить?")?) {
                 return Ok(());
@@ -143,6 +154,20 @@ fn run(cli: Cli) -> Result<()> {
                 );
             }
         }
+        Command::Presets => {
+            for spec in presets::all()? {
+                let description = spec.description.as_deref().unwrap_or("");
+                println!("{:<18} {description}", spec.name);
+            }
+            println!("\nПрименить: plove apply <имя>. Посмотреть: plove preview <имя>");
+        }
+        Command::Preview { rice, output } => {
+            let spec = load_rice(&rice)?;
+            let output = output.unwrap_or_else(|| PathBuf::from(format!("{}.png", spec.name)));
+            let png = plove_preview::render_png(&spec, &registry, &env)?;
+            std::fs::write(&output, png)?;
+            println!("Превью сохранено в {}", output.display());
+        }
         Command::Modules => {
             for module in registry.iter() {
                 let m = &module.manifest;
@@ -158,9 +183,23 @@ fn run(cli: Cli) -> Result<()> {
     Ok(())
 }
 
-fn load_plan(spec_path: &Path, registry: &Registry, env: &Env) -> Result<Plan> {
-    let spec = RiceSpec::load(spec_path)?;
-    plan::build(spec, registry, env)
+/// Райс по имени встроенного или по пути к файлу.
+/// Если файл с таким именем есть, он важнее встроенного райса.
+fn load_rice(rice: &str) -> Result<RiceSpec> {
+    let path = Path::new(rice);
+    if path.exists() {
+        return RiceSpec::load(path);
+    }
+    match presets::get(rice)? {
+        Some(spec) => Ok(spec),
+        None => {
+            let names: Vec<String> = presets::all()?.into_iter().map(|s| s.name).collect();
+            bail!(
+                "нет ни файла «{rice}», ни встроенного райса с таким именем. Встроенные: {}",
+                names.join(", ")
+            )
+        }
+    }
 }
 
 fn print_plan(plan: &Plan, env: &Env) {

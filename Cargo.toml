@@ -2,7 +2,7 @@
 # несколько проектов, которые собираются вместе.
 [workspace]
 resolver = "2"
-members = ["crates/plove-core", "crates/plove-cli"]
+members = ["crates/plove-core", "crates/plove-preview", "crates/plove-cli"]
 
 [workspace.package]
 version = "0.1.0"
@@ -16,8 +16,15 @@ serde_json = "1.0"
 serde_yaml = "0.9"
 tera = { version = "1.20", default-features = false }
 include_dir = "0.7"
+tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd", "png-format"] }
+fontdue = "0.9"
 clap = { version = "4.5", features = ["derive"] }
 tempfile = "3.10"
+
+# Библиотеки собираем с оптимизацией даже в debug: иначе рисование
+# обоев и превью в тестах идёт в десятки раз медленнее.
+[profile.dev.package."*"]
+opt-level = 2
 
 [profile.release]
 # Меньше и быстрее бинарник: удобно скачивать на чистую систему.

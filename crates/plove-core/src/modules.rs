@@ -25,6 +25,7 @@ pub struct Manifest {
     pub role: String,
     /// Команда запуска. Нужна другим модулям: например, Hyprland
     /// запускает панель и вешает терминал на Super+Enter.
+    /// Это тоже шаблон: может использовать `{{ wallpaper }}` и цвета темы.
     #[serde(default)]
     pub exec: Option<String>,
     /// Пакеты pacman, которые нужны модулю.
@@ -33,12 +34,14 @@ pub struct Manifest {
     /// С какими модулями других ролей совместим: роль → список id.
     #[serde(default)]
     pub compatible_with: BTreeMap<String, Vec<String>>,
+    #[serde(default)]
     pub templates: Vec<TemplateEntry>,
     /// Файлы для ручных правок пользователя. plove создаёт их пустыми
     /// и никогда не перезаписывает.
     #[serde(default)]
     pub user_files: Vec<String>,
     /// Команда, после которой программа перечитывает конфиг.
+    /// Шаблон, как и `exec`; внутри доступна `{{ exec }}` — готовая команда запуска.
     #[serde(default)]
     pub reload: Option<String>,
     /// Настройки, которые можно менять через `overrides`, и их значения по умолчанию.

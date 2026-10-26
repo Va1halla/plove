@@ -2,21 +2,27 @@
 
 Конструктор райсов для Arch Linux: описываешь рабочий стол одним YAML-файлом, plove ставит пакеты и пишет конфиги.
 
-> Ранняя версия: есть ядро и CLI, модули Hyprland, Waybar и kitty. Готовые райсы, превью и TUI-мастер появятся следом.
+> Ранняя версия: ядро, CLI, 4 готовых райса и превью. TUI-мастер появится следом.
 
 ## Быстрый старт
 
 ```sh
 cargo build --release
+# Готовые райсы:
+./target/release/plove presets
+# Нарисовать превью в tokyo-night.png:
+./target/release/plove preview tokyo-night
 # Посмотреть, что изменится, ничего не трогая:
-./target/release/plove plan examples/tokyo-night.yaml
+./target/release/plove plan tokyo-night
 # Попробовать в песочнице: всё пишется в /tmp/plove-test, система не меняется:
-./target/release/plove --root /tmp/plove-test apply examples/tokyo-night.yaml
+./target/release/plove --root /tmp/plove-test apply tokyo-night
 # На настоящей системе:
-./target/release/plove apply examples/tokyo-night.yaml
+./target/release/plove apply tokyo-night
 # Вернуть как было:
 ./target/release/plove rollback
 ```
+
+Вместо имени готового райса можно передать путь к своему файлу: `plove apply ~/my-rice.yaml`.
 
 Другие команды: `plove history` (история применений), `plove modules` (список модулей), `plove --help`.
 
@@ -29,7 +35,9 @@ rice.yaml ──► spec    разбор и проверка райса
           ──► state   история применений и откат
 ```
 
-- **Райс — это данные.** Всё описано в RiceSpec (`examples/tokyo-night.yaml`): дизайн-токены (цвета, шрифты, отступы) отдельно от компонентов (какие программы).
+- **Райс — это данные.** Всё описано в RiceSpec (например, `presets/tokyo-night.yaml`): дизайн-токены (цвета, шрифты, отступы) отдельно от компонентов (какие программы).
+- **Готовые райсы** лежат в `presets/` и вшиты в бинарник. Обои для них plove рисует сам из палитры (`wallpaper: { generate: hills | waves | rings }`), поэтому никаких проблем с лицензиями на картинки.
+- **Превью** (`plove preview`) — макет из слоёв: обои, окна kitty с размытием и панель Waybar в цветах и геометрии райса. Это не скриншот: шрифт в превью один, содержимое окон выдумано.
 - **Модуль = папка** в `modules/`: `module.yaml` плюс шаблоны конфигов на [Tera](https://keats.github.io/tera/) (синтаксис как у Jinja2). Новая программа добавляется новой папкой, ядро не меняется.
 - **Сначала план, потом действие.** `plan` ничего не меняет. `apply` показывает план и спрашивает подтверждение.
 - **Безопасный откат.** Перед записью plove сохраняет старые файлы в `~/.local/state/plove/generations/`. `plove rollback` возвращает их.
@@ -46,9 +54,12 @@ rice.yaml ──► spec    разбор и проверка райса
 | `crates/plove-core/src/apply.rs` | применение плана |
 | `crates/plove-core/src/state.rs` | история и откат |
 | `crates/plove-core/src/system.rs` | пути, pacman, запуск команд |
+| `crates/plove-core/src/presets.rs` | встроенные райсы |
+| `crates/plove-core/src/wallpaper.rs` | обои, нарисованные из палитры |
+| `crates/plove-preview/src/lib.rs` | превью райса |
 | `crates/plove-cli/src/main.rs` | командная строка |
 | `modules/` | модули программ |
-| `examples/` | примеры райсов |
+| `presets/` | готовые райсы |
 
 Тесты: `cargo test`.
 
