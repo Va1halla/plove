@@ -1,0 +1,10 @@
+# Модуль hyprpicker: пипетка. Super+Shift+C — кликнуть в любое место
+# экрана, цвет (#rrggbb) копируется в буфер обмена.
+id: hyprpicker
+role: picker
+exec: hyprpicker -a -f hex
+packages: [hyprpicker, wl-clipboard]
+compatible_with:
+  compositor: [hyprland]
+binds:
+  - "$mod SHIFT, C, exec, {{ exec }}"

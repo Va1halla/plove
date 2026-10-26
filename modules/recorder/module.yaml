@@ -1,0 +1,12 @@
+# Модуль recorder: запись экрана. Super+Shift+R — выделить область и начать,
+# ещё раз Super+Shift+R — остановить. Видео в ~/Videos.
+# Без переменных $x: Hyprland принял бы их за свои.
+id: recorder
+role: recorder
+exec: >-
+  pkill -INT -x wf-recorder && notify-send 'Запись сохранена' 'в ~/Videos' ||
+  { mkdir -p ~/Videos; notify-send 'Запись' 'Выделите область. Остановить — Super+Shift+R';
+  wf-recorder -g "$(slurp)" -f ~/Videos/$(date +%F_%H-%M-%S).mp4; }
+packages: [wf-recorder, slurp, libnotify]
+binds:
+  - "$mod SHIFT, R, exec, {{ exec }}"

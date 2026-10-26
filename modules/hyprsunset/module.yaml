@@ -1,0 +1,20 @@
+# Модуль hyprsunset: ночной режим — вечером экран становится тёплым,
+# чтобы не резал глаза, утром возвращается обычный цвет.
+id: hyprsunset
+role: nightlight
+exec: hyprsunset
+packages: [hyprsunset]
+compatible_with:
+  compositor: [hyprland]
+templates:
+  - src: hyprsunset.conf.tera
+    dest: ~/.config/hypr/hyprsunset.conf
+autostart: true
+process: hyprsunset
+reload: "pkill -x hyprsunset; setsid -f hyprsunset >/dev/null 2>&1"
+defaults:
+  # Когда включать и выключать тёплый режим.
+  evening: "21:00"
+  morning: "7:00"
+  # Температура вечером в кельвинах: чем меньше, тем теплее (обычный цвет — 6500).
+  temperature: 4500

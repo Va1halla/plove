@@ -1,0 +1,10 @@
+# Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+profile {
+    time = {{ options.morning }}
+    identity = true
+}
+
+profile {
+    time = {{ options.evening }}
+    temperature = {{ options.temperature }}
+}

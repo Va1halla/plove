@@ -35,6 +35,10 @@ components:
   fetch: fastfetch
   monitor: btop
   editor: neovim
+  nightlight: hyprsunset
+  recorder: recorder
+  picker: hyprpicker
+  emoji: rofimoji
 overrides:
   hyprland: { animations: smooth, kb_layout: "us,ru" }
   waybar: { position: bottom, floating: true }

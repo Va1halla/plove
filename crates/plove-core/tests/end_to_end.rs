@@ -37,7 +37,7 @@ fn apply_is_idempotent_and_rollback_restores() {
     // Первое применение: все конфиги новые, kitty и ~/.zshrc меняются.
     let first = plan::build(example_spec(), &registry, &env).unwrap();
     assert!(first.warnings.iter().all(|w| !w.contains("занята")));
-    assert_eq!(first.changed_files().len(), 28);
+    assert_eq!(first.changed_files().len(), 29);
     let report = apply(&first, &env, &options).unwrap();
     assert_eq!(report.generation, Some(1));
 

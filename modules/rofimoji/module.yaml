@@ -1,0 +1,12 @@
+# Модуль rofimoji: выбор эмодзи и спецсимволов через лаунчер (Super+.).
+# Выбранный символ копируется в буфер обмена.
+id: rofimoji
+role: emoji
+exec: "rofimoji --selector {{ dmenu | split(pat=' ') | first }} --action copy"
+# Может оказаться и в репозитории: paru поставит его в любом случае.
+aur: [rofimoji]
+packages: [wl-clipboard]
+compatible_with:
+  launcher: [fuzzel, rofi]
+binds:
+  - "$mod, period, exec, {{ exec }}"
