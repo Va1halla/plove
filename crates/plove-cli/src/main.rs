@@ -7,14 +7,15 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use plove_core::apply::{self, ApplyOptions};
 use plove_core::check::{self, Check, Level, LiveProbe};
 use plove_core::modules::Registry;
+use plove_core::palette;
 use plove_core::plan::{self, FileStatus, Plan};
 use plove_core::presets;
-use plove_core::spec::RiceSpec;
+use plove_core::spec::{Color, RiceSpec, Wallpaper};
 use plove_core::state;
 use plove_core::system::Env;
 
@@ -66,6 +67,17 @@ enum Command {
         /// Встроенный райс (см. `plove presets`) или путь к файлу .yaml
         rice: String,
         /// Куда сохранить картинку (по умолчанию <имя райса>.png)
+        #[arg(short, long, value_name = "ФАЙЛ")]
+        output: Option<PathBuf>,
+    },
+    /// Сделать свой райс из картинки: цвета подбираются по обоям
+    New {
+        /// Обои: PNG, JPEG или WebP
+        image: PathBuf,
+        /// Встроенный райс, из которого берутся шрифты, отступы и панель
+        #[arg(long, default_value = "tokyo-night")]
+        base: String,
+        /// Куда сохранить райс (по умолчанию <имя картинки>.yaml)
         #[arg(short, long, value_name = "ФАЙЛ")]
         output: Option<PathBuf>,
     },
@@ -198,6 +210,11 @@ fn run(cli: Cli) -> Result<()> {
             std::fs::write(&output, png)?;
             println!("Превью сохранено в {}", output.display());
         }
+        Command::New {
+            image,
+            base,
+            output,
+        } => new_from_wallpaper(&image, &base, output)?,
         Command::Doctor { fix } => doctor(fix)?,
         Command::Modules => {
             for module in registry.iter() {
@@ -301,6 +318,61 @@ fn print_check(c: &Check) {
 
 /// Райс по имени встроенного или по пути к файлу.
 /// Если файл с таким именем есть, он важнее встроенного райса.
+/// `plove new`: взять готовый райс и перекрасить его в цвета картинки.
+fn new_from_wallpaper(image: &Path, base: &str, output: Option<PathBuf>) -> Result<()> {
+    let image = image
+        .canonicalize()
+        .with_context(|| format!("картинка {} не найдена", image.display()))?;
+    let palette = palette::from_image(&image)?;
+    let name = image
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().to_lowercase().replace(' ', "-"))
+        .unwrap_or_else(|| "my-rice".into());
+
+    let mut spec = load_rice(base)?;
+    spec.description = Some(format!(
+        "Цвета из обоев {}, остальное из {}",
+        image.display(),
+        spec.name
+    ));
+    spec.name = name;
+    spec.theme.palette = palette;
+    // В райсе путь лучше хранить через «~/»: так файл можно перенести
+    // на другую машину с другим именем пользователя.
+    let home = PathBuf::from(std::env::var_os("HOME").unwrap_or_default());
+    let wallpaper = match image.strip_prefix(&home) {
+        Ok(rest) if !home.as_os_str().is_empty() => format!("~/{}", rest.display()),
+        _ => image.display().to_string(),
+    };
+    spec.theme.wallpaper = Some(Wallpaper::File(wallpaper));
+    spec.validate()?;
+
+    let output = output.unwrap_or_else(|| PathBuf::from(format!("{}.yaml", spec.name)));
+    let header = format!(
+        "# Сделано командой `plove new` из {}.\n# Файл можно править руками.\n",
+        image.display()
+    );
+    std::fs::write(&output, header + &spec.to_yaml()?)
+        .with_context(|| format!("не удалось записать {}", output.display()))?;
+
+    let p = &spec.theme.palette;
+    println!("Палитра из {}:", image.display());
+    println!("  фон     {} {}", swatch(p.bg), p.bg.hex());
+    println!("  текст   {} {}", swatch(p.fg), p.fg.hex());
+    println!("  акцент  {} {}", swatch(p.accent), p.accent.hex());
+    let ansi: String = p.ansi.iter().map(|&c| swatch(c)).collect();
+    println!("  терминал {ansi}");
+    println!("\nРайс сохранён в {}. Дальше:", output.display());
+    println!("  plove preview {}   # посмотреть", output.display());
+    println!("  plove apply {}     # применить", output.display());
+    Ok(())
+}
+
+/// Цветной квадратик в терминале (24-битный цвет, его понимают kitty и TTY с fbterm).
+fn swatch(c: Color) -> String {
+    format!("\x1b[48;2;{};{};{}m   \x1b[0m", c.r, c.g, c.b)
+}
+
 fn load_rice(rice: &str) -> Result<RiceSpec> {
     let path = Path::new(rice);
     if path.exists() {

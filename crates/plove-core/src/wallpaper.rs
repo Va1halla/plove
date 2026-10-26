@@ -41,6 +41,26 @@ pub fn generate_png(pattern: Pattern, palette: &Palette) -> Result<Vec<u8>> {
         .map_err(|e| anyhow!("не удалось сохранить обои в PNG: {e}"))
 }
 
+/// Открыть свои обои (PNG, JPEG или WebP) как холст tiny-skia.
+pub fn load(path: &std::path::Path) -> Result<Pixmap> {
+    let image = image::open(path)
+        .map_err(|e| anyhow!("не удалось открыть {}: {e}", path.display()))?
+        .to_rgba8();
+    let (width, height) = image.dimensions();
+    // tiny-skia хранит цвета, уже умноженные на прозрачность
+    // («premultiplied alpha»), поэтому пересчитываем каждую точку.
+    let mut data = image.into_raw();
+    for pixel in data.chunks_exact_mut(4) {
+        let alpha = pixel[3] as u16;
+        for channel in &mut pixel[..3] {
+            *channel = ((*channel as u16 * alpha + 127) / 255) as u8;
+        }
+    }
+    let size =
+        tiny_skia::IntSize::from_wh(width, height).ok_or_else(|| anyhow!("пустая картинка"))?;
+    Pixmap::from_vec(data, size).ok_or_else(|| anyhow!("не удалось прочитать {}", path.display()))
+}
+
 /// Ночное небо, луна, звёзды и четыре слоя холмов: дальние светлее, ближние темнее.
 fn hills(canvas: &mut Pixmap, p: &Palette) {
     let (w, h) = (canvas.width() as f32, canvas.height() as f32);
