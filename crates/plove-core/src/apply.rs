@@ -79,7 +79,7 @@ pub fn apply(plan: &Plan, env: &Env, options: &ApplyOptions) -> Result<ApplyRepo
 /// Записать файл «атомарно»: сначала во временный файл рядом, потом
 /// переименовать. Если запись прервётся, старый конфиг останется целым,
 /// а не обрезанным наполовину.
-fn write_atomic(path: &Path, content: &str) -> Result<()> {
+fn write_atomic(path: &Path, content: &[u8]) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }

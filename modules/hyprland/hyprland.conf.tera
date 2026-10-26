@@ -4,6 +4,8 @@
 
 monitor = , preferred, auto, 1
 
+{% if apps.wallpaper %}exec-once = {{ apps.wallpaper }}
+{% endif -%}
 {% if apps.bar %}exec-once = {{ apps.bar }}
 {% endif %}
 general {

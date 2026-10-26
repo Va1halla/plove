@@ -22,6 +22,9 @@ pub const CURRENT_VERSION: u32 = 1;
 pub struct RiceSpec {
     pub version: u32,
     pub name: String,
+    /// Короткое описание для списка райсов.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     pub theme: Theme,
     /// Роль → id модуля, например `bar: waybar`.
     /// BTreeMap — отсортированный словарь (как SortedDictionary в C#),
@@ -40,9 +43,34 @@ pub struct Theme {
     pub fonts: Fonts,
     #[serde(default)]
     pub geometry: Geometry,
-    /// Путь к обоям. В этой версии ещё не применяется.
-    #[serde(default)]
-    pub wallpaper: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wallpaper: Option<Wallpaper>,
+}
+
+/// Обои: свой файл или картинка, нарисованная из палитры.
+///
+/// `untagged` значит, что serde сам угадывает вариант по виду значения:
+/// строка → `File`, словарь с ключом `generate` → `Generated`.
+/// В C# это было бы похоже на два класса-наследника с общим базовым.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum Wallpaper {
+    /// `wallpaper: { generate: hills }`
+    Generated { generate: Pattern },
+    /// `wallpaper: ~/Pictures/wall.png`
+    File(String),
+}
+
+/// Узор сгенерированных обоев.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Pattern {
+    /// Слои холмов под ночным небом.
+    Hills,
+    /// Волны снизу экрана.
+    Waves,
+    /// Концентрические кольца.
+    Rings,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

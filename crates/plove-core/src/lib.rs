@@ -18,8 +18,10 @@
 pub mod apply;
 pub mod modules;
 pub mod plan;
+pub mod presets;
 pub mod render;
 pub mod spec;
 pub mod state;
 pub mod system;
 pub mod theme;
+pub mod wallpaper;

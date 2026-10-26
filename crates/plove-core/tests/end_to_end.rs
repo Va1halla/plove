@@ -2,18 +2,17 @@
 //! Запуск: `cargo test`.
 
 use std::fs;
-use std::path::Path;
 
 use plove_core::apply::{apply, ApplyOptions};
 use plove_core::modules::Registry;
 use plove_core::plan::{self, FileStatus};
+use plove_core::presets;
 use plove_core::spec::RiceSpec;
 use plove_core::state;
 use plove_core::system::Env;
 
 fn example_spec() -> RiceSpec {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/tokyo-night.yaml");
-    RiceSpec::load(&path).unwrap()
+    presets::get("tokyo-night").unwrap().unwrap()
 }
 
 #[test]
@@ -31,9 +30,9 @@ fn apply_is_idempotent_and_rollback_restores() {
     fs::create_dir_all(kitty.parent().unwrap()).unwrap();
     fs::write(&kitty, "font_size 20\n").unwrap();
 
-    // Первое применение: hyprland и waybar новые, kitty меняется.
+    // Первое применение: обои, hyprland и waybar новые, kitty меняется.
     let first = plan::build(example_spec(), &registry, &env).unwrap();
-    assert_eq!(first.changed_files().len(), 4);
+    assert_eq!(first.changed_files().len(), 5);
     let report = apply(&first, &env, &options).unwrap();
     assert_eq!(report.generation, Some(1));
 
@@ -41,6 +40,11 @@ fn apply_is_idempotent_and_rollback_restores() {
     assert!(hypr.contains("col.active_border = rgb(7aa2f7)"));
     assert!(hypr.contains("bind = $mod, Return, exec, kitty"));
     assert!(hypr.contains("kb_layout = us,ru"));
+    assert!(hypr.contains("exec-once = swaybg -m fill -i"));
+    assert!(home
+        .path()
+        .join(".local/share/plove/wallpaper.png")
+        .exists());
     assert!(fs::read_to_string(&kitty)
         .unwrap()
         .contains("color15 #c0caf5"));
@@ -80,4 +84,21 @@ fn incompatible_and_unknown_are_rejected() {
         .insert("positon".into(), "bottom".into());
     let error = plan::build(spec, &registry, &env).err().unwrap();
     assert!(error.to_string().contains("positon"));
+}
+
+#[test]
+fn all_presets_build() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let all = presets::all().unwrap();
+    assert_eq!(all.len(), 4);
+    for spec in all {
+        let name = spec.name.clone();
+        let plan = plan::build(spec, &registry, &env).unwrap_or_else(|e| panic!("{name}: {e:#}"));
+        assert!(
+            plan.warnings.iter().all(|w| !w.contains("components")),
+            "{name}"
+        );
+    }
 }

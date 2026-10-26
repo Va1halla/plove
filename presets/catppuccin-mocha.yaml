@@ -1,0 +1,22 @@
+# Catppuccin Mocha: мягкие пастельные цвета, плавные анимации.
+version: 1
+name: catppuccin-mocha
+description: Пастельные цвета, мягкие скругления, волны и панель снизу
+theme:
+  palette:
+    bg: "#1e1e2e"
+    fg: "#cdd6f4"
+    accent: "#cba6f7"
+    ansi: ["#45475a", "#f38ba8", "#a6e3a1", "#f9e2af", "#89b4fa", "#f5c2e7", "#94e2d5", "#bac2de",
+           "#585b70", "#f38ba8", "#a6e3a1", "#f9e2af", "#89b4fa", "#f5c2e7", "#94e2d5", "#a6adc8"]
+  fonts: { ui: "Inter", mono: "FiraCode Nerd Font", size: 11 }
+  geometry: { gaps: 10, border: 2, radius: 14, opacity: 0.94 }
+  wallpaper: { generate: waves }
+components:
+  compositor: hyprland
+  bar: waybar
+  terminal: kitty
+  wallpaper: swaybg
+overrides:
+  hyprland: { animations: smooth, kb_layout: "us,ru" }
+  waybar: { position: bottom, floating: true }

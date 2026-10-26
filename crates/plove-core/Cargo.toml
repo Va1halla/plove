@@ -12,6 +12,7 @@ serde_json.workspace = true
 serde_yaml.workspace = true
 tera.workspace = true
 include_dir.workspace = true
+tiny-skia.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

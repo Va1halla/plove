@@ -1,0 +1,12 @@
+# Модуль swaybg: показывает обои под окнами.
+# Своих конфигов у него нет: путь к картинке передаётся в командной строке.
+id: swaybg
+role: wallpaper
+# Без обоев в райсе просто заливаем экран цветом фона.
+# Цвет пишем без «#»: в конфиге Hyprland «#» начинает комментарий.
+exec: "{% if wallpaper %}swaybg -m fill -i '{{ wallpaper }}'{% else %}swaybg -c {{ colors.bg.raw }}{% endif %}"
+packages: [swaybg]
+compatible_with:
+  compositor: [hyprland]
+# swaybg не умеет перечитывать картинку, поэтому перезапускаем его.
+reload: "pkill -x swaybg; setsid -f {{ exec }} >/dev/null 2>&1"
