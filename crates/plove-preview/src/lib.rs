@@ -10,7 +10,7 @@
 //! отступы, скругления, прозрачность и расположение панели совпадают,
 //! но шрифт один на всё превью (JetBrains Mono), а содержимое окон выдумано.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use fontdue::{Font, FontSettings};
 use plove_core::modules::Registry;
 use plove_core::plan::module_options;
@@ -114,9 +114,7 @@ fn background(spec: &RiceSpec, env: &Env) -> Result<Pixmap> {
         }
         (Some(Wallpaper::File(file)), true) => {
             let path = env.expand(file);
-            let image = Pixmap::load_png(&path).with_context(|| {
-                format!("не удалось открыть обои {file} (превью пока понимает только PNG)")
-            })?;
+            let image = wallpaper::load(&path)?;
             Ok(cover(&image))
         }
         // Обоев нет: swaybg или Hyprland покажут сплошной цвет фона.

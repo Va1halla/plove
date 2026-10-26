@@ -38,6 +38,18 @@ cargo build --release
 
 Вместо имени готового райса можно передать путь к своему файлу: `plove apply ~/my-rice.yaml`.
 
+### Свой райс из обоев
+
+```sh
+# Подобрать цвета по картинке (PNG, JPEG, WebP) и сохранить райс в my-wall.yaml.
+# Шрифты, отступы и панель берутся из готового райса (--base, по умолчанию tokyo-night):
+./target/release/plove new ~/Pictures/my-wall.jpg --base nord
+./target/release/plove preview my-wall.yaml
+./target/release/plove apply my-wall.yaml
+```
+
+Тема всегда получается тёмной. Цвета подбираются автоматически, а файл райса можно поправить руками.
+
 Другие команды: `plove history` (история применений), `plove modules` (список модулей), `plove --help`.
 
 ## Как это работает
@@ -70,6 +82,7 @@ rice.yaml ──► spec    разбор и проверка райса
 | `crates/plove-core/src/system.rs` | пути, pacman, запуск команд |
 | `crates/plove-core/src/presets.rs` | встроенные райсы |
 | `crates/plove-core/src/wallpaper.rs` | обои, нарисованные из палитры |
+| `crates/plove-core/src/palette.rs` | палитра из своих обоев (`plove new`) |
 | `crates/plove-preview/src/lib.rs` | превью райса |
 | `crates/plove-core/src/check.rs` | проверка системы (`plove doctor`) |
 | `crates/plove-tui/src/lib.rs` | мастер в терминале |

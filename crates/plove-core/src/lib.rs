@@ -18,6 +18,7 @@
 pub mod apply;
 pub mod check;
 pub mod modules;
+pub mod palette;
 pub mod plan;
 pub mod presets;
 pub mod render;
