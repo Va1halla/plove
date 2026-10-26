@@ -48,8 +48,13 @@ pub struct Manifest {
     #[serde(default)]
     pub reload: Option<String>,
     /// Настройки, которые можно менять через `overrides`, и их значения по умолчанию.
+    /// Значения из `settings` при загрузке тоже попадают сюда.
     #[serde(default)]
     pub defaults: serde_yaml::Mapping,
+    /// Описанные настройки: название, пояснение, границы. По ним мастер
+    /// строит экран настроек, а план проверяет значения из райса.
+    #[serde(default)]
+    pub settings: Vec<Setting>,
     /// Запускать `exec` вместе с Hyprland (exec-once): панель, обои, демоны.
     #[serde(default)]
     pub autostart: bool,
@@ -102,6 +107,115 @@ pub struct EnsureLine {
     /// вместо init.lua: Neovim не любит оба сразу).
     #[serde(default)]
     pub unless_exists: Option<String>,
+}
+
+/// Одна описанная настройка модуля.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Setting {
+    /// Ключ в `overrides`, например `blur_size`.
+    pub id: String,
+    /// Группа на экране настроек: «Эффекты», «Окна»…
+    pub group: String,
+    pub title: String,
+    /// Пояснение в одно-два предложения.
+    #[serde(default)]
+    pub about: String,
+    pub default: serde_yaml::Value,
+    /// Для чисел: наименьшее и наибольшее значение.
+    #[serde(default)]
+    pub range: Option<[f64; 2]>,
+    /// Для чисел: шаг ползунка (по умолчанию 1).
+    #[serde(default)]
+    pub step: Option<f64>,
+    /// Для выбора из списка: допустимые значения.
+    #[serde(default)]
+    pub choices: Vec<String>,
+}
+
+/// Какого вида настройка: от этого зависит, как её показывать и проверять.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingKind {
+    Switch,
+    Number,
+    Choice,
+    /// Список или строка без ограничений: меняется только в файле райса.
+    Other,
+}
+
+impl Setting {
+    pub fn kind(&self) -> SettingKind {
+        if !self.choices.is_empty() {
+            SettingKind::Choice
+        } else if self.range.is_some() {
+            SettingKind::Number
+        } else if self.default.is_bool() {
+            SettingKind::Switch
+        } else {
+            SettingKind::Other
+        }
+    }
+
+    /// Проверить значение из райса. Ошибка объясняет, что не так и что можно.
+    pub fn check(&self, value: &serde_yaml::Value) -> Result<()> {
+        match self.kind() {
+            SettingKind::Switch if !value.is_bool() => {
+                bail!("«{}» — это вкл/выкл: true или false", self.title)
+            }
+            SettingKind::Choice => {
+                let ok = value
+                    .as_str()
+                    .is_some_and(|v| self.choices.iter().any(|c| c == v));
+                if !ok {
+                    bail!("«{}»: можно {}", self.title, self.choices.join(", "));
+                }
+            }
+            SettingKind::Number => {
+                let [min, max] = self.range.unwrap_or([f64::MIN, f64::MAX]);
+                match value.as_f64() {
+                    Some(v) if (min..=max).contains(&v) => {}
+                    _ => bail!("«{}»: число от {min} до {max}", self.title),
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Следующее (или предыдущее) значение: для стрелок ←→ в мастере.
+    pub fn step_value(&self, value: &serde_yaml::Value, forward: bool) -> serde_yaml::Value {
+        use serde_yaml::Value;
+        match self.kind() {
+            SettingKind::Switch => Value::Bool(!value.as_bool().unwrap_or(false)),
+            SettingKind::Choice => {
+                let n = self.choices.len();
+                let i = value
+                    .as_str()
+                    .and_then(|v| self.choices.iter().position(|c| c == v))
+                    .unwrap_or(0);
+                let next = if forward {
+                    (i + 1) % n
+                } else {
+                    (i + n - 1) % n
+                };
+                Value::String(self.choices[next].clone())
+            }
+            SettingKind::Number => {
+                let [min, max] = self.range.unwrap_or([0.0, 0.0]);
+                let step = self.step.unwrap_or(1.0);
+                let v = value.as_f64().unwrap_or(min);
+                let next = if forward { v + step } else { v - step }.clamp(min, max);
+                // Целые остаются целыми: `6`, а не `6.0` в файле райса.
+                let whole = step.fract() == 0.0 && min.fract() == 0.0;
+                if whole {
+                    Value::Number((next.round() as i64).into())
+                } else {
+                    Value::Number(((next * 100.0).round() / 100.0).into())
+                }
+            }
+            SettingKind::Other => value.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -170,7 +284,23 @@ fn load_module(dir: &'static Dir<'static>) -> Result<Module> {
     let text = manifest_file
         .contents_utf8()
         .ok_or_else(|| anyhow!("module.yaml не в UTF-8"))?;
-    let manifest: Manifest = serde_yaml::from_str(text)?;
+    let mut manifest: Manifest = serde_yaml::from_str(text)?;
+    // Значения описанных настроек — те же defaults: шаблонам всё равно,
+    // откуда пришло значение.
+    for setting in &manifest.settings {
+        if manifest.defaults.contains_key(setting.id.as_str()) {
+            bail!(
+                "настройка {} описана и в defaults, и в settings",
+                setting.id
+            );
+        }
+        setting
+            .check(&setting.default)
+            .with_context(|| format!("значение по умолчанию у {}", setting.id))?;
+        manifest
+            .defaults
+            .insert(setting.id.clone().into(), setting.default.clone());
+    }
 
     let dir_name = dir
         .path()
@@ -197,4 +327,15 @@ fn load_module(dir: &'static Dir<'static>) -> Result<Module> {
         module.template(&t.src)?;
     }
     Ok(module)
+}
+
+/// Значение настройки одной строкой: `true`, `0.15`, `us,ru`, `[]`.
+pub fn show_value(value: &serde_yaml::Value) -> String {
+    match value {
+        serde_yaml::Value::String(s) => s.clone(),
+        other => serde_yaml::to_string(other)
+            .unwrap_or_default()
+            .trim()
+            .to_string(),
+    }
 }

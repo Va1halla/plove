@@ -72,6 +72,23 @@ theme:
 
 Состав панели задаётся в `overrides.waybar`: `modules_left`, `modules_center`, `modules_right` из launcher, workspaces, window, clock, media, cpu, memory, backlight, pulseaudio, network, battery, language, tray, power. Панель можно поставить и вертикально: `position: left`.
 
+## Тонкая настройка программ
+
+У программ есть описанные настройки: что делает каждая, какие значения можно, что по умолчанию. В мастере (`plove`) это экран «Тонкая настройка»: слева программы райса, справа их настройки по группам — переключатели, списки и ползунки меняются стрелками ←→, под выбранной строкой пояснение. То же списком в терминале:
+
+```sh
+plove modules hyprland   # размытие, тени, анимации, раскладка окон, тачпад, мониторы…
+plove modules waybar     # положение, часы, рабочие столы, модули
+```
+
+В файле райса это `overrides`, plove проверяет значения и границы до применения:
+
+```yaml
+overrides:
+  hyprland: { blur_size: 10, dim_inactive: true, window_animation: slide }
+  waybar: { clock_seconds: true, workspace_count: 0 }
+```
+
 ## Что входит в готовые райсы
 
 Райсы отличаются не только цветами, но и набором программ:

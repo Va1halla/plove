@@ -18,6 +18,9 @@
 {%- else -%}{{ glyph }} {{ word }} {{ value }}{%- endif -%}
 {%- endmacro label %}
 {%- set floats = style.bar != "solid" or options.floating %}
+{%- set date = "" %}{% if options.clock_date %}{% set date = "%d.%m  " %}{% endif %}
+{%- set seconds = "" %}{% if options.clock_seconds %}{% set seconds = ":%S" %}{% endif %}
+{%- set clock = "{:" ~ date ~ "%H:%M" ~ seconds ~ "}" %}
 {%- set vertical = options.position == "left" or options.position == "right" %}
 {
   "layer": "top",
@@ -51,11 +54,19 @@
 {%- endif %}{% endfor %}{% endif %}
 {%- endfor %}
 
-  "hyprland/workspaces": { "format": "{id}" },
-  "hyprland/window": { "max-length": 40, "separate-outputs": true },
+  "hyprland/workspaces": {
+    "format": "{id}"
+{%- if options.workspace_count > 0 %},
+    "persistent-workspaces": { "*": {{ options.workspace_count }} }
+{%- endif %}
+  },
+  "hyprland/window": { "max-length": {{ options.window_length }}, "separate-outputs": true },
   "hyprland/language": { "format": "{{ self::label(glyph="󰌌", word="", value="{short}") }}" },
   "clock": {
-    "format": "{{ self::label(glyph="󰅐", word="", value="{:%H:%M}") | trim }}",
+{%- if options.clock_seconds %}
+    "interval": 1,
+{%- endif %}
+    "format": "{{ self::label(glyph="󰅐", word="", value=clock) | trim }}",
     "tooltip-format": "<big>{:%d.%m.%Y}</big>\n<tt>{calendar}</tt>"
   },
   "cpu": { "format": "{{ self::label(glyph="󰻠", word="cpu", value="{usage}%") }}", "interval": 3 },

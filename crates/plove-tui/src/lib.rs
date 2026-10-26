@@ -1,12 +1,13 @@
 //! TUI-мастер: `plove` без аргументов.
 //!
-//! Четыре экрана по порядку:
+//! Пять экранов по порядку:
 //!
 //! ```text
 //! 1. Проверка   — готова ли система (то же, что plove doctor)
 //! 2. Райс       — выбор готового райса
-//! 3. Настройки  — раскладка, положение и вид панели
-//! 4. План       — что будет установлено и записано
+//! 3. Настройки  — раскладка, положение панели, выбор программ
+//! 4. Тонкая     — все описанные настройки каждой программы с пояснениями
+//! 5. План       — что будет установлено и записано
 //! ```
 //!
 //! Мастер сам ничего не применяет: он возвращает выбранный райс, а
@@ -21,7 +22,9 @@ use std::io;
 
 use anyhow::Result;
 use plove_core::check::{self, Check, Level, LiveProbe, Probe};
-use plove_core::modules::Registry;
+use std::collections::BTreeMap;
+
+use plove_core::modules::{show_value, Registry, Setting, SettingKind};
 use plove_core::plan::{self, FileStatus, Plan};
 use plove_core::presets;
 use plove_core::spec::{Color as SpecColor, RiceSpec};
@@ -109,17 +112,25 @@ enum Step {
     Checks,
     Rice,
     Settings,
+    Tune,
     Plan,
 }
 
 impl Step {
-    const ALL: [Step; 4] = [Step::Checks, Step::Rice, Step::Settings, Step::Plan];
+    const ALL: [Step; 5] = [
+        Step::Checks,
+        Step::Rice,
+        Step::Settings,
+        Step::Tune,
+        Step::Plan,
+    ];
 
     fn title(self) -> &'static str {
         match self {
             Step::Checks => "Проверка",
             Step::Rice => "Райс",
             Step::Settings => "Настройки",
+            Step::Tune => "Тонкая настройка",
             Step::Plan => "План",
         }
     }
@@ -288,12 +299,44 @@ impl Settings {
     }
 }
 
+/// Значение настройки для экрана: переключатель, выбор или ползунок.
+fn format_value(setting: &Setting, value: &Value) -> String {
+    match setting.kind() {
+        SettingKind::Switch => {
+            if value.as_bool() == Some(true) {
+                "● вкл".into()
+            } else {
+                "○ выкл".into()
+            }
+        }
+        SettingKind::Choice => format!("◀ {} ▶", show_value(value)),
+        SettingKind::Number => {
+            // Ползунок из 10 делений: ▰▰▰▱▱▱▱▱▱▱ 6
+            let [min, max] = setting.range.unwrap_or([0.0, 1.0]);
+            let v = value.as_f64().unwrap_or(min);
+            let filled = (((v - min) / (max - min)) * 10.0).round() as usize;
+            let bar: String = (0..10)
+                .map(|i| if i < filled { '▰' } else { '▱' })
+                .collect();
+            format!("{bar} {}", show_value(value))
+        }
+        SettingKind::Other => format!("{} (в файле райса)", show_value(value)),
+    }
+}
+
 /// Записать одно значение в `overrides.<module>.<key>`.
 fn set(spec: &mut RiceSpec, module: &str, key: &str, value: Value) {
     spec.overrides
         .entry(module.to_string())
         .or_default()
         .insert(key.into(), value);
+}
+
+/// Программа райса с описанными настройками и их текущими значениями.
+struct TuneModule {
+    id: String,
+    settings: Vec<Setting>,
+    values: Vec<Value>,
 }
 
 struct App {
@@ -303,6 +346,13 @@ struct App {
     rice: ListState,
     settings: Settings,
     setting_row: usize,
+    /// Тонкая настройка: программы, выбранная программа и строка, фокус справа.
+    tune: Vec<TuneModule>,
+    tune_module: usize,
+    tune_row: usize,
+    tune_inside: bool,
+    /// Что пользователь поменял: (модуль, настройка) → значение.
+    tweaks: BTreeMap<(String, String), Value>,
     plan: Option<Plan>,
     /// Ошибка построения плана, показывается на последнем экране.
     error: Option<String>,
@@ -322,6 +372,11 @@ impl App {
                 programs: Vec::new(),
             },
             setting_row: 0,
+            tune: Vec::new(),
+            tune_module: 0,
+            tune_row: 0,
+            tune_inside: false,
+            tweaks: BTreeMap::new(),
             plan: None,
             error: None,
         })
@@ -335,7 +390,65 @@ impl App {
     fn final_spec(&self) -> RiceSpec {
         let mut spec = self.selected_rice().clone();
         self.settings.apply_to(&mut spec);
+        for ((module, key), value) in &self.tweaks {
+            // Настройки программ, которые потом убрали из райса, не пишем:
+            // иначе план споткнётся о модуль, которого нет.
+            if spec.components.values().any(|id| id == module) {
+                set(&mut spec, module, key, value.clone());
+            }
+        }
         spec
+    }
+
+    /// Собрать список программ с настройками для текущего райса.
+    fn build_tune(&mut self, registry: &Registry) {
+        let spec = self.final_spec();
+        self.tune = spec
+            .components
+            .values()
+            .filter_map(|id| registry.get(id))
+            .filter(|m| !m.manifest.settings.is_empty())
+            .map(|m| {
+                let id = m.manifest.id.clone();
+                let values = m
+                    .manifest
+                    .settings
+                    .iter()
+                    .map(|s| {
+                        spec.overrides
+                            .get(&id)
+                            .and_then(|o| o.get(s.id.as_str()))
+                            .cloned()
+                            .unwrap_or_else(|| s.default.clone())
+                    })
+                    .collect();
+                TuneModule {
+                    id,
+                    settings: m.manifest.settings.clone(),
+                    values,
+                }
+            })
+            .collect();
+        // Композитор первым: у него больше всего настроек, дальше по алфавиту.
+        self.tune
+            .sort_by_key(|m| (m.id != spec.components["compositor"], m.id.clone()));
+        self.tune_module = self.tune_module.min(self.tune.len().saturating_sub(1));
+        self.tune_row = 0;
+        self.tune_inside = false;
+    }
+
+    fn build_plan(&mut self, registry: &Registry, env: &Env) {
+        match plan::build(self.final_spec(), registry, env) {
+            Ok(plan) => {
+                self.plan = Some(plan);
+                self.error = None;
+            }
+            Err(e) => {
+                self.plan = None;
+                self.error = Some(format!("{e:#}"));
+            }
+        }
+        self.step = Step::Plan;
     }
 
     fn handle(&mut self, key: KeyCode, registry: &Registry, env: &Env) -> Action {
@@ -379,26 +492,54 @@ impl App {
                 KeyCode::Char(' ') | KeyCode::Right => self.settings.change(self.setting_row, true),
                 KeyCode::Left => self.settings.change(self.setting_row, false),
                 KeyCode::Enter => {
-                    match plan::build(self.final_spec(), registry, env) {
-                        Ok(plan) => {
-                            self.plan = Some(plan);
-                            self.error = None;
-                        }
-                        Err(e) => {
-                            self.plan = None;
-                            self.error = Some(format!("{e:#}"));
-                        }
-                    }
-                    self.step = Step::Plan;
+                    self.build_tune(registry);
+                    self.step = Step::Tune;
                 }
                 KeyCode::Esc | KeyCode::Backspace => self.step = Step::Rice,
+                _ => {}
+            },
+            Step::Tune if self.tune_inside => {
+                let module = &mut self.tune[self.tune_module];
+                let last = module.settings.len() - 1;
+                match key {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        self.tune_row = self.tune_row.saturating_sub(1)
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        self.tune_row = (self.tune_row + 1).min(last)
+                    }
+                    KeyCode::Left | KeyCode::Right | KeyCode::Char(' ') => {
+                        let setting = &module.settings[self.tune_row];
+                        let value = &mut module.values[self.tune_row];
+                        *value = setting.step_value(value, key != KeyCode::Left);
+                        self.tweaks
+                            .insert((module.id.clone(), setting.id.clone()), value.clone());
+                    }
+                    KeyCode::Enter => self.build_plan(registry, env),
+                    KeyCode::Esc | KeyCode::Backspace => self.tune_inside = false,
+                    _ => {}
+                }
+            }
+            Step::Tune => match key {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.tune_module = self.tune_module.saturating_sub(1)
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.tune_module = (self.tune_module + 1).min(self.tune.len().saturating_sub(1))
+                }
+                KeyCode::Right if !self.tune.is_empty() => {
+                    self.tune_inside = true;
+                    self.tune_row = 0;
+                }
+                KeyCode::Enter => self.build_plan(registry, env),
+                _ if back => self.step = Step::Settings,
                 _ => {}
             },
             Step::Plan => match key {
                 KeyCode::Enter if self.plan.is_some() => {
                     return Action::Apply(Box::new(self.final_spec()))
                 }
-                _ if back => self.step = Step::Settings,
+                _ if back => self.step = Step::Tune,
                 _ => {}
             },
         }
@@ -420,6 +561,7 @@ impl App {
             Step::Checks => self.draw_checks(frame, body),
             Step::Rice => self.draw_rice(frame, body),
             Step::Settings => self.draw_settings(frame, body),
+            Step::Tune => self.draw_tune(frame, body),
             Step::Plan => self.draw_plan(frame, body),
         }
         frame.render_widget(Paragraph::new(self.hints()).dark_gray(), footer);
@@ -453,7 +595,11 @@ impl App {
             }
             Step::Checks => " Enter дальше · f исправить автоматически · q выйти",
             Step::Rice => " ↑↓ выбрать · Enter дальше · Esc назад · q выйти",
-            Step::Settings => " ↑↓ выбрать · ←→ или Пробел изменить · Enter показать план · Esc назад",
+            Step::Settings => " ↑↓ выбрать · ←→ или Пробел изменить · Enter дальше · Esc назад",
+            Step::Tune if self.tune_inside => {
+                " ↑↓ выбрать · ←→ изменить · Esc к списку программ · Enter показать план"
+            }
+            Step::Tune => " ↑↓ программа · → открыть настройки · Enter показать план · Esc назад",
             Step::Plan => " Enter применить · Esc назад · q выйти",
         }
     }
@@ -561,6 +707,79 @@ impl App {
             Paragraph::new(lines).block(Block::bordered().title(title)),
             area,
         );
+    }
+
+    fn draw_tune(&self, frame: &mut Frame, area: Rect) {
+        let [list_area, info_area] =
+            Layout::horizontal([Constraint::Length(22), Constraint::Min(40)]).areas(area);
+
+        let items: Vec<ListItem> = self
+            .tune
+            .iter()
+            .map(|m| ListItem::new(format!(" {}", m.id)))
+            .collect();
+        let mut state = ListState::default().with_selected(Some(self.tune_module));
+        let highlight = if self.tune_inside {
+            Style::new().bold().cyan()
+        } else {
+            Style::new().reversed().bold()
+        };
+        let list = List::new(items)
+            .block(Block::bordered().title(" Программы "))
+            .highlight_style(highlight)
+            .highlight_symbol("›");
+        frame.render_stateful_widget(list, list_area, &mut state);
+
+        let Some(module) = self.tune.get(self.tune_module) else {
+            let text = Paragraph::new(" У программ этого райса пока нет описанных настроек.")
+                .block(Block::bordered());
+            frame.render_widget(text, info_area);
+            return;
+        };
+        // Строки по группам; выбранную держим в видимой части экрана.
+        let mut lines: Vec<Line> = Vec::new();
+        let mut selected_line = 0;
+        let mut group = "";
+        for (i, (setting, value)) in module.settings.iter().zip(&module.values).enumerate() {
+            if setting.group != group {
+                group = &setting.group;
+                lines.push(Line::raw(""));
+                lines.push(Line::raw(format!(" {group}")).bold().dark_gray());
+            }
+            let selected = self.tune_inside && i == self.tune_row;
+            if selected {
+                selected_line = lines.len();
+            }
+            let changed = *value != setting.default;
+            let name_style = if selected {
+                Style::new().reversed().bold()
+            } else {
+                Style::new()
+            };
+            lines.push(Line::from(vec![
+                Span::raw(if selected { " › " } else { "   " }),
+                Span::styled(format!("{:<34}", setting.title), name_style),
+                Span::raw(" "),
+                Span::styled(
+                    format_value(setting, value),
+                    if changed {
+                        Style::new().yellow().bold()
+                    } else {
+                        Style::new().cyan()
+                    },
+                ),
+            ]));
+            if selected && !setting.about.is_empty() {
+                lines.push(Line::raw(format!("     {}", setting.about)).dark_gray());
+            }
+        }
+        let height = info_area.height.saturating_sub(2) as usize;
+        let scroll = selected_line.saturating_sub(height.saturating_sub(3));
+        let text = Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .scroll((scroll as u16, 0))
+            .block(Block::bordered().title(format!(" {} ", module.id)));
+        frame.render_widget(text, info_area);
     }
 
     fn draw_plan(&self, frame: &mut Frame, area: Rect) {
@@ -732,6 +951,29 @@ mod tests {
         assert!(!spec.components.contains_key("widgets"));
     }
 
+    /// Числа двигаются шагом и не выходят за границы, списки идут по кругу.
+    #[test]
+    fn setting_steps_stay_in_range() {
+        let registry = Registry::builtin().unwrap();
+        let hypr = &registry.get("hyprland").unwrap().manifest;
+        let find = |id: &str| hypr.settings.iter().find(|s| s.id == id).unwrap();
+        let blur = find("blur_size");
+        let mut v = blur.default.clone();
+        for _ in 0..40 {
+            v = blur.step_value(&v, true);
+        }
+        assert_eq!(v, Value::from(20));
+        let dim = find("dim_strength");
+        assert_eq!(dim.step_value(&Value::from(0.15), true), Value::from(0.2));
+        let layout = find("layout");
+        assert_eq!(
+            layout.step_value(&Value::from("dwindle"), false),
+            Value::from("master")
+        );
+        assert!(blur.check(&Value::from(99)).is_err());
+        assert_eq!(format_value(blur, &Value::from(6)), "▰▰▰▱▱▱▱▱▱▱ 6");
+    }
+
     #[test]
     fn settings_roundtrip() {
         let registry = Registry::builtin().unwrap();
@@ -759,6 +1001,10 @@ mod tests {
             KeyCode::Enter,
             KeyCode::Char(' '),
             KeyCode::Enter,
+            KeyCode::Right,
+            KeyCode::Down,
+            KeyCode::Right,
+            KeyCode::Enter,
         ];
         for key in keys {
             terminal.draw(|f| app.draw(f)).unwrap();
@@ -771,6 +1017,11 @@ mod tests {
         };
         // Второй по алфавиту райс — gruvbox, и раскладку мы переключили пробелом.
         assert_eq!(spec.name, "gruvbox");
+        // На экране тонкой настройки включили затемнение неактивных окон.
+        assert_eq!(
+            spec.overrides["hyprland"]["dim_inactive"],
+            Value::Bool(true)
+        );
         let gruvbox = presets::get("gruvbox").unwrap().unwrap();
         assert!(
             Settings::from_spec(&spec, &registry).russian

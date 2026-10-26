@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 
 use crate::modules::{Module, Registry};
 use crate::render;
@@ -460,6 +460,16 @@ pub fn module_options(
                     key.as_str().unwrap_or("?"),
                     known.join(", ")
                 );
+            }
+            let setting = module
+                .manifest
+                .settings
+                .iter()
+                .find(|s| Some(s.id.as_str()) == key.as_str());
+            if let Some(setting) = setting {
+                setting
+                    .check(value)
+                    .with_context(|| format!("модуль {}", module.manifest.id))?;
             }
             options.insert(key.clone(), value.clone());
         }

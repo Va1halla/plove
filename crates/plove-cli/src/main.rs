@@ -93,8 +93,11 @@ enum Command {
         #[arg(long)]
         fix: bool,
     },
-    /// Показать встроенные модули
-    Modules,
+    /// Показать встроенные модули, а с именем — все настройки модуля
+    Modules {
+        /// Модуль, например hyprland
+        id: Option<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -248,7 +251,13 @@ fn run(cli: Cli) -> Result<()> {
             output,
         } => new_from_wallpaper(&image, &base, output)?,
         Command::Doctor { fix } => doctor(fix)?,
-        Command::Modules => {
+        Command::Modules { id: Some(id) } => {
+            let module = registry
+                .get(&id)
+                .with_context(|| format!("модуль «{id}» не найден, список: plove modules"))?;
+            print_settings(module);
+        }
+        Command::Modules { id: None } => {
             for module in registry.iter() {
                 let m = &module.manifest;
                 println!(
@@ -261,6 +270,47 @@ fn run(cli: Cli) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Настройки модуля по группам: что делает, какие значения можно, что по умолчанию.
+fn print_settings(module: &plove_core::modules::Module) {
+    use plove_core::modules::SettingKind;
+    let m = &module.manifest;
+    println!("{} ({})\n", m.id, m.role);
+    if m.settings.is_empty() {
+        // Старые модули: настройки без описаний.
+        for (key, value) in &m.defaults {
+            let value = plove_core::modules::show_value(value);
+            println!("  {:<22} {value}", key.as_str().unwrap_or("?"));
+        }
+        return;
+    }
+    let mut group = "";
+    for s in &m.settings {
+        if s.group != group {
+            group = &s.group;
+            println!("{group}");
+        }
+        let default = plove_core::modules::show_value(&s.default);
+        let values = match s.kind() {
+            SettingKind::Switch => "вкл/выкл".to_string(),
+            SettingKind::Choice => s.choices.join(" | "),
+            SettingKind::Number => {
+                let [min, max] = s.range.unwrap_or_default();
+                format!("{min}…{max}")
+            }
+            SettingKind::Other => "в файле райса".to_string(),
+        };
+        println!("  {:<22} {}", s.id, s.title);
+        println!("  {:<22} {values}, по умолчанию {default}", "");
+        if !s.about.is_empty() {
+            println!("  {:<22} {}", "", s.about);
+        }
+    }
+    println!(
+        "\nМенять в файле райса: overrides: {{ {}: {{ ключ: значение }} }}",
+        m.id
+    );
 }
 
 /// `plove doctor`: показать все проверки и, с `--fix`, починить что можно.

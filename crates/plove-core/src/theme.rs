@@ -215,7 +215,10 @@ mod style_tests {
             },
             &geometry,
         );
-        assert_eq!((sharp.radius_window, sharp.radius_chip, sharp.border), (0, 0, 0));
+        assert_eq!(
+            (sharp.radius_window, sharp.radius_chip, sharp.border),
+            (0, 0, 0)
+        );
         // Hyprland не принимает 0 проходов размытия даже при выключенном размытии.
         assert!(!sharp.blur && sharp.blur_passes >= 1);
 

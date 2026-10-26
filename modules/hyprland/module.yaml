@@ -20,25 +20,151 @@ templates:
 user_files:
   - ~/.config/hypr/user.conf
 reload: hyprctl reload
-defaults:
-  # snappy — быстрые анимации, smooth — плавные, none — без анимаций.
-  animations: snappy
-  # Раскладки через запятую, например "us,ru".
-  kb_layout: us
-  # Как переключать раскладку.
-  kb_options: grp:alt_shift_toggle
-  # Тени под окнами.
-  shadows: true
-  # Как перелистываются рабочие столы: slide, slidevert, fade.
-  workspace_animation: slide
-  # Масштаб интерфейса для всех мониторов: 1, 1.25, 1.5, 2 (для 4K).
-  scale: 1
-  # Мониторы с точными настройками. Каждый — либо строка в формате Hyprland
-  # ("DP-1, 2560x1440@144, 0x0, 1"), либо описание:
-  #   - name: DP-1              # имя из `hyprctl monitors`
-  #     mode: 2560x1440@144     # по умолчанию лучший режим (preferred)
-  #     position: above         # right, left, above, below или точно "0x-1440"
-  #     scale: 1.25             # по умолчанию общий scale
-  #     rotate: 90              # 0, 90, 180, 270 — вертикальный монитор
-  # Неописанные мониторы включаются сами в лучшем режиме и ставятся справа.
-  monitors: []
+# Настройки: мастер показывает их по группам, `plove modules hyprland` — списком.
+# Менять в райсе: overrides: { hyprland: { blur_size: 10 } }
+settings:
+  # ── Окна ──
+  - id: layout
+    group: Окна
+    title: Раскладка окон
+    about: dwindle делит экран пополам для каждого нового окна, master держит одно большое окно и стопку маленьких.
+    choices: [dwindle, master]
+    default: dwindle
+  - id: dim_inactive
+    group: Окна
+    title: Затемнять неактивные окна
+    about: Окно без фокуса становится темнее, чтобы активное было видно сразу.
+    default: false
+  - id: dim_strength
+    group: Окна
+    title: Сила затемнения
+    about: Насколько темнеют неактивные окна, если затемнение включено.
+    range: [0.05, 0.5]
+    step: 0.05
+    default: 0.15
+  - id: resize_on_border
+    group: Окна
+    title: Менять размер за край
+    about: Тянуть окно мышью за рамку, как в обычных системах.
+    default: true
+
+  # ── Эффекты ──
+  - id: blur_size
+    group: Эффекты
+    title: Сила размытия
+    about: Насколько размыт фон под прозрачными окнами, панелью и меню. Работает, если в стиле включено стекло.
+    range: [1, 20]
+    default: 6
+  - id: blur_vibrancy
+    group: Эффекты
+    title: Насыщенность размытия
+    about: Делает цвета под стеклом ярче.
+    range: [0, 1]
+    step: 0.05
+    default: 0.2
+  - id: blur_noise
+    group: Эффекты
+    title: Зерно на стекле
+    about: Лёгкий шум поверх размытия, как у матового стекла.
+    range: [0, 0.2]
+    step: 0.01
+    default: 0.01
+  - id: blur_xray
+    group: Эффекты
+    title: Размывать только обои
+    about: Плавающие окна просвечивают до обоев, а не до окон под ними. Быстрее на слабых видеокартах.
+    default: false
+  - id: shadows
+    group: Эффекты
+    title: Тени под окнами
+    default: true
+  - id: shadow_range
+    group: Эффекты
+    title: Размер тени
+    about: Насколько далеко тень расходится от окна, px.
+    range: [2, 60]
+    step: 2
+    default: 18
+  - id: shadow_offset
+    group: Эффекты
+    title: Смещение тени вниз
+    about: 0 — тень равномерно со всех сторон, больше — будто свет сверху.
+    range: [0, 20]
+    default: 0
+
+  # ── Анимации ──
+  - id: animations
+    group: Анимации
+    title: Скорость анимаций
+    about: snappy — быстрые, smooth — плавные и медленнее, none — без анимаций (полезно в виртуальной машине).
+    choices: [snappy, smooth, none]
+    default: snappy
+  - id: window_animation
+    group: Анимации
+    title: Появление окон
+    about: popin — вырастает из центра, slide — выезжает сбоку, gnomed — разворачивается по вертикали.
+    choices: [popin, slide, gnomed]
+    default: popin
+  - id: workspace_animation
+    group: Анимации
+    title: Смена рабочего стола
+    about: slide — листается вбок, slidevert — вверх-вниз (удобно для мониторов друг над другом), fade — растворяется.
+    choices: [slide, slidevert, fade, slidefade, slidefadevert]
+    default: slide
+  - id: layer_animation
+    group: Анимации
+    title: Появление меню и панелей
+    choices: [popin, slide, fade]
+    default: popin
+
+  # ── Ввод ──
+  - id: kb_layout
+    group: Ввод
+    title: Раскладки
+    about: Через запятую, например "us,ru".
+    default: us
+  - id: kb_options
+    group: Ввод
+    title: Переключение раскладки
+    about: Параметры xkb, например grp:alt_shift_toggle или grp:caps_toggle.
+    default: grp:alt_shift_toggle
+  - id: follow_mouse
+    group: Ввод
+    title: Фокус за мышью
+    about: Окно под курсором становится активным без щелчка.
+    default: true
+  - id: sensitivity
+    group: Ввод
+    title: Скорость мыши
+    about: От -1 (медленно) до 1 (быстро), 0 — как есть.
+    range: [-1, 1]
+    step: 0.1
+    default: 0
+  - id: natural_scroll
+    group: Ввод
+    title: Естественная прокрутка тачпада
+    about: Содержимое едет за пальцами, как на телефоне.
+    default: false
+  - id: tap_to_click
+    group: Ввод
+    title: Касание тачпада — щелчок
+    default: true
+  - id: workspace_swipe
+    group: Ввод
+    title: Жест тремя пальцами
+    about: Листать рабочие столы тремя пальцами по тачпаду.
+    default: true
+
+  # ── Мониторы ──
+  - id: scale
+    group: Мониторы
+    title: Масштаб интерфейса
+    about: Для всех мониторов без своих настроек. 1.5–2 — для 4K.
+    range: [0.5, 3]
+    step: 0.25
+    default: 1
+  - id: monitors
+    group: Мониторы
+    title: Мониторы по отдельности
+    about: Расположение (в том числе друг над другом), режим и поворот каждого монитора. Задаётся в файле райса, см. README.
+    default: []

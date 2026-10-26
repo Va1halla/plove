@@ -43,25 +43,32 @@ general {
     col.active_border = rgb({{ colors.accent.raw }})
 {%- endif %}
     col.inactive_border = rgb({{ colors.surface.raw }})
-    layout = dwindle
+    layout = {{ options.layout }}
+    resize_on_border = {{ options.resize_on_border }}
 }
 
 decoration {
     rounding = {{ style.radius_window }}
     active_opacity = {{ geometry.opacity }}
     inactive_opacity = {{ geometry.opacity_inactive }}
+    dim_inactive = {{ options.dim_inactive }}
+    dim_strength = {{ options.dim_strength }}
 
     blur {
         enabled = {{ style.blur }}
-        size = 6
+        size = {{ options.blur_size }}
         passes = {{ style.blur_passes }}
+        vibrancy = {{ options.blur_vibrancy }}
+        noise = {{ options.blur_noise }}
+        xray = {{ options.blur_xray }}
         popups = true
     }
 
     shadow {
         enabled = {{ options.shadows }}
-        range = 18
+        range = {{ options.shadow_range }}
         render_power = 3
+        offset = 0 {{ options.shadow_offset }}
         color = rgba({{ colors.bg.raw }}cc)
     }
 }
@@ -85,10 +92,10 @@ animations {
 {%- if options.animations == "smooth" %}{% set speed = 6 %}{% else %}{% set speed = 3 %}{% endif %}
     enabled = true
     bezier = ease, 0.25, 0.1, 0.25, 1.0
-    animation = windows, 1, {{ speed }}, ease, popin 85%
+    animation = windows, 1, {{ speed }}, ease, {{ options.window_animation }}{% if options.window_animation == "popin" %} 85%{% endif %}
     animation = fade, 1, {{ speed }}, ease
     bezier = overshot, 0.05, 0.9, 0.1, 1.05
-    animation = layers, 1, {{ speed }}, overshot, popin 90%
+    animation = layers, 1, {{ speed }}, overshot, {{ options.layer_animation }}{% if options.layer_animation == "popin" %} 90%{% endif %}
     animation = border, 1, {{ speed * 2 }}, ease
 {%- if style.borders == "gradient" %}
     # Градиент рамки медленно вращается по кругу.
@@ -101,7 +108,22 @@ animations {
 input {
     kb_layout = {{ options.kb_layout }}
     kb_options = {{ options.kb_options }}
-    follow_mouse = 1
+    follow_mouse = {% if options.follow_mouse %}1{% else %}0{% endif %}
+    sensitivity = {{ options.sensitivity }}
+
+    touchpad {
+        natural_scroll = {{ options.natural_scroll }}
+        tap-to-click = {{ options.tap_to_click }}
+    }
+}
+{% if options.workspace_swipe %}
+# Три пальца по тачпаду — соседний рабочий стол.
+gesture = 3, horizontal, workspace
+{% endif %}
+misc {
+    # Без обоев-заставки и надписей Hyprland поверх наших обоев.
+    disable_hyprland_logo = true
+    disable_splash_rendering = true
 }
 
 $mod = SUPER

@@ -12,15 +12,51 @@ templates:
     dest: ~/.config/waybar/style.css
 reload: pkill -SIGUSR2 waybar
 autostart: true
-defaults:
-  # top, bottom, left или right (вертикальная панель).
-  position: top
-  # true — панель «парит» с отступами от краёв. То же, что style.bar: floating.
-  floating: false
-  # Модули: launcher, workspaces, window, clock, media, cpu, memory, backlight,
-  # pulseaudio, network, battery, language, tray, power.
-  modules_left: [workspaces]
-  modules_center: [clock]
-  modules_right: [pulseaudio, network, battery]
 # Фоновый процесс: plove остановит его, если модуль уберут из райса.
 process: "waybar"
+settings:
+  - id: position
+    group: Панель
+    title: Где панель
+    about: left и right — вертикальная панель вдоль края.
+    choices: [top, bottom, left, right]
+    default: top
+  - id: floating
+    group: Панель
+    title: Отступ от краёв
+    about: Панель «парит» с отступами от краёв экрана. То же, что стиль панели floating.
+    default: false
+  - id: workspace_count
+    group: Рабочие столы
+    title: Всегда показывать столов
+    about: Сколько рабочих столов видно на панели, даже пустых. 0 — только занятые.
+    range: [0, 10]
+    default: 5
+  - id: clock_seconds
+    group: Часы
+    title: Секунды на часах
+    default: false
+  - id: clock_date
+    group: Часы
+    title: Дата рядом с часами
+    default: false
+  - id: window_length
+    group: Модули
+    title: Длина заголовка окна
+    about: Сколько символов заголовка активного окна показывать.
+    range: [10, 80]
+    step: 5
+    default: 40
+  - id: modules_left
+    group: Модули
+    title: Слева
+    about: "Из: launcher, workspaces, window, clock, media, cpu, memory, backlight, pulseaudio, network, battery, language, tray, power."
+    default: [workspaces]
+  - id: modules_center
+    group: Модули
+    title: По центру
+    default: [clock]
+  - id: modules_right
+    group: Модули
+    title: Справа
+    default: [pulseaudio, network, battery]
