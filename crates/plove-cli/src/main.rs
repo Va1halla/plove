@@ -141,9 +141,12 @@ fn run(cli: Cli) -> Result<()> {
                 return Ok(());
             }
             if let Some(generation) = state::rollback(&env)? {
-                if !env.sandbox && plove_core::system::in_graphical_session() {
+                let session = (!env.sandbox)
+                    .then(plove_core::system::graphical_session)
+                    .flatten();
+                if let Some(session) = session {
                     for command in &generation.record.reloads {
-                        plove_core::system::run_reload(command);
+                        plove_core::system::run_reload(command, &session);
                     }
                 }
                 println!("Откачено поколение #{}.", generation.number);
