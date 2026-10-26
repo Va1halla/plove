@@ -1,0 +1,31 @@
+// Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+{%- set accent = "38;2;" ~ colors.accent.rgb | replace(from=", ", to=";") %}
+{%- set muted = "38;2;" ~ colors.muted.rgb | replace(from=", ", to=";") %}
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "type": "builtin",
+    "color": { "1": "{{ accent }}", "2": "{{ accent }}" },
+    "padding": { "top": 1, "right": 3 }
+  },
+  "display": {
+    "separator": "  ",
+    "color": { "keys": "{{ accent }}", "title": "{{ accent }}", "separator": "{{ muted }}" },
+    "key": { "width": 10 }
+  },
+  "modules": [
+    "title",
+    { "type": "custom", "format": "" },
+    { "type": "os", "key": "os" },
+    { "type": "kernel", "key": "kernel" },
+    { "type": "uptime", "key": "uptime" },
+    { "type": "packages", "key": "pkgs" },
+    { "type": "wm", "key": "wm" },
+    { "type": "terminal", "key": "term" },
+    { "type": "shell", "key": "shell" },
+    { "type": "cpu", "key": "cpu" },
+    { "type": "memory", "key": "memory" },
+    { "type": "custom", "format": "" },
+    "colors"
+  ]
+}

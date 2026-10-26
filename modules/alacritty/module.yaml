@@ -1,0 +1,14 @@
+# Модуль Alacritty: быстрый минималистичный терминал. Альтернатива kitty.
+id: alacritty
+role: terminal
+exec: alacritty
+run_in: alacritty -e
+packages: [alacritty]
+templates:
+  - src: alacritty.toml.tera
+    dest: ~/.config/alacritty/alacritty.toml
+user_files:
+  - ~/.config/alacritty/user.toml
+# Alacritty сам следит за конфигом и применяет изменения на лету.
+binds:
+  - "$mod, Return, exec, {{ exec }}"

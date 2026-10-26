@@ -17,13 +17,22 @@ components:
   bar: waybar
   terminal: kitty
   wallpaper: swaybg
-  launcher: fuzzel
-  notifications: mako
+  launcher: rofi
+  notifications: swaync
+  power: power-menu
   lock: hyprlock
   idle: hypridle
-  power: power-menu
   screenshot: grim
   clipboard: cliphist
+  polkit: hyprpolkitagent
+  gtk: gtk
+  files: thunar
+  terminal_files: yazi
+  images: imv
+  shell: zsh
+  fetch: fastfetch
+  monitor: btop
+  editor: neovim
 overrides:
   hyprland: { animations: smooth, kb_layout: "us,ru" }
   waybar: { floating: true, modules_center: [], modules_right: [pulseaudio, network, battery, clock] }

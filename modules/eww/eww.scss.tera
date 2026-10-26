@@ -1,0 +1,33 @@
+// Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+
+* {
+  all: unset;
+}
+
+window {
+  background-color: transparent;
+}
+
+.desktop {
+  font-family: "{{ fonts.ui }}";
+  color: {{ colors.fg.hex }};
+}
+
+.time {
+  font-size: 110px;
+  font-weight: bold;
+  color: {{ colors.accent.hex }};
+  text-shadow: 0 4px 16px rgba({{ colors.bg.rgb }}, 0.6);
+}
+
+.date {
+  font-size: 22px;
+  margin-top: -8px;
+}
+
+.stats {
+  margin-top: 12px;
+  font-family: "{{ fonts.mono }}";
+  font-size: 14px;
+  color: {{ colors.muted.hex }};
+}

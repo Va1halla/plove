@@ -1,0 +1,27 @@
+# Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+
+[mgr]
+cwd = { fg = "{{ colors.accent.hex }}" }
+hovered = { fg = "{{ colors.bg.hex }}", bg = "{{ colors.accent.hex }}" }
+preview_hovered = { underline = true }
+find_keyword = { fg = "{{ colors.accent.hex }}", bold = true }
+marker_selected = { fg = "{{ colors.accent.hex }}", bg = "{{ colors.accent.hex }}" }
+border_style = { fg = "{{ colors.surface.hex }}" }
+
+[mode]
+normal_main = { fg = "{{ colors.bg.hex }}", bg = "{{ colors.accent.hex }}", bold = true }
+normal_alt = { fg = "{{ colors.accent.hex }}", bg = "{{ colors.surface.hex }}" }
+
+[status]
+overall = { fg = "{{ colors.fg.hex }}" }
+progress_label = { fg = "{{ colors.fg.hex }}", bold = true }
+progress_normal = { fg = "{{ colors.accent.hex }}", bg = "{{ colors.surface.hex }}" }
+
+[filetype]
+rules = [
+	{ mime = "image/*", fg = "{% if ansi | length == 16 %}{{ ansi.3.hex }}{% else %}{{ colors.accent.hex }}{% endif %}" },
+	{ mime = "{audio,video}/*", fg = "{% if ansi | length == 16 %}{{ ansi.5.hex }}{% else %}{{ colors.accent.hex }}{% endif %}" },
+	{ mime = "application/{zip,rar,7z*,tar,gzip,xz,zstd,bzip*,lzma,compress,archive,cpio,arj,xar,ms-cab*}", fg = "{% if ansi | length == 16 %}{{ ansi.1.hex }}{% else %}{{ colors.accent.hex }}{% endif %}" },
+	{ name = "*/", fg = "{{ colors.accent.hex }}" },
+	{ name = "*", fg = "{{ colors.fg.hex }}" },
+]

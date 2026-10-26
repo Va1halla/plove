@@ -1,0 +1,20 @@
+# Модуль eww: виджет на рабочем столе — большие часы, дата и загрузка
+# системы поверх обоев. eww умеет и панели, но здесь только «украшение».
+id: eww
+role: widgets
+exec: eww open desktop
+# Собирается из AUR; paru поставит его и если пакет появится в репозитории.
+aur: [eww]
+compatible_with:
+  compositor: [hyprland]
+templates:
+  - src: eww.yuck.tera
+    dest: ~/.config/eww/eww.yuck
+  - src: eww.scss.tera
+    dest: ~/.config/eww/eww.scss
+autostart: true
+# `eww open` сам запускает фоновый процесс eww, если его ещё нет.
+reload: "pgrep -x eww >/dev/null && eww reload || eww open desktop"
+defaults:
+  # Показывать загрузку процессора и памяти под часами.
+  stats: true

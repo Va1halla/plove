@@ -134,21 +134,69 @@ enum Action {
     Apply(Box<RiceSpec>),
 }
 
+/// Роли, для которых мастер предлагает выбрать программу:
+/// (роль, подпись, можно ли обойтись без неё).
+const PROGRAM_ROLES: [(&str, &str, bool); 6] = [
+    ("terminal", "Терминал", false),
+    ("launcher", "Лаунчер", false),
+    ("notifications", "Уведомления", false),
+    ("wallpaper", "Обои", false),
+    ("power", "Меню выхода", false),
+    ("widgets", "Виджеты", true),
+];
+
+/// Выбор программы для одной роли, например лаунчер fuzzel или rofi.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Program {
+    role: &'static str,
+    label: &'static str,
+    /// id модулей этой роли; пустая строка — «без этой программы».
+    choices: Vec<String>,
+    current: usize,
+}
+
 /// Настройки, которые мастер позволяет поменять поверх готового райса.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Settings {
     /// Раскладка us,ru вместо us.
     russian: bool,
     bar_bottom: bool,
     bar_floating: bool,
+    programs: Vec<Program>,
 }
 
 impl Settings {
-    const ROWS: usize = 3;
+    /// Строки-переключатели до списка программ.
+    const SWITCHES: usize = 3;
 
-    /// Прочитать текущие значения из overrides райса.
-    fn from_spec(spec: &RiceSpec) -> Settings {
+    /// Прочитать текущие значения из райса. Из реестра берём, какие
+    /// программы вообще есть для каждой роли.
+    fn from_spec(spec: &RiceSpec, registry: &Registry) -> Settings {
         let get = |module: &str, key: &str| spec.overrides.get(module).and_then(|m| m.get(key));
+        let mut programs = Vec::new();
+        for (role, label, optional) in PROGRAM_ROLES {
+            let mut choices: Vec<String> = registry
+                .iter()
+                .filter(|m| m.manifest.role == role)
+                .map(|m| m.manifest.id.clone())
+                .collect();
+            choices.sort();
+            if optional {
+                choices.insert(0, String::new());
+            }
+            // Выбирать не из чего — строку не показываем.
+            if choices.len() < 2 {
+                continue;
+            }
+            let chosen = spec.components.get(role).map_or("", String::as_str);
+            let current = choices.iter().position(|c| c == chosen).unwrap_or(0);
+            programs.push(Program {
+                role,
+                label,
+                choices,
+                current,
+            });
+        }
         Settings {
             russian: get("hyprland", "kb_layout")
                 .and_then(Value::as_str)
@@ -157,28 +205,52 @@ impl Settings {
             bar_floating: get("waybar", "floating")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            programs,
         }
     }
 
-    /// Записать настройки в overrides райса.
-    fn apply_to(self, spec: &mut RiceSpec) {
+    fn len(&self) -> usize {
+        Self::SWITCHES + self.programs.len()
+    }
+
+    /// Записать настройки в райс.
+    fn apply_to(&self, spec: &mut RiceSpec) {
         let layout = if self.russian { "us,ru" } else { "us" };
         let position = if self.bar_bottom { "bottom" } else { "top" };
         set(spec, "hyprland", "kb_layout", layout.into());
         set(spec, "waybar", "position", position.into());
         set(spec, "waybar", "floating", self.bar_floating.into());
-    }
-
-    fn toggle(&mut self, row: usize) {
-        match row {
-            0 => self.russian = !self.russian,
-            1 => self.bar_bottom = !self.bar_bottom,
-            _ => self.bar_floating = !self.bar_floating,
+        for program in &self.programs {
+            let id = &program.choices[program.current];
+            if id.is_empty() {
+                spec.components.remove(program.role);
+            } else {
+                spec.components.insert(program.role.to_string(), id.clone());
+            }
         }
     }
 
-    fn rows(self) -> [(&'static str, &'static str); Self::ROWS] {
-        [
+    /// Поменять значение строки: → вперёд по списку, ← назад.
+    fn change(&mut self, row: usize, forward: bool) {
+        match row {
+            0 => self.russian = !self.russian,
+            1 => self.bar_bottom = !self.bar_bottom,
+            2 => self.bar_floating = !self.bar_floating,
+            _ => {
+                let program = &mut self.programs[row - Self::SWITCHES];
+                let n = program.choices.len();
+                // Как `%` в Python: + n, чтобы не уйти в минус при движении назад.
+                program.current = if forward {
+                    (program.current + 1) % n
+                } else {
+                    (program.current + n - 1) % n
+                };
+            }
+        }
+    }
+
+    fn rows(&self) -> Vec<(&'static str, String)> {
+        let mut rows: Vec<(&str, String)> = [
             (
                 "Раскладка",
                 if self.russian {
@@ -204,6 +276,14 @@ impl Settings {
                 },
             ),
         ]
+        .map(|(name, value)| (name, value.to_string()))
+        .to_vec();
+        for program in &self.programs {
+            let id = &program.choices[program.current];
+            let value = if id.is_empty() { "нет" } else { id.as_str() };
+            rows.push((program.label, value.to_string()));
+        }
+        rows
     }
 }
 
@@ -238,6 +318,7 @@ impl App {
                 russian: false,
                 bar_bottom: false,
                 bar_floating: false,
+                programs: Vec::new(),
             },
             setting_row: 0,
             plan: None,
@@ -279,7 +360,7 @@ impl App {
                     self.rice.select(Some(next));
                 }
                 KeyCode::Enter | KeyCode::Right => {
-                    self.settings = Settings::from_spec(self.selected_rice());
+                    self.settings = Settings::from_spec(self.selected_rice(), registry);
                     self.setting_row = 0;
                     self.step = Step::Settings;
                 }
@@ -291,13 +372,11 @@ impl App {
                     self.setting_row = self.setting_row.saturating_sub(1)
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
-                    self.setting_row = (self.setting_row + 1).min(Settings::ROWS - 1)
+                    self.setting_row = (self.setting_row + 1).min(self.settings.len() - 1)
                 }
-                // Все настройки сейчас — переключатели с двумя значениями,
-                // поэтому и ←, и → просто меняют значение. Назад — Esc.
-                KeyCode::Char(' ') | KeyCode::Left | KeyCode::Right => {
-                    self.settings.toggle(self.setting_row)
-                }
+                // ← и → меняют значение (у программ — листают список). Назад — Esc.
+                KeyCode::Char(' ') | KeyCode::Right => self.settings.change(self.setting_row, true),
+                KeyCode::Left => self.settings.change(self.setting_row, false),
                 KeyCode::Enter => {
                     match plan::build(self.final_spec(), registry, env) {
                         Ok(plan) => {
@@ -468,7 +547,7 @@ impl App {
                 Span::raw(if selected { " › " } else { "   " }),
                 Span::styled(format!("{name:<14}"), style),
                 Span::raw("  ◀ "),
-                Span::styled(*value, Style::new().cyan()),
+                Span::styled(value.clone(), Style::new().cyan()),
                 Span::raw(" ▶"),
             ]));
         }
@@ -506,7 +585,11 @@ impl App {
                 None => ("?", "не удалось проверить", Color::Yellow),
             };
             lines.push(Line::styled(
-                format!("   {mark} {:<28} {note}", p.name),
+                format!(
+                    "   {mark} {:<28} {note}{}",
+                    p.name,
+                    if p.aur { " (AUR)" } else { "" }
+                ),
                 Style::new().fg(color),
             ));
         }
@@ -587,7 +670,7 @@ mod tests {
             vec!["wheel".into(), "seat".into()]
         }
         fn command_exists(&self, name: &str) -> bool {
-            matches!(name, "pacman" | "sudo" | "seatd")
+            matches!(name, "pacman" | "sudo" | "seatd" | "paru")
         }
         fn service_active(&self, _: &str) -> bool {
             true
@@ -620,16 +703,44 @@ mod tests {
         assert!(matches!(app.step, Step::Rice));
     }
 
+    /// Программы листаются по кругу в обе стороны, а «нет» убирает роль из райса.
+    #[test]
+    fn programs_can_be_switched() {
+        let registry = Registry::builtin().unwrap();
+        let mut spec = presets::get("tokyo-night").unwrap().unwrap();
+        let mut settings = Settings::from_spec(&spec, &registry);
+        let launcher = Settings::SWITCHES
+            + settings
+                .programs
+                .iter()
+                .position(|p| p.role == "launcher")
+                .unwrap();
+        let widgets = Settings::SWITCHES
+            + settings
+                .programs
+                .iter()
+                .position(|p| p.role == "widgets")
+                .unwrap();
+        settings.change(launcher, true);
+        settings.change(launcher, true);
+        settings.change(launcher, false);
+        // eww стоит первым после «нет»: шаг назад — без виджетов.
+        settings.change(widgets, false);
+        settings.apply_to(&mut spec);
+        assert_eq!(spec.components["launcher"], "rofi");
+        assert!(!spec.components.contains_key("widgets"));
+    }
+
     #[test]
     fn settings_roundtrip() {
+        let registry = Registry::builtin().unwrap();
         let mut spec = presets::get("gruvbox").unwrap().unwrap();
-        let settings = Settings {
-            russian: true,
-            bar_bottom: true,
-            bar_floating: true,
-        };
+        let mut settings = Settings::from_spec(&spec, &registry);
+        settings.russian = true;
+        settings.bar_bottom = true;
+        settings.bar_floating = true;
         settings.apply_to(&mut spec);
-        assert_eq!(Settings::from_spec(&spec), settings);
+        assert_eq!(Settings::from_spec(&spec, &registry), settings);
     }
 
     /// Пройти мастер клавишами от начала до конца и нарисовать каждый экран.
@@ -659,9 +770,10 @@ mod tests {
         };
         // Второй по алфавиту райс — gruvbox, и раскладку мы переключили пробелом.
         assert_eq!(spec.name, "gruvbox");
+        let gruvbox = presets::get("gruvbox").unwrap().unwrap();
         assert!(
-            Settings::from_spec(&spec).russian
-                == !Settings::from_spec(&presets::get("gruvbox").unwrap().unwrap()).russian
+            Settings::from_spec(&spec, &registry).russian
+                == !Settings::from_spec(&gruvbox, &registry).russian
         );
     }
 }

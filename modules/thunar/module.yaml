@@ -1,0 +1,10 @@
+# Модуль Thunar: обычный графический файловый менеджер (Super+E).
+# Миниатюры картинок — tumbler, корзина и флешки — gvfs.
+id: thunar
+role: files
+exec: thunar
+packages: [thunar, gvfs, tumbler, thunar-archive-plugin, file-roller]
+binds:
+  - "$mod, E, exec, {{ exec }}"
+on_apply:
+  - "xdg-mime default thunar.desktop inode/directory"

@@ -30,10 +30,14 @@ fn apply_is_idempotent_and_rollback_restores() {
     fs::create_dir_all(kitty.parent().unwrap()).unwrap();
     fs::write(&kitty, "font_size 20\n").unwrap();
 
-    // Первое применение: обои, hyprland, waybar, fuzzel, mako, hyprlock
-    // и hypridle новые, kitty меняется.
+    // Пусть у пользователя уже есть свой ~/.zshrc.
+    let zshrc = home.path().join(".zshrc");
+    fs::write(&zshrc, "export EDITOR=nvim").unwrap();
+
+    // Первое применение: все конфиги новые, kitty и ~/.zshrc меняются.
     let first = plan::build(example_spec(), &registry, &env).unwrap();
-    assert_eq!(first.changed_files().len(), 9);
+    assert!(first.warnings.iter().all(|w| !w.contains("занята")));
+    assert_eq!(first.changed_files().len(), 26);
     let report = apply(&first, &env, &options).unwrap();
     assert_eq!(report.generation, Some(1));
 
@@ -41,7 +45,13 @@ fn apply_is_idempotent_and_rollback_restores() {
     assert!(hypr.contains("col.active_border = rgb(7aa2f7)"));
     assert!(hypr.contains("bind = $mod, Return, exec, kitty"));
     assert!(hypr.contains("kb_layout = us,ru"));
-    assert!(hypr.contains("exec-once = swaybg -m fill -i"));
+    assert!(hypr.contains("exec-once = swww-daemon"));
+    assert!(hypr.contains("bind = $mod SHIFT, F, exec, kitty yazi"));
+    // Строка дописана в конец, свои настройки пользователя на месте.
+    assert_eq!(
+        fs::read_to_string(&zshrc).unwrap(),
+        "export EDITOR=nvim\nsource ~/.config/zsh/plove.zsh\n"
+    );
     assert!(home
         .path()
         .join(".local/share/plove/wallpaper.png")
@@ -73,10 +83,9 @@ fn incompatible_and_unknown_are_rejected() {
     let registry = Registry::builtin().unwrap();
 
     let mut spec = example_spec();
-    spec.components
-        .insert("terminal".into(), "alacritty".into());
+    spec.components.insert("terminal".into(), "foot".into());
     let error = plan::build(spec, &registry, &env).err().unwrap();
-    assert!(error.to_string().contains("alacritty"));
+    assert!(error.to_string().contains("foot"));
 
     let mut spec = example_spec();
     spec.overrides
@@ -100,6 +109,12 @@ fn all_presets_build() {
         assert!(
             plan.warnings.iter().all(|w| !w.contains("components")),
             "{name}"
+        );
+        // Ни одна клавиша не занята двумя модулями.
+        assert!(
+            plan.warnings.iter().all(|w| !w.contains("занята")),
+            "{name}: {:?}",
+            plan.warnings
         );
     }
 }

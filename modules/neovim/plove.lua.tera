@@ -1,0 +1,88 @@
+-- Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+-- Подключается строкой `pcall(vim.cmd.colorscheme, "plove")` в init.lua.
+{%- if ansi | length == 16 %}
+{%- set red = ansi.1.hex %}{% set green = ansi.2.hex %}{% set yellow = ansi.3.hex %}
+{%- set blue = ansi.4.hex %}{% set magenta = ansi.5.hex %}{% set cyan = ansi.6.hex %}
+{%- else %}
+{%- set red = colors.accent.hex %}{% set green = colors.accent.hex %}{% set yellow = colors.accent.hex %}
+{%- set blue = colors.accent.hex %}{% set magenta = colors.accent.hex %}{% set cyan = colors.accent.hex %}
+{%- endif %}
+
+vim.cmd("highlight clear")
+vim.g.colors_name = "plove"
+vim.o.termguicolors = true
+vim.o.background = "dark"
+
+local c = {
+  bg = "{{ colors.bg.hex }}",
+  fg = "{{ colors.fg.hex }}",
+  accent = "{{ colors.accent.hex }}",
+  surface = "{{ colors.surface.hex }}",
+  muted = "{{ colors.muted.hex }}",
+  red = "{{ red }}",
+  green = "{{ green }}",
+  yellow = "{{ yellow }}",
+  blue = "{{ blue }}",
+  magenta = "{{ magenta }}",
+  cyan = "{{ cyan }}",
+}
+
+local groups = {
+  Normal = { fg = c.fg, bg = c.bg },
+  NormalFloat = { fg = c.fg, bg = c.surface },
+  FloatBorder = { fg = c.accent, bg = c.surface },
+  CursorLine = { bg = c.surface },
+  CursorLineNr = { fg = c.accent, bold = true },
+  LineNr = { fg = c.muted },
+  Visual = { bg = c.surface },
+  Search = { fg = c.bg, bg = c.yellow },
+  IncSearch = { fg = c.bg, bg = c.accent },
+  Pmenu = { fg = c.fg, bg = c.surface },
+  PmenuSel = { fg = c.bg, bg = c.accent },
+  StatusLine = { fg = c.fg, bg = c.surface },
+  StatusLineNC = { fg = c.muted, bg = c.surface },
+  WinSeparator = { fg = c.surface },
+  VertSplit = { fg = c.surface },
+  SignColumn = { bg = c.bg },
+  MatchParen = { fg = c.accent, bold = true },
+  NonText = { fg = c.surface },
+  Directory = { fg = c.accent },
+  Title = { fg = c.accent, bold = true },
+
+  Comment = { fg = c.muted, italic = true },
+  Constant = { fg = c.magenta },
+  String = { fg = c.green },
+  Character = { fg = c.green },
+  Number = { fg = c.magenta },
+  Boolean = { fg = c.magenta },
+  Identifier = { fg = c.fg },
+  Function = { fg = c.blue },
+  Statement = { fg = c.accent },
+  Keyword = { fg = c.accent, italic = true },
+  Operator = { fg = c.cyan },
+  PreProc = { fg = c.cyan },
+  Type = { fg = c.yellow },
+  Special = { fg = c.cyan },
+  Delimiter = { fg = c.muted },
+  Todo = { fg = c.bg, bg = c.yellow, bold = true },
+  Error = { fg = c.red },
+
+  DiagnosticError = { fg = c.red },
+  DiagnosticWarn = { fg = c.yellow },
+  DiagnosticInfo = { fg = c.blue },
+  DiagnosticHint = { fg = c.cyan },
+  DiffAdd = { fg = c.green },
+  DiffChange = { fg = c.yellow },
+  DiffDelete = { fg = c.red },
+}
+
+for name, style in pairs(groups) do
+  vim.api.nvim_set_hl(0, name, style)
+end
+
+-- Цвета встроенного терминала Neovim.
+{%- if ansi | length == 16 %}
+{%- for color in ansi %}
+vim.g.terminal_color_{{ loop.index0 }} = "{{ color.hex }}"
+{%- endfor %}
+{%- endif %}

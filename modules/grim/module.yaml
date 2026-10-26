@@ -6,5 +6,8 @@ exec: >-
   mkdir -p ~/Pictures/Screenshots &&
   grim -g "$(slurp)" - | tee ~/Pictures/Screenshots/$(date +%F_%H-%M-%S).png | wl-copy
 packages: [grim, slurp, wl-clipboard]
+binds:
+  - ", Print, exec, {{ exec }}"
+  - "SHIFT, Print, exec, {{ exec | replace(from='-g \"$(slurp)\" ', to='') }}"
 compatible_with:
   compositor: [hyprland]

@@ -2,7 +2,18 @@
 id: hyprland
 role: compositor
 exec: Hyprland
-packages: [hyprland, xdg-desktop-portal-hyprland]
+# wireplumber (wpctl), brightnessctl и playerctl нужны мультимедийным клавишам,
+# pipewire-pulse — модулю громкости в панели.
+packages:
+  - hyprland
+  - xdg-desktop-portal-hyprland
+  - pipewire
+  - pipewire-pulse
+  - wireplumber
+  - brightnessctl
+  - playerctl
+# pipewire-pulse заменяет PulseAudio: pacman предложит удалить старый.
+conflicts: [pulseaudio]
 templates:
   - src: hyprland.conf.tera
     dest: ~/.config/hypr/hyprland.conf
@@ -16,3 +27,7 @@ defaults:
   kb_layout: us
   # Как переключать раскладку.
   kb_options: grp:alt_shift_toggle
+  # Тени под окнами.
+  shadows: true
+  # Как перелистываются рабочие столы: slide, slidevert, fade.
+  workspace_animation: slide

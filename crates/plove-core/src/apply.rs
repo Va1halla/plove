@@ -40,9 +40,17 @@ pub fn apply(plan: &Plan, env: &Env, options: &ApplyOptions) -> Result<ApplyRepo
         if plan.packages.iter().any(|p| p.installed.is_none()) {
             bail!("pacman не найден, похоже, это не Arch. Запустите с --skip-packages");
         }
-        let missing = plan.missing_packages();
+        let missing = plan.missing_from(false);
         if !missing.is_empty() {
             system::install_packages(&missing)?;
+        }
+        let missing_aur = plan.missing_from(true);
+        if !missing_aur.is_empty() {
+            if !system::command_exists("paru") {
+                println!("Для пакетов из AUR нужен paru, ставлю его.");
+                system::install_paru()?;
+            }
+            system::install_aur(&missing_aur)?;
         }
     }
 
@@ -65,6 +73,13 @@ pub fn apply(plan: &Plan, env: &Env, options: &ApplyOptions) -> Result<ApplyRepo
     // 4. Перезагрузка программ: только на живой системе, внутри графической
     //    сессии и только если что-то поменялось.
     let mut failed_reloads = Vec::new();
+    if !env.sandbox && !changed.is_empty() {
+        for command in &plan.on_apply {
+            if !system::run_command(command) {
+                failed_reloads.push(command.clone());
+            }
+        }
+    }
     let wants_reload = !env.sandbox && !changed.is_empty();
     let session = if wants_reload {
         system::graphical_session()

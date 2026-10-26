@@ -1,0 +1,57 @@
+/* Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`. */
+
+configuration {
+    modi: "drun,run,window";
+    show-icons: true;
+    display-drun: "";
+    display-run: "";
+    display-window: "";
+    drun-display-format: "{name}";
+{%- if apps.terminal %}
+    terminal: "{{ apps.terminal }}";
+{%- endif %}
+}
+
+* {
+    bg: {{ colors.bg.hex }}f2;
+    bg-alt: {{ colors.surface.hex }};
+    fg: {{ colors.fg.hex }};
+    muted: {{ colors.muted.hex }};
+    accent: {{ colors.accent.hex }};
+    background-color: transparent;
+    text-color: @fg;
+    font: "{{ fonts.ui }} {{ fonts.size + 2 }}";
+}
+
+window {
+    width: 36%;
+    background-color: @bg;
+    border: {{ geometry.border }}px;
+    border-color: @accent;
+    border-radius: {{ geometry.radius }}px;
+    padding: 18px;
+}
+
+mainbox { spacing: 12px; children: [ inputbar, listview ]; }
+
+inputbar {
+    background-color: @bg-alt;
+    border-radius: {{ geometry.radius }}px;
+    padding: 10px 14px;
+    spacing: 10px;
+    children: [ prompt, entry ];
+}
+
+prompt { text-color: @accent; }
+entry { placeholder: "Поиск…"; placeholder-color: @muted; }
+
+listview { lines: 8; spacing: 4px; scrollbar: false; }
+
+element {
+    padding: 8px 12px;
+    border-radius: {{ geometry.radius }}px;
+    spacing: 12px;
+}
+element-icon { size: 24px; }
+element selected { background-color: @accent; text-color: @bg; }
+element-text { text-color: inherit; vertical-align: 0.5; }

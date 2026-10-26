@@ -1,0 +1,11 @@
+# Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+# btop сам дописывает сюда свои настройки при выходе — это нормально.
+color_theme = "plove"
+theme_background = False
+truecolor = True
+rounded_corners = {% if geometry.radius > 0 %}True{% else %}False{% endif %}
+graph_symbol = "braille"
+shown_boxes = "cpu mem net proc"
+update_ms = 1500
+proc_sorting = "cpu lazy"
+vim_keys = True

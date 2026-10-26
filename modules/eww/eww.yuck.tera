@@ -1,0 +1,18 @@
+; Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+
+(defpoll time :interval "5s" "date '+%H:%M'")
+(defpoll date :interval "60s" "date '+%A, %d %B'")
+
+(defwindow desktop
+  :monitor 0
+  :geometry (geometry :x "0%" :y "-15%" :anchor "center")
+  :stacking "bg"
+  :exclusive false
+  (box :class "desktop" :orientation "v" :space-evenly false
+    (label :class "time" :text time)
+    (label :class "date" :text date)
+{%- if options.stats %}
+    (box :class "stats" :spacing 24 :halign "center" :space-evenly false
+      (label :text "cpu ${round(EWW_CPU.avg, 0)}%")
+      (label :text "ram ${round(EWW_RAM.used_mem_perc, 0)}%"))
+{%- endif %}))

@@ -11,6 +11,7 @@ templates:
   - src: style.css.tera
     dest: ~/.config/waybar/style.css
 reload: pkill -SIGUSR2 waybar
+autostart: true
 defaults:
   # top или bottom
   position: top

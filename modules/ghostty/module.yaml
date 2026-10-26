@@ -1,0 +1,13 @@
+# Модуль Ghostty: новый быстрый терминал. Альтернатива kitty.
+id: ghostty
+role: terminal
+exec: ghostty
+run_in: ghostty -e
+packages: [ghostty]
+templates:
+  - src: config.tera
+    dest: ~/.config/ghostty/config
+user_files:
+  - ~/.config/ghostty/user.conf
+binds:
+  - "$mod, Return, exec, {{ exec }}"

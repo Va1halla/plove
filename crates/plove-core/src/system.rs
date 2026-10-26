@@ -179,6 +179,79 @@ pub fn install_packages(packages: &[&str]) -> Result<()> {
     Ok(())
 }
 
+/// Поставить пакеты из AUR через paru. paru сам спросит пароль sudo.
+pub fn install_aur(packages: &[&str]) -> Result<()> {
+    let status = Command::new("paru")
+        .args(["-S", "--needed"])
+        .args(packages)
+        .status()
+        .context("не удалось запустить paru")?;
+    if !status.success() {
+        bail!("paru завершился с ошибкой, пакеты из AUR не установлены");
+    }
+    Ok(())
+}
+
+/// Команды установки paru: он сам живёт в AUR, поэтому собираем его
+/// из готового бинарного пакета paru-bin через makepkg.
+pub fn paru_install_commands() -> Vec<Vec<String>> {
+    let build = "rm -rf /tmp/plove-paru && \
+                 git clone https://aur.archlinux.org/paru-bin.git /tmp/plove-paru && \
+                 cd /tmp/plove-paru && makepkg -si --noconfirm";
+    [
+        vec![
+            "sudo",
+            "pacman",
+            "-S",
+            "--needed",
+            "--noconfirm",
+            "base-devel",
+            "git",
+        ],
+        vec!["sh", "-c", build],
+    ]
+    .iter()
+    .map(|c| c.iter().map(|s| s.to_string()).collect())
+    .collect()
+}
+
+/// Поставить paru.
+pub fn install_paru() -> Result<()> {
+    for command in paru_install_commands() {
+        let status = Command::new(&command[0])
+            .args(&command[1..])
+            .status()
+            .with_context(|| format!("не удалось запустить {}", command[0]))?;
+        if !status.success() {
+            bail!(
+                "не удалось поставить paru (команда «{}»)",
+                command.join(" ")
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Выполнить команду через sh без вывода. `false`, если не вышло.
+pub fn run_command(command: &str) -> bool {
+    Command::new("sh")
+        .args(["-c", command])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+/// Есть ли программа в PATH.
+pub fn command_exists(name: &str) -> bool {
+    Command::new("sh")
+        .args(["-c", &format!("command -v {name}")])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
 /// Выполнить команду перезагрузки программы. `false`, если не вышло:
 /// например, программа сейчас не запущена. Это не ошибка.
 pub fn run_reload(command: &str, session: &Session) -> bool {

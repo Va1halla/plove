@@ -1,0 +1,28 @@
+/* Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`. */
+
+* { background-image: none; box-shadow: none; }
+
+window { background-color: rgba({{ colors.bg.rgb }}, 0.85); }
+
+button {
+    color: {{ colors.fg.hex }};
+    font-family: "{{ fonts.ui }}";
+    font-size: {{ fonts.size + 3 }}pt;
+    background-color: {{ colors.surface.hex }};
+    border: {{ geometry.border }}px solid transparent;
+    border-radius: {{ geometry.radius }}px;
+    margin: 12px;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 22%;
+}
+
+button:focus, button:hover {
+    border-color: {{ colors.accent.hex }};
+    background-color: rgba({{ colors.accent.rgb }}, 0.25);
+}
+
+#lock { background-image: image(url("/usr/share/wlogout/icons/lock.png")); }
+#logout { background-image: image(url("/usr/share/wlogout/icons/logout.png")); }
+#reboot { background-image: image(url("/usr/share/wlogout/icons/reboot.png")); }
+#shutdown { background-image: image(url("/usr/share/wlogout/icons/shutdown.png")); }

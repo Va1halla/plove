@@ -1,0 +1,20 @@
+# Модуль gtk: тёмная тема, шрифт и иконки для обычных программ (Thunar,
+# Firefox, диалоги открытия файлов), чтобы они не выглядели чужими.
+id: gtk
+role: gtk
+packages: [gnome-themes-extra, papirus-icon-theme, adwaita-cursors]
+templates:
+  - src: settings.ini.tera
+    dest: ~/.config/gtk-3.0/settings.ini
+  - src: settings.ini.tera
+    dest: ~/.config/gtk-4.0/settings.ini
+  - src: gtk.css.tera
+    dest: ~/.config/gtk-3.0/gtk.css
+  - src: gtk.css.tera
+    dest: ~/.config/gtk-4.0/gtk.css
+# GTK4/libadwaita читает тёмный режим из gsettings, а не из settings.ini.
+on_apply:
+  - "gsettings set org.gnome.desktop.interface color-scheme prefer-dark"
+  - "gsettings set org.gnome.desktop.interface gtk-theme Adwaita-dark"
+  - "gsettings set org.gnome.desktop.interface icon-theme Papirus-Dark"
+  - "gsettings set org.gnome.desktop.interface font-name '{{ fonts.ui }} {{ fonts.size }}'"

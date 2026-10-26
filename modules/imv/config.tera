@@ -1,0 +1,16 @@
+# Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+# Клавиши: стрелки — соседние картинки, +/- — масштаб, f — на весь экран, q — выход.
+
+[options]
+background = {{ colors.bg.raw }}
+overlay = false
+overlay_font = {{ fonts.ui }}:{{ fonts.size + 1 }}
+overlay_text_color = {{ colors.fg.raw }}
+overlay_background_color = {{ colors.surface.raw }}
+overlay_background_alpha = e6
+title_text = imv — $imv_current_file
+
+[binds]
+<Left> = prev
+<Right> = next
+f = fullscreen

@@ -1,0 +1,19 @@
+# Модуль zsh: оболочка с подсказками из истории, подсветкой команд
+# и цветным приглашением в цветах райса. Терминалы запускают её сами
+# (shell в их конфиге), поэтому менять оболочку входа не нужно.
+id: zsh
+role: shell
+exec: zsh
+packages: [zsh, zsh-autosuggestions, zsh-syntax-highlighting, zsh-completions]
+templates:
+  - src: plove.zsh.tera
+    dest: ~/.config/zsh/plove.zsh
+user_files:
+  - ~/.config/zsh/user.zsh
+# ~/.zshrc — файл пользователя: только подключаем в него наш конфиг.
+ensure_lines:
+  - file: ~/.zshrc
+    line: "source ~/.config/zsh/plove.zsh"
+defaults:
+  # Показывать fastfetch при открытии терминала (если он есть в райсе).
+  fetch_on_start: true

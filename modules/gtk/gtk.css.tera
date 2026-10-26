@@ -1,0 +1,28 @@
+/* Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+   Перекрашивает тёмную тему Adwaita в цвета райса. */
+
+@define-color accent_color {{ colors.accent.hex }};
+@define-color accent_bg_color {{ colors.accent.hex }};
+@define-color accent_fg_color {{ colors.bg.hex }};
+@define-color window_bg_color {{ colors.bg.hex }};
+@define-color window_fg_color {{ colors.fg.hex }};
+@define-color view_bg_color {{ colors.bg.hex }};
+@define-color view_fg_color {{ colors.fg.hex }};
+@define-color headerbar_bg_color {{ colors.surface.hex }};
+@define-color headerbar_fg_color {{ colors.fg.hex }};
+@define-color sidebar_bg_color {{ colors.surface.hex }};
+@define-color sidebar_fg_color {{ colors.fg.hex }};
+@define-color popover_bg_color {{ colors.surface.hex }};
+@define-color popover_fg_color {{ colors.fg.hex }};
+@define-color card_bg_color {{ colors.surface.hex }};
+@define-color card_fg_color {{ colors.fg.hex }};
+@define-color dialog_bg_color {{ colors.surface.hex }};
+@define-color dialog_fg_color {{ colors.fg.hex }};
+
+/* Имена цветов GTK3-темы Adwaita. */
+@define-color theme_bg_color {{ colors.bg.hex }};
+@define-color theme_fg_color {{ colors.fg.hex }};
+@define-color theme_base_color {{ colors.bg.hex }};
+@define-color theme_text_color {{ colors.fg.hex }};
+@define-color theme_selected_bg_color {{ colors.accent.hex }};
+@define-color theme_selected_fg_color {{ colors.bg.hex }};

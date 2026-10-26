@@ -31,6 +31,9 @@ pub struct Manifest {
     /// Пакеты pacman, которые нужны модулю.
     #[serde(default)]
     pub packages: Vec<String>,
+    /// Пакеты из AUR (ставятся через paru; paru plove поставит сам).
+    #[serde(default)]
+    pub aur: Vec<String>,
     /// С какими модулями других ролей совместим: роль → список id.
     #[serde(default)]
     pub compatible_with: BTreeMap<String, Vec<String>>,
@@ -47,6 +50,50 @@ pub struct Manifest {
     /// Настройки, которые можно менять через `overrides`, и их значения по умолчанию.
     #[serde(default)]
     pub defaults: serde_yaml::Mapping,
+    /// Запускать `exec` вместе с Hyprland (exec-once): панель, обои, демоны.
+    #[serde(default)]
+    pub autostart: bool,
+    /// Горячие клавиши в формате Hyprland без `bind =`, например
+    /// `$mod, D, exec, {{ exec }}`. Шаблоны: доступны `exec`, `apps`, цвета.
+    #[serde(default)]
+    pub binds: Vec<String>,
+    /// Только у лаунчеров: как вызвать его в режиме «выбрать строку из списка»
+    /// (dmenu). Им пользуются меню выключения и история буфера обмена.
+    #[serde(default)]
+    pub dmenu: Option<String>,
+    /// Только у терминалов: префикс команды «открыть программу в терминале»,
+    /// например `alacritty -e`. Им пользуются btop, yazi и подобные.
+    #[serde(default)]
+    pub run_in: Option<String>,
+    /// Программы, которые мешают этой и останавливаются при применении
+    /// (например, два демона уведомлений не уживаются вместе).
+    #[serde(default)]
+    pub stops: Vec<String>,
+    /// Пакеты, которые конфликтуют с пакетами модуля: план предупредит,
+    /// если они установлены (pacman предложит их удалить).
+    #[serde(default)]
+    pub conflicts: Vec<String>,
+    /// Строки, которые нужно дописать в чужой файл, не перезаписывая его
+    /// (например, подключить конфиг plove в ~/.zshrc).
+    #[serde(default)]
+    pub ensure_lines: Vec<EnsureLine>,
+    /// Команды, которые выполняются после каждого применения с изменениями,
+    /// даже вне графической сессии (например, программы по умолчанию).
+    #[serde(default)]
+    pub on_apply: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EnsureLine {
+    /// Файл, всегда внутри домашней папки (`~/…`).
+    pub file: String,
+    /// Строка, которая должна там быть.
+    pub line: String,
+    /// Не трогать файл, если существует этот путь (например, init.vim
+    /// вместо init.lua: Neovim не любит оба сразу).
+    #[serde(default)]
+    pub unless_exists: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

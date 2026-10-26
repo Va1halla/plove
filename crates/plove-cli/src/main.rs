@@ -403,7 +403,8 @@ fn print_plan(plan: &Plan, env: &Env) {
             Some(false) => ("+", "будет установлен"),
             None => ("?", "не удалось проверить"),
         };
-        println!("  {mark} {:<28} {note}", package.name);
+        let source = if package.aur { " (AUR)" } else { "" };
+        println!("  {mark} {:<28} {note}{source}", package.name);
     }
 
     println!("\nКонфиги:");

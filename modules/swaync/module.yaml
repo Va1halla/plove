@@ -1,0 +1,18 @@
+# Модуль SwayNC: уведомления + боковая панель с историей и переключателями
+# (Super+N). Альтернатива mako.
+id: swaync
+role: notifications
+exec: swaync
+packages: [swaync, libnotify]
+compatible_with:
+  compositor: [hyprland]
+templates:
+  - src: config.json.tera
+    dest: ~/.config/swaync/config.json
+  - src: style.css.tera
+    dest: ~/.config/swaync/style.css
+autostart: true
+stops: [mako, dunst]
+reload: "swaync-client -R -rs || setsid -f {{ exec }} >/dev/null 2>&1"
+binds:
+  - "$mod, N, exec, swaync-client -t -sw"

@@ -15,15 +15,25 @@ theme:
 components:
   compositor: hyprland
   bar: waybar
-  terminal: kitty
-  wallpaper: swaybg
-  launcher: fuzzel
-  notifications: mako
+  terminal: ghostty
+  wallpaper: swww
+  launcher: rofi
+  notifications: swaync
+  power: wlogout
+  widgets: eww
   lock: hyprlock
   idle: hypridle
-  power: power-menu
   screenshot: grim
   clipboard: cliphist
+  polkit: hyprpolkitagent
+  gtk: gtk
+  files: thunar
+  terminal_files: yazi
+  images: imv
+  shell: zsh
+  fetch: fastfetch
+  monitor: btop
+  editor: neovim
 overrides:
   hyprland: { animations: smooth, kb_layout: "us,ru" }
   waybar: { position: bottom, floating: true }

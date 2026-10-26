@@ -1,0 +1,45 @@
+# Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+# Свои настройки пишите в ~/.config/zsh/user.zsh, plove его не трогает.
+
+# История: общая для всех окон, без повторов.
+HISTFILE=~/.zsh_history
+HISTSIZE=10000
+SAVEHIST=10000
+setopt share_history hist_ignore_all_dups hist_reduce_blanks
+setopt autocd interactive_comments
+
+# Дополнение по Tab с меню и без учёта регистра.
+autoload -Uz compinit && compinit
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+
+# Emacs-клавиши (Ctrl+A, Ctrl+E) и поиск по истории стрелками.
+bindkey -e
+autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
+bindkey '^[[A' up-line-or-beginning-search
+bindkey '^[[B' down-line-or-beginning-search
+
+alias ls='ls --color=auto'
+alias ll='ls -lh --group-directories-first'
+alias grep='grep --color=auto'
+
+# Приглашение: папка цветом акцента, ветка git приглушённо,
+# стрелка краснеет, если прошлая команда упала.
+autoload -Uz vcs_info
+precmd() { vcs_info }
+zstyle ':vcs_info:git:*' formats ' %F{{ "{" }}{{ colors.muted.hex }}{{ "}" }}%b%f'
+setopt prompt_subst
+PROMPT='%F{{ "{" }}{{ colors.accent.hex }}{{ "}" }}%~%f${vcs_info_msg_0_} %(?.%F{{ "{" }}{{ colors.fg.hex }}{{ "}" }}.%F{{ "{" }}{% if ansi | length == 16 %}{{ ansi.1.hex }}{% else %}red{% endif %}{{ "}" }})❯%f '
+
+# Подсказки из истории (→ принимает) и подсветка команд.
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg={{ colors.muted.hex }}'
+source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+[[ -f ~/.config/zsh/user.zsh ]] && source ~/.config/zsh/user.zsh
+# Подсветка должна подключаться последней.
+source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+{% if options.fetch_on_start and apps.fetch %}
+# Сводка о системе при открытии терминала.
+[[ -o interactive ]] && {{ apps.fetch }}
+{%- endif %}

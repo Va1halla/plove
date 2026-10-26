@@ -2,6 +2,8 @@
 id: kitty
 role: terminal
 exec: kitty
+# kitty запускает программу, переданную после своих аргументов.
+run_in: kitty
 packages: [kitty]
 templates:
   - src: kitty.conf.tera
@@ -10,3 +12,5 @@ user_files:
   - ~/.config/kitty/user.conf
 # SIGUSR1 заставляет kitty перечитать конфиг во всех окнах.
 reload: pkill -SIGUSR1 kitty
+binds:
+  - "$mod, Return, exec, {{ exec }}"

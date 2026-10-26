@@ -6,6 +6,9 @@ role: wallpaper
 # Цвет пишем без «#»: в конфиге Hyprland «#» начинает комментарий.
 exec: "{% if wallpaper %}swaybg -m fill -i '{{ wallpaper }}'{% else %}swaybg -c {{ colors.bg.raw }}{% endif %}"
 packages: [swaybg]
+autostart: true
+# Двум программам обоев на одном экране не место.
+stops: [swww-daemon, hyprpaper]
 compatible_with:
   compositor: [hyprland]
 # swaybg не умеет перечитывать картинку, поэтому перезапускаем его.

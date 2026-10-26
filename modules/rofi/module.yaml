@@ -1,0 +1,15 @@
+# Модуль rofi: лаунчер приложений с богатыми темами (Super+D).
+# Альтернатива fuzzel; в райсе может быть только один лаунчер.
+id: rofi
+role: launcher
+exec: rofi -show drun
+dmenu: rofi -dmenu -i
+packages: [rofi]
+compatible_with:
+  compositor: [hyprland]
+templates:
+  - src: config.rasi.tera
+    dest: ~/.config/rofi/config.rasi
+binds:
+  - "$mod, D, exec, {{ exec }}"
+  - "$mod, Tab, exec, rofi -show window"

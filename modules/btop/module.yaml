@@ -1,0 +1,13 @@
+# Модуль btop: красивый монитор процессов, графики в цветах райса.
+# Ctrl+Shift+Escape, как диспетчер задач в Windows.
+id: btop
+role: monitor
+exec: "{{ run_in }} btop"
+packages: [btop]
+templates:
+  - src: plove.theme.tera
+    dest: ~/.config/btop/themes/plove.theme
+  - src: btop.conf.tera
+    dest: ~/.config/btop/btop.conf
+binds:
+  - "CTRL SHIFT, Escape, exec, {{ exec }}"

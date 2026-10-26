@@ -4,6 +4,7 @@ id: hypridle
 role: idle
 exec: hypridle
 packages: [hypridle]
+autostart: true
 compatible_with:
   compositor: [hyprland]
   lock: [hyprlock]

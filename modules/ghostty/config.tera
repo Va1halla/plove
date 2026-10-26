@@ -1,0 +1,22 @@
+# Сгенерировано plove из райса «{{ name }}».
+# Этот файл перезаписывается при каждом `plove apply`.
+# Свои настройки пишите в ~/.config/ghostty/user.conf, plove его не трогает.
+
+font-family = {{ fonts.mono }}
+font-size = {{ fonts.size }}
+{% if apps.shell %}command = {{ apps.shell }}
+{% endif -%}
+background = {{ colors.bg.hex }}
+foreground = {{ colors.fg.hex }}
+cursor-color = {{ colors.accent.hex }}
+selection-background = {{ colors.accent.hex }}
+selection-foreground = {{ colors.bg.hex }}
+background-opacity = {{ geometry.opacity }}
+window-padding-x = {{ geometry.gaps }}
+window-padding-y = {{ geometry.gaps }}
+window-decoration = false
+confirm-close-surface = false
+{% for color in ansi -%}
+palette = {{ loop.index0 }}={{ color.hex }}
+{% endfor %}
+config-file = ?user.conf

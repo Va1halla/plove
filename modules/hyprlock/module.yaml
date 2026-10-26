@@ -3,6 +3,8 @@ id: hyprlock
 role: lock
 exec: hyprlock
 packages: [hyprlock]
+binds:
+  - "$mod, L, exec, pidof hyprlock || {{ exec }}"
 compatible_with:
   compositor: [hyprland]
 templates:

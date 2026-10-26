@@ -1,0 +1,24 @@
+{
+    "label" : "lock",
+    "action" : "pidof hyprlock || hyprlock",
+    "text" : "Заблокировать",
+    "keybind" : "l"
+}
+{
+    "label" : "logout",
+    "action" : "hyprctl dispatch exit",
+    "text" : "Выйти",
+    "keybind" : "e"
+}
+{
+    "label" : "reboot",
+    "action" : "systemctl reboot",
+    "text" : "Перезагрузить",
+    "keybind" : "r"
+}
+{
+    "label" : "shutdown",
+    "action" : "systemctl poweroff",
+    "text" : "Выключить",
+    "keybind" : "s"
+}

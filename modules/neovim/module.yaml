@@ -1,0 +1,14 @@
+# Модуль neovim: цветовая схема «plove» в цветах райса. Свой init.lua
+# пользователя не перезаписываем — только дописываем в него одну строку.
+id: neovim
+role: editor
+exec: "{{ run_in }} nvim"
+packages: [neovim]
+templates:
+  - src: plove.lua.tera
+    dest: ~/.config/nvim/colors/plove.lua
+ensure_lines:
+  - file: ~/.config/nvim/init.lua
+    line: "pcall(vim.cmd.colorscheme, \"plove\")"
+    # Neovim не запускается, если есть и init.vim, и init.lua.
+    unless_exists: ~/.config/nvim/init.vim

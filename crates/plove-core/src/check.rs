@@ -81,6 +81,7 @@ pub fn run_all(probe: &dyn Probe) -> Vec<Check> {
         gpu(probe),
         seat(probe),
         login(probe),
+        paru(probe),
         other_desktop(probe),
     ]
 }
@@ -251,6 +252,23 @@ fn login(probe: &dyn Probe) -> Check {
     }
 }
 
+/// paru нужен для пакетов из AUR (например, wlogout). Без него райсы
+/// из официальных репозиториев работают, поэтому это лишь предупреждение.
+fn paru(probe: &dyn Probe) -> Check {
+    if probe.command_exists("paru") {
+        return Check::ok("paru (AUR)", "есть");
+    }
+    Check {
+        fix: crate::system::paru_install_commands(),
+        ..Check::problem(
+            "paru (AUR)",
+            Level::Warn,
+            "не установлен: пакеты из AUR поставить не получится. \
+             plove поставит его сам при первом таком пакете или по --fix",
+        )
+    }
+}
+
 fn other_desktop(probe: &dyn Probe) -> Check {
     let desktops = [
         ("gnome-shell", "GNOME"),
@@ -322,12 +340,7 @@ impl Probe for LiveProbe {
     }
 
     fn command_exists(&self, name: &str) -> bool {
-        Command::new("sh")
-            .args(["-c", &format!("command -v {name}")])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .is_ok_and(|s| s.success())
+        crate::system::command_exists(name)
     }
 
     fn service_active(&self, name: &str) -> bool {
@@ -390,7 +403,7 @@ mod tests {
                 root: false,
                 groups: vec!["wheel", "seat"],
                 seatd_active: true,
-                commands: vec!["pacman", "sudo", "seatd"],
+                commands: vec!["pacman", "sudo", "seatd", "paru"],
                 greetd: true,
             }
         }

@@ -3,8 +3,11 @@ id: cliphist
 role: clipboard
 exec: wl-paste --watch cliphist store
 packages: [cliphist, wl-clipboard]
+autostart: true
+binds:
+  - "$mod SHIFT, V, exec, cliphist list | {{ dmenu }} | cliphist decode | wl-copy"
 compatible_with:
   compositor: [hyprland]
-  launcher: [fuzzel]
+  launcher: [fuzzel, rofi]
 # Своего конфига нет; при первом применении запускаем сборщик истории.
 reload: "pgrep -f 'cliphist store' >/dev/null || setsid -f {{ exec }} >/dev/null 2>&1"

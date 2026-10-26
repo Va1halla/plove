@@ -1,0 +1,7 @@
+# Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+[Settings]
+gtk-theme-name=Adwaita-dark
+gtk-application-prefer-dark-theme=1
+gtk-icon-theme-name=Papirus-Dark
+gtk-cursor-theme-name=Adwaita
+gtk-font-name={{ fonts.ui }} {{ fonts.size }}

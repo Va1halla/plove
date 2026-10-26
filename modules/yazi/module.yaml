@@ -1,0 +1,13 @@
+# Модуль yazi: файловый менеджер в терминале с превью картинок
+# (Super+Shift+F). Отлично смотрится на скриншотах.
+id: yazi
+role: terminal_files
+exec: "{{ run_in }} yazi"
+packages: [yazi, ffmpegthumbnailer, poppler, 7zip, jq, fd, ripgrep, fzf, zoxide, imagemagick]
+templates:
+  - src: theme.toml.tera
+    dest: ~/.config/yazi/theme.toml
+binds:
+  - "$mod SHIFT, F, exec, {{ exec }}"
+# 7zip заменил старый p7zip: pacman предложит удалить p7zip, план предупредит.
+conflicts: [p7zip]

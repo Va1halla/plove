@@ -42,6 +42,8 @@ pub struct PackageStatus {
     pub name: String,
     /// `Some(true)` — стоит, `Some(false)` — нет, `None` — не удалось проверить.
     pub installed: Option<bool>,
+    /// Пакет из AUR: ставится через paru, а не pacman.
+    pub aur: bool,
 }
 
 pub struct Plan {
@@ -50,8 +52,11 @@ pub struct Plan {
     pub files: Vec<FileChange>,
     /// Пустые файлы для ручных правок, которых ещё нет.
     pub user_files: Vec<PathBuf>,
-    /// Команды перезагрузки программ после записи конфигов.
+    /// Команды перезагрузки программ после записи конфигов
+    /// (только внутри графической сессии).
     pub reloads: Vec<String>,
+    /// Команды после записи конфигов, которые выполняются всегда.
+    pub on_apply: Vec<String>,
     pub warnings: Vec<String>,
 }
 
@@ -60,6 +65,15 @@ impl Plan {
         self.packages
             .iter()
             .filter(|p| p.installed == Some(false))
+            .map(|p| p.name.as_str())
+            .collect()
+    }
+
+    /// Недостающие пакеты по источнику: `aur = false` — pacman, `true` — AUR.
+    pub fn missing_from(&self, aur: bool) -> Vec<&str> {
+        self.packages
+            .iter()
+            .filter(|p| p.installed == Some(false) && p.aur == aur)
             .map(|p| p.name.as_str())
             .collect()
     }
@@ -162,6 +176,22 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         system::virtual_machine()
     };
     base.insert("vm", &vm);
+    // Режим «выбрать из списка» у лаунчера. Нужен до команд запуска:
+    // через него работает, например, меню выключения.
+    // То же для «открыть программу в терминале».
+    let mut dmenu = String::new();
+    let mut run_in = String::new();
+    for module in &modules {
+        let id = &module.manifest.id;
+        if let Some(template) = &module.manifest.dmenu {
+            dmenu = render::render_str(template, &base, &format!("{id}/module.yaml (dmenu)"))?;
+        }
+        if let Some(template) = &module.manifest.run_in {
+            run_in = render::render_str(template, &base, &format!("{id}/module.yaml (run_in)"))?;
+        }
+    }
+    base.insert("dmenu", &dmenu);
+    base.insert("run_in", &run_in);
     let mut apps: BTreeMap<String, String> = BTreeMap::new();
     for module in &modules {
         if let Some(exec) = &module.manifest.exec {
@@ -172,6 +202,43 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
             );
         }
     }
+
+    // Автозапуск и горячие клавиши всех модулей: их собирает конфиг Hyprland.
+    let mut autostart = Vec::new();
+    let mut binds = Vec::new();
+    // Клавиши, которые уже заняты самим конфигом Hyprland (см. hyprland.conf.tera).
+    let mut taken_keys: BTreeMap<String, String> = ["Q", "V", "F"]
+        .into_iter()
+        .map(|k| (bind_key(&format!("$mod, {k}")), "hyprland".to_string()))
+        .collect();
+    for module in &modules {
+        let exec = apps.get(&module.manifest.role);
+        if module.manifest.autostart {
+            if let Some(exec) = exec {
+                autostart.push(exec.clone());
+            }
+        }
+        let mut context = base.clone();
+        context.insert("apps", &apps);
+        context.insert("exec", &exec);
+        for bind in &module.manifest.binds {
+            let what = format!("{}/module.yaml (binds)", module.manifest.id);
+            let bind = render::render_str(bind, &context, &what)?;
+            // Два модуля на одной клавише: Hyprland запустит оба, это почти всегда ошибка.
+            let key = bind_key(&bind);
+            if let Some(owner) = taken_keys.get(&key) {
+                warnings.push(format!(
+                    "клавиша {} занята дважды: {} и {}",
+                    key, owner, module.manifest.id
+                ));
+            } else {
+                taken_keys.insert(key, module.manifest.id.clone());
+            }
+            binds.push(bind);
+        }
+    }
+    base.insert("autostart", &autostart);
+    base.insert("binds", &binds);
 
     // 5. Рендерим конфиги и сравниваем с тем, что сейчас на диске.
     for module in &modules {
@@ -185,25 +252,66 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         }
     }
 
-    // 6. Пакеты: от модулей и от шрифтов. Без повторов, порядок сохраняем.
-    let mut package_names: Vec<String> = Vec::new();
+    // Строки в чужих файлах: дописываем, только если их там ещё нет.
     for module in &modules {
-        package_names.extend(module.manifest.packages.iter().cloned());
+        for entry in &module.manifest.ensure_lines {
+            if !entry.file.starts_with("~/") {
+                bail!(
+                    "{}: ensure_lines должен указывать на файл в ~/",
+                    module.manifest.id
+                );
+            }
+            if let Some(other) = &entry.unless_exists {
+                if env.expand(other).exists() {
+                    warnings.push(format!(
+                        "{}: есть {other}, поэтому {} не трогаю. Добавьте вручную: {}",
+                        module.manifest.id, entry.file, entry.line
+                    ));
+                    continue;
+                }
+            }
+            let path = env.expand(&entry.file);
+            let mut text = std::fs::read_to_string(&path).unwrap_or_default();
+            if text.lines().any(|l| l.trim() == entry.line.trim()) {
+                continue;
+            }
+            if files.iter().any(|f| f.path == path) {
+                bail!("два модуля пишут в один файл {}", entry.file);
+            }
+            if !text.is_empty() && !text.ends_with('\n') {
+                text.push('\n');
+            }
+            text.push_str(&entry.line);
+            text.push('\n');
+            files.push(file_change(path, text.into_bytes()));
+        }
+    }
+
+    // 6. Пакеты: от модулей и от шрифтов. Без повторов, порядок сохраняем.
+    // Второй элемент пары: пакет из AUR.
+    let mut package_names: Vec<(String, bool)> = Vec::new();
+    for module in &modules {
+        package_names.extend(module.manifest.packages.iter().map(|p| (p.clone(), false)));
+        package_names.extend(module.manifest.aur.iter().map(|p| (p.clone(), true)));
     }
     let fonts = &spec.theme.fonts;
     for font in [&fonts.ui, &fonts.mono] {
         match font_package(font) {
-            Some(package) => package_names.push(package.to_string()),
+            Some(package) => package_names.push((package.to_string(), false)),
             None => warnings.push(format!(
                 "не знаю, какой пакет ставит шрифт «{font}». Установите его вручную"
             )),
         }
     }
     let mut packages: Vec<PackageStatus> = Vec::new();
-    for name in package_names {
+    for (name, aur) in package_names {
         if !packages.iter().any(|p| p.name == name) {
             let installed = system::package_installed(&name);
-            packages.push(PackageStatus { name, installed });
+            packages.push(PackageStatus {
+                name,
+                installed,
+                aur,
+            });
         }
     }
 
@@ -214,7 +322,39 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         .map(|f| env.expand(f))
         .filter(|path| !path.exists())
         .collect();
+    // Сначала останавливаем программы, которые мешают выбранным
+    // (но не сами выбранные: их имя совпадает с первым словом команды запуска).
+    let chosen: Vec<&str> = apps
+        .values()
+        .filter_map(|exec| exec.split_whitespace().next())
+        .collect();
     let mut reloads = Vec::new();
+    for module in &modules {
+        for name in &module.manifest.stops {
+            // Linux хранит имя процесса только до 15 символов, поэтому
+            // длинные имена ищем по командной строке.
+            let flag = if name.len() > 15 { "-f" } else { "-x" };
+            let stop = format!("pkill {flag} {name}; true");
+            if !chosen.contains(&name.as_str()) && !reloads.contains(&stop) {
+                reloads.push(stop);
+            }
+        }
+        for package in &module.manifest.conflicts {
+            if system::package_installed(package) == Some(true) {
+                warnings.push(format!(
+                    "{} конфликтует с установленным пакетом {package}: pacman предложит его удалить",
+                    module.manifest.id
+                ));
+            }
+        }
+    }
+    let mut on_apply = Vec::new();
+    for module in &modules {
+        for command in &module.manifest.on_apply {
+            let what = format!("{}/module.yaml (on_apply)", module.manifest.id);
+            on_apply.push(render::render_str(command, &base, &what)?);
+        }
+    }
     for module in &modules {
         if let Some(reload) = &module.manifest.reload {
             let mut context = base.clone();
@@ -230,11 +370,27 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         files,
         user_files,
         reloads,
+        on_apply,
         warnings,
     })
 }
 
 /// Сравнить новое содержимое файла с тем, что сейчас на диске.
+/// Сочетание клавиш из строки `bind`: «$mod SHIFT, E, exec, …» → «$MOD+SHIFT+E».
+/// Модификаторы сортируются, чтобы «SHIFT $mod» и «$mod SHIFT» совпали.
+fn bind_key(bind: &str) -> String {
+    let mut parts = bind.splitn(3, ',');
+    let mut mods: Vec<String> = parts
+        .next()
+        .unwrap_or("")
+        .split_whitespace()
+        .map(str::to_uppercase)
+        .collect();
+    mods.sort();
+    mods.push(parts.next().unwrap_or("").trim().to_uppercase());
+    mods.join("+")
+}
+
 fn file_change(path: PathBuf, content: Vec<u8>) -> FileChange {
     // fs::read вернёт ошибку, если файла нет: `.ok()` превращает её в None.
     let status = match std::fs::read(&path).ok() {
@@ -271,4 +427,20 @@ pub fn module_options(
         }
     }
     Ok(serde_json::to_value(options)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bind_key_ignores_modifier_order_and_case() {
+        assert_eq!(bind_key("$mod SHIFT, E, exec, wlogout"), "$MOD+SHIFT+E");
+        assert_eq!(bind_key("SHIFT $mod, e, exec, other"), "$MOD+SHIFT+E");
+        assert_eq!(bind_key(", Print, exec, grim"), "PRINT");
+        assert_ne!(
+            bind_key("$mod, E, exec, thunar"),
+            bind_key("$mod SHIFT, E, exec, x")
+        );
+    }
 }

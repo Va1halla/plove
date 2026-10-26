@@ -3,6 +3,9 @@ id: mako
 role: notifications
 exec: mako
 packages: [mako, libnotify]
+autostart: true
+# Уведомления может показывать только одна программа.
+stops: [swaync, dunst]
 compatible_with:
   compositor: [hyprland]
 templates:

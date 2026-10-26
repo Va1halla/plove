@@ -3,6 +3,9 @@
 id: fuzzel
 role: launcher
 exec: fuzzel
+dmenu: fuzzel --dmenu
+binds:
+  - "$mod, D, exec, {{ exec }}"
 packages: [fuzzel]
 compatible_with:
   compositor: [hyprland]

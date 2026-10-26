@@ -1,0 +1,11 @@
+# Модуль imv: быстрый просмотрщик картинок. Становится программой
+# по умолчанию для PNG, JPEG, GIF, WebP и других форматов.
+id: imv
+role: images
+exec: imv
+packages: [imv, xdg-utils]
+templates:
+  - src: config.tera
+    dest: ~/.config/imv/config
+on_apply:
+  - "xdg-mime default imv.desktop image/png image/jpeg image/gif image/webp image/bmp image/tiff image/svg+xml image/avif image/heic"

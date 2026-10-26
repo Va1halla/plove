@@ -1,0 +1,16 @@
+# Модуль swww: обои с анимированной сменой. При применении нового райса
+# обои меняются плавной волной, а не мгновенно. Альтернатива swaybg.
+id: swww
+role: wallpaper
+exec: "{% if wallpaper %}swww-daemon & sleep 1; swww img '{{ wallpaper }}' --transition-type none{% else %}swww-daemon & sleep 1; swww clear {{ colors.bg.raw }}{% endif %}"
+packages: [swww]
+compatible_with:
+  compositor: [hyprland]
+autostart: true
+stops: [swaybg, hyprpaper]
+defaults:
+  # Анимация смены: grow, wipe, wave, outer, any, fade, simple.
+  transition: grow
+reload: >-
+  pgrep -x swww-daemon >/dev/null || { setsid -f swww-daemon >/dev/null 2>&1; sleep 1; };
+  {% if wallpaper %}swww img '{{ wallpaper }}' --transition-type grow --transition-pos top-right --transition-fps 60 --transition-duration 1.2{% else %}swww clear {{ colors.bg.raw }}{% endif %}

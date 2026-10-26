@@ -1,0 +1,54 @@
+# Сгенерировано plove из райса «{{ name }}».
+# Этот файл перезаписывается при каждом `plove apply`.
+# Свои настройки пишите в ~/.config/alacritty/user.toml, plove его не трогает.
+
+[general]
+import = ["~/.config/alacritty/user.toml"]
+live_config_reload = true
+
+{% if apps.shell -%}
+[terminal.shell]
+program = "{{ apps.shell }}"
+
+{% endif -%}
+[window]
+padding = { x = {{ geometry.gaps }}, y = {{ geometry.gaps }} }
+opacity = {{ geometry.opacity }}
+decorations = "None"
+
+[font]
+normal = { family = "{{ fonts.mono }}" }
+size = {{ fonts.size }}
+
+[colors.primary]
+background = "{{ colors.bg.hex }}"
+foreground = "{{ colors.fg.hex }}"
+
+[colors.cursor]
+cursor = "{{ colors.accent.hex }}"
+text = "{{ colors.bg.hex }}"
+
+[colors.selection]
+background = "{{ colors.accent.hex }}"
+text = "{{ colors.bg.hex }}"
+{% if ansi | length == 16 %}
+[colors.normal]
+black = "{{ ansi.0.hex }}"
+red = "{{ ansi.1.hex }}"
+green = "{{ ansi.2.hex }}"
+yellow = "{{ ansi.3.hex }}"
+blue = "{{ ansi.4.hex }}"
+magenta = "{{ ansi.5.hex }}"
+cyan = "{{ ansi.6.hex }}"
+white = "{{ ansi.7.hex }}"
+
+[colors.bright]
+black = "{{ ansi.8.hex }}"
+red = "{{ ansi.9.hex }}"
+green = "{{ ansi.10.hex }}"
+yellow = "{{ ansi.11.hex }}"
+blue = "{{ ansi.12.hex }}"
+magenta = "{{ ansi.13.hex }}"
+cyan = "{{ ansi.14.hex }}"
+white = "{{ ansi.15.hex }}"
+{% endif %}

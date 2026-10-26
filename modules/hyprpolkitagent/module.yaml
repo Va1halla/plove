@@ -1,0 +1,10 @@
+# Модуль hyprpolkitagent: окно ввода пароля, когда программе нужны права
+# администратора (например, файловому менеджеру смонтировать диск).
+id: hyprpolkitagent
+role: polkit
+exec: systemctl --user start hyprpolkitagent
+packages: [hyprpolkitagent]
+compatible_with:
+  compositor: [hyprland]
+autostart: true
+stops: [polkit-gnome-authentication-agent-1, lxpolkit]

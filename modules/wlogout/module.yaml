@@ -1,0 +1,15 @@
+# Модуль wlogout: полноэкранное меню выхода с большими кнопками
+# (Super+Shift+E). Альтернатива power-menu. Живёт в AUR.
+id: wlogout
+role: power
+exec: wlogout -b 4 -T 400 -B 400
+aur: [wlogout]
+compatible_with:
+  compositor: [hyprland]
+templates:
+  - src: layout.tera
+    dest: ~/.config/wlogout/layout
+  - src: style.css.tera
+    dest: ~/.config/wlogout/style.css
+binds:
+  - "$mod SHIFT, E, exec, pidof wlogout || {{ exec }}"

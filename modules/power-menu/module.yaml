@@ -1,9 +1,9 @@
 # Модуль power-menu: меню «заблокировать / выйти / перезагрузить / выключить»
-# по Super+Shift+E. Своей программы нет: меню рисует лаунчер fuzzel.
+# по Super+Shift+E. Своей программы нет: меню рисует лаунчер (fuzzel или rofi).
 id: power-menu
 role: power
 exec: >-
-  case $(printf 'Заблокировать\nВыйти\nПерезагрузить\nВыключить' | fuzzel --dmenu --lines 4 --width 20 --prompt '⏻ ') in
+  case $(printf 'Заблокировать\nВыйти\nПерезагрузить\nВыключить' | {{ dmenu }}) in
   Заблокировать) pidof hyprlock || hyprlock ;;
   Выйти) hyprctl dispatch exit ;;
   Перезагрузить) systemctl reboot ;;
@@ -11,4 +11,6 @@ exec: >-
   esac
 compatible_with:
   compositor: [hyprland]
-  launcher: [fuzzel]
+  launcher: [fuzzel, rofi]
+binds:
+  - "$mod SHIFT, E, exec, {{ exec }}"

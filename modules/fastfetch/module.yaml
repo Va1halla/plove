@@ -1,0 +1,9 @@
+# Модуль fastfetch: сводка о системе с логотипом — обязательный
+# кадр любого скриншота райса. Запускается из оболочки при открытии терминала.
+id: fastfetch
+role: fetch
+exec: fastfetch
+packages: [fastfetch]
+templates:
+  - src: config.jsonc.tera
+    dest: ~/.config/fastfetch/config.jsonc

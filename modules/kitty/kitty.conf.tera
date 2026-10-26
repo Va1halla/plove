@@ -13,7 +13,8 @@ selection_foreground {{ colors.bg.hex }}
 background_opacity {{ geometry.opacity }}
 window_padding_width {{ geometry.gaps }}
 confirm_os_window_close 0
-{% for color in ansi %}
+{% if apps.shell %}shell {{ apps.shell }}
+{% endif %}{% for color in ansi %}
 color{{ loop.index0 }} {{ color.hex }}
 {%- endfor %}
 
