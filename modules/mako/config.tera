@@ -1,0 +1,21 @@
+# Сгенерировано plove из райса «{{ name }}».
+# Этот файл перезаписывается при каждом `plove apply`.
+
+font={{ fonts.ui }} {{ fonts.size }}
+anchor={{ options.anchor }}
+default-timeout={{ options.timeout }}
+margin={{ geometry.gaps }}
+padding=12
+width=360
+border-size={{ geometry.border }}
+border-radius={{ geometry.radius }}
+background-color={{ colors.bg.hex }}
+text-color={{ colors.fg.hex }}
+border-color={{ colors.accent.hex }}
+progress-color=over {{ colors.surface.hex }}
+
+[urgency=low]
+border-color={{ colors.muted.hex }}
+
+[urgency=critical]
+default-timeout=0

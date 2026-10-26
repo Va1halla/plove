@@ -1,0 +1,56 @@
+# Сгенерировано plove из райса «{{ name }}».
+# Этот файл перезаписывается при каждом `plove apply`.
+
+general {
+    hide_cursor = true
+}
+
+background {
+{%- if wallpaper %}
+    path = {{ wallpaper }}
+    blur_passes = 3
+    brightness = 0.6
+{%- else %}
+    color = rgb({{ colors.bg.raw }})
+{%- endif %}
+}
+
+# Часы
+label {
+    text = cmd[update:1000] date +%H:%M
+    color = rgb({{ colors.fg.raw }})
+    font_family = {{ fonts.ui }}
+    font_size = 96
+    position = 0, 160
+    halign = center
+    valign = center
+}
+
+# Дата
+label {
+    text = cmd[update:60000] date +"%A, %d %B"
+    color = rgb({{ colors.muted.raw }})
+    font_family = {{ fonts.ui }}
+    font_size = {{ fonts.size + 7 }}
+    position = 0, 70
+    halign = center
+    valign = center
+}
+
+input-field {
+    size = 320, 56
+    outline_thickness = {{ geometry.border }}
+    rounding = {{ geometry.radius }}
+    outer_color = rgb({{ colors.accent.raw }})
+    inner_color = rgb({{ colors.bg.raw }})
+    font_color = rgb({{ colors.fg.raw }})
+    check_color = rgb({{ colors.accent.raw }})
+{%- if ansi | length == 16 %}
+    fail_color = rgb({{ ansi.1.raw }})
+{%- endif %}
+    placeholder_text = Пароль
+    fade_on_empty = false
+    position = 0, -40
+    halign = center
+    valign = center
+}

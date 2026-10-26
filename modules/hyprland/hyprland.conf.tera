@@ -8,10 +8,11 @@ monitor = , preferred, auto, 1
 # с «unknown object … attach»). Пусть они рисуют программно.
 env = LIBGL_ALWAYS_SOFTWARE,1
 {% endif %}
-{% if apps.wallpaper %}exec-once = {{ apps.wallpaper }}
+# Фоновые программы: обои, панель, уведомления, простой, буфер обмена.
+{% for role in ["wallpaper", "bar", "notifications", "idle", "clipboard"] -%}
+{% if apps[role] %}exec-once = {{ apps[role] }}
 {% endif -%}
-{% if apps.bar %}exec-once = {{ apps.bar }}
-{% endif %}
+{% endfor %}
 general {
     gaps_in = {{ geometry.gaps_in }}
     gaps_out = {{ geometry.gaps }}
@@ -56,8 +57,19 @@ $mod = SUPER
 
 {% if apps.terminal %}bind = $mod, Return, exec, {{ apps.terminal }}
 {% endif -%}
+{% if apps.launcher %}bind = $mod, D, exec, {{ apps.launcher }}
+{% endif -%}
+{% if apps.lock %}bind = $mod, L, exec, pidof hyprlock || {{ apps.lock }}
+{% endif -%}
+{% if apps.screenshot %}bind = , Print, exec, {{ apps.screenshot }}
+bind = SHIFT, Print, exec, {{ apps.screenshot | replace(from='-g "$(slurp)" ', to="") }}
+{% endif -%}
+{% if apps.clipboard and apps.launcher %}bind = $mod SHIFT, V, exec, cliphist list | {{ apps.launcher }} --dmenu | cliphist decode | wl-copy
+{% endif -%}
 bind = $mod, Q, killactive,
-bind = $mod SHIFT, E, exit,
+{% if apps.power %}bind = $mod SHIFT, E, exec, {{ apps.power }}
+{% else %}bind = $mod SHIFT, E, exit,
+{% endif -%}
 bind = $mod, V, togglefloating,
 bind = $mod, F, fullscreen,
 

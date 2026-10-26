@@ -1,0 +1,17 @@
+# Модуль mako: всплывающие уведомления.
+id: mako
+role: notifications
+exec: mako
+packages: [mako, libnotify]
+compatible_with:
+  compositor: [hyprland]
+templates:
+  - src: config.tera
+    dest: ~/.config/mako/config
+# Если mako ещё не запущен (райс применён впервые), запускаем его.
+reload: "makoctl reload || setsid -f {{ exec }} >/dev/null 2>&1"
+defaults:
+  # В каком углу показывать: top-right, top-left, bottom-right, bottom-left.
+  anchor: top-right
+  # Сколько миллисекунд висит уведомление.
+  timeout: 5000

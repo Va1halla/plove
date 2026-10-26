@@ -1,0 +1,10 @@
+# Модуль hyprlock: экран блокировки (Super+L или автоматически через hypridle).
+id: hyprlock
+role: lock
+exec: hyprlock
+packages: [hyprlock]
+compatible_with:
+  compositor: [hyprland]
+templates:
+  - src: hyprlock.conf.tera
+    dest: ~/.config/hypr/hyprlock.conf

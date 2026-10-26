@@ -293,7 +293,11 @@ impl App {
                 KeyCode::Down | KeyCode::Char('j') => {
                     self.setting_row = (self.setting_row + 1).min(Settings::ROWS - 1)
                 }
-                KeyCode::Char(' ') | KeyCode::Right => self.settings.toggle(self.setting_row),
+                // Все настройки сейчас — переключатели с двумя значениями,
+                // поэтому и ←, и → просто меняют значение. Назад — Esc.
+                KeyCode::Char(' ') | KeyCode::Left | KeyCode::Right => {
+                    self.settings.toggle(self.setting_row)
+                }
                 KeyCode::Enter => {
                     match plan::build(self.final_spec(), registry, env) {
                         Ok(plan) => {
@@ -307,7 +311,7 @@ impl App {
                     }
                     self.step = Step::Plan;
                 }
-                KeyCode::Esc | KeyCode::Backspace | KeyCode::Left => self.step = Step::Rice,
+                KeyCode::Esc | KeyCode::Backspace => self.step = Step::Rice,
                 _ => {}
             },
             Step::Plan => match key {
@@ -369,7 +373,7 @@ impl App {
             }
             Step::Checks => " Enter дальше · f исправить автоматически · q выйти",
             Step::Rice => " ↑↓ выбрать · Enter дальше · Esc назад · q выйти",
-            Step::Settings => " ↑↓ выбрать · Пробел изменить · Enter показать план · Esc назад",
+            Step::Settings => " ↑↓ выбрать · ←→ или Пробел изменить · Enter показать план · Esc назад",
             Step::Plan => " Enter применить · Esc назад · q выйти",
         }
     }
@@ -588,12 +592,32 @@ mod tests {
         fn service_active(&self, _: &str) -> bool {
             true
         }
+        fn service_enabled(&self, _: &str) -> bool {
+            true
+        }
         fn path_exists(&self, path: &str) -> bool {
             path == "/dev/dri/card0"
         }
         fn online(&self) -> bool {
             true
         }
+    }
+
+    /// ← в настройках меняет значение, а не уводит на прошлый экран.
+    #[test]
+    fn left_arrow_toggles_setting() {
+        let registry = Registry::builtin().unwrap();
+        let env = Env::sandbox(std::env::temp_dir().join("plove-tui-left"));
+        let mut app = App::new(&Healthy).unwrap();
+        app.handle(KeyCode::Enter, &registry, &env);
+        app.handle(KeyCode::Enter, &registry, &env);
+        assert!(matches!(app.step, Step::Settings));
+        let before = app.settings.russian;
+        app.handle(KeyCode::Left, &registry, &env);
+        assert!(matches!(app.step, Step::Settings));
+        assert_ne!(app.settings.russian, before);
+        app.handle(KeyCode::Esc, &registry, &env);
+        assert!(matches!(app.step, Step::Rice));
     }
 
     #[test]
