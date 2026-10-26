@@ -4,6 +4,16 @@
 
 > Ранняя версия: ядро, CLI, TUI-мастер, 4 готовых райса и превью.
 
+## Готовые райсы
+
+| tokyo-night | catppuccin-mocha |
+| --- | --- |
+| ![tokyo-night](docs/previews/tokyo-night.png) | ![catppuccin-mocha](docs/previews/catppuccin-mocha.png) |
+| **gruvbox** | **nord** |
+| ![gruvbox](docs/previews/gruvbox.png) | ![nord](docs/previews/nord.png) |
+
+Это превью, которые рисует сама plove (`plove preview <райс>`), а не скриншоты: настоящий рабочий стол выглядит так же по цветам, обоям и геометрии, но содержимое окон выдумано.
+
 ## Быстрый старт
 
 ```sh
@@ -66,6 +76,7 @@ rice.yaml ──► spec    разбор и проверка райса
 | `crates/plove-cli/src/main.rs` | командная строка |
 | `modules/` | модули программ |
 | `presets/` | готовые райсы |
+| `docs/previews/` | картинки для README (`plove preview`) |
 
 Тесты: `cargo test`.
 
