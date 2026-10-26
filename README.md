@@ -18,7 +18,7 @@
 
 ```sh
 cargo build --release
-# Мастер: проверка системы, выбор райса и настроек, план, применение:
+# Мастер: проверка системы, выбор райса, стиль и программы, тонкая настройка, план:
 ./target/release/plove
 # Проверить систему отдельно (и починить то, что можно, с --fix):
 ./target/release/plove doctor
@@ -70,7 +70,7 @@ theme:
     glass: light       # none, light, strong — прозрачность и размытие
 ```
 
-Состав панели задаётся в `overrides.waybar`: `modules_left`, `modules_center`, `modules_right` из launcher, workspaces, window, clock, media, cpu, memory, backlight, pulseaudio, network, battery, language, tray, power. Панель можно поставить и вертикально: `position: left`. Панелей может быть несколько, в том числе свои на разных мониторах:
+Всё это можно выбрать и в мастере (`plove`) на экране настроек стрелками ←→. Состав панели задаётся в `overrides.waybar`: `modules_left`, `modules_center`, `modules_right` из launcher, workspaces, window, clock, media, cpu, memory, backlight, pulseaudio, network, battery, language, tray, power. Панель можно поставить и вертикально: `position: left`. Панелей может быть несколько, в том числе свои на разных мониторах:
 
 ```yaml
 overrides:

@@ -167,19 +167,46 @@ struct Program {
     current: usize,
 }
 
+/// Токены стиля на экране настроек: (ключ в theme.style, подпись, варианты).
+const STYLE_TOKENS: [(&str, &str, &[&str]); 7] = [
+    ("shape", "Форма", &["sharp", "rounded", "pill"]),
+    (
+        "bar",
+        "Вид панели",
+        &["solid", "floating", "islands", "minimal"],
+    ),
+    (
+        "separators",
+        "Разделители",
+        &["none", "dots", "line", "arrows", "slants", "round"],
+    ),
+    (
+        "borders",
+        "Рамки окон",
+        &["none", "thin", "accent", "gradient"],
+    ),
+    ("density", "Плотность", &["compact", "normal", "spacious"]),
+    ("labels", "Подписи", &["glyphs", "text", "both"]),
+    ("glass", "Стекло", &["none", "light", "strong"]),
+];
+
+const POSITIONS: [&str; 4] = ["top", "bottom", "left", "right"];
+
 /// Настройки, которые мастер позволяет поменять поверх готового райса.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Settings {
     /// Раскладка us,ru вместо us.
     russian: bool,
-    bar_bottom: bool,
-    bar_floating: bool,
+    /// Индекс в POSITIONS.
+    position: usize,
+    /// Индексы вариантов в STYLE_TOKENS.
+    style: [usize; 7],
     programs: Vec<Program>,
 }
 
 impl Settings {
-    /// Строки-переключатели до списка программ.
-    const SWITCHES: usize = 3;
+    /// Строки до списка программ: раскладка, панель и токены стиля.
+    const SWITCHES: usize = 2 + STYLE_TOKENS.len();
 
     /// Прочитать текущие значения из райса. Из реестра берём, какие
     /// программы вообще есть для каждой роли.
@@ -209,14 +236,22 @@ impl Settings {
                 current,
             });
         }
+        // Стиль через YAML: так не нужно перечислять варианты каждого enum в коде.
+        let style = serde_yaml::to_value(spec.theme.style).unwrap_or_default();
+        let mut indexes = [0; 7];
+        for (i, (key, _, variants)) in STYLE_TOKENS.iter().enumerate() {
+            let value = style.get(key).and_then(Value::as_str).unwrap_or("");
+            indexes[i] = variants.iter().position(|v| *v == value).unwrap_or(0);
+        }
+        let position = get("waybar", "position")
+            .and_then(Value::as_str)
+            .unwrap_or("top");
         Settings {
             russian: get("hyprland", "kb_layout")
                 .and_then(Value::as_str)
                 .is_some_and(|l| l.contains("ru")),
-            bar_bottom: get("waybar", "position").and_then(Value::as_str) == Some("bottom"),
-            bar_floating: get("waybar", "floating")
-                .and_then(Value::as_bool)
-                .unwrap_or(false),
+            position: POSITIONS.iter().position(|p| *p == position).unwrap_or(0),
+            style: indexes,
             programs,
         }
     }
@@ -228,10 +263,15 @@ impl Settings {
     /// Записать настройки в райс.
     fn apply_to(&self, spec: &mut RiceSpec) {
         let layout = if self.russian { "us,ru" } else { "us" };
-        let position = if self.bar_bottom { "bottom" } else { "top" };
         set(spec, "hyprland", "kb_layout", layout.into());
-        set(spec, "waybar", "position", position.into());
-        set(spec, "waybar", "floating", self.bar_floating.into());
+        set(spec, "waybar", "position", POSITIONS[self.position].into());
+        let mut style = serde_yaml::Mapping::new();
+        for (i, (key, _, variants)) in STYLE_TOKENS.iter().enumerate() {
+            style.insert((*key).into(), variants[self.style[i]].into());
+        }
+        if let Ok(style) = serde_yaml::from_value(Value::Mapping(style)) {
+            spec.theme.style = style;
+        }
         for program in &self.programs {
             let id = &program.choices[program.current];
             if id.is_empty() {
@@ -244,52 +284,42 @@ impl Settings {
 
     /// Поменять значение строки: → вперёд по списку, ← назад.
     fn change(&mut self, row: usize, forward: bool) {
+        // Как `%` в Python: + n, чтобы не уйти в минус при движении назад.
+        let cycle = |i: usize, n: usize| {
+            if forward {
+                (i + 1) % n
+            } else {
+                (i + n - 1) % n
+            }
+        };
         match row {
             0 => self.russian = !self.russian,
-            1 => self.bar_bottom = !self.bar_bottom,
-            2 => self.bar_floating = !self.bar_floating,
+            1 => self.position = cycle(self.position, POSITIONS.len()),
+            r if r < Self::SWITCHES => {
+                let i = r - 2;
+                self.style[i] = cycle(self.style[i], STYLE_TOKENS[i].2.len());
+            }
             _ => {
                 let program = &mut self.programs[row - Self::SWITCHES];
-                let n = program.choices.len();
-                // Как `%` в Python: + n, чтобы не уйти в минус при движении назад.
-                program.current = if forward {
-                    (program.current + 1) % n
-                } else {
-                    (program.current + n - 1) % n
-                };
+                program.current = cycle(program.current, program.choices.len());
             }
         }
     }
 
     fn rows(&self) -> Vec<(&'static str, String)> {
-        let mut rows: Vec<(&str, String)> = [
-            (
-                "Раскладка",
-                if self.russian {
-                    "us + ru (Alt+Shift)"
-                } else {
-                    "только us"
-                },
-            ),
-            (
-                "Панель",
-                if self.bar_bottom {
-                    "снизу"
-                } else {
-                    "сверху"
-                },
-            ),
-            (
-                "Вид панели",
-                if self.bar_floating {
-                    "плавающая"
-                } else {
-                    "вплотную к краю"
-                },
-            ),
-        ]
-        .map(|(name, value)| (name, value.to_string()))
-        .to_vec();
+        let layout = if self.russian {
+            "us + ru (Alt+Shift)"
+        } else {
+            "только us"
+        };
+        let position = ["сверху", "снизу", "слева", "справа"][self.position];
+        let mut rows = vec![
+            ("Раскладка", layout.to_string()),
+            ("Панель", position.to_string()),
+        ];
+        for (i, (_, label, variants)) in STYLE_TOKENS.iter().enumerate() {
+            rows.push((*label, variants[self.style[i]].to_string()));
+        }
         for program in &self.programs {
             let id = &program.choices[program.current];
             let value = if id.is_empty() { "нет" } else { id.as_str() };
@@ -367,8 +397,8 @@ impl App {
             rice: ListState::default().with_selected(Some(0)),
             settings: Settings {
                 russian: false,
-                bar_bottom: false,
-                bar_floating: false,
+                position: 0,
+                style: [0; 7],
                 programs: Vec::new(),
             },
             setting_row: 0,
@@ -980,8 +1010,8 @@ mod tests {
         let mut spec = presets::get("gruvbox").unwrap().unwrap();
         let mut settings = Settings::from_spec(&spec, &registry);
         settings.russian = true;
-        settings.bar_bottom = true;
-        settings.bar_floating = true;
+        settings.position = 2;
+        settings.style = [2, 2, 3, 3, 0, 1, 2];
         settings.apply_to(&mut spec);
         assert_eq!(Settings::from_spec(&spec, &registry), settings);
     }
