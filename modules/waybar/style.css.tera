@@ -1,0 +1,39 @@
+/* Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`. */
+
+* {
+    font-family: "{{ fonts.ui }}";
+    font-size: {{ fonts.size }}pt;
+    border: none;
+    min-height: 0;
+}
+
+window#waybar {
+    background: rgba({{ colors.bg.rgb }}, {{ geometry.opacity }});
+    color: {{ colors.fg.hex }};
+{%- if options.floating %}
+    border-radius: {{ geometry.radius }}px;
+{%- endif %}
+}
+
+#workspaces button {
+    padding: 0 8px;
+    color: {{ colors.muted.hex }};
+    background: transparent;
+    border-radius: {{ geometry.radius }}px;
+}
+
+#workspaces button.active {
+    color: {{ colors.bg.hex }};
+    background: {{ colors.accent.hex }};
+}
+
+#clock,
+#battery,
+#network,
+#pulseaudio {
+    padding: 0 10px;
+}
+
+#clock {
+    color: {{ colors.accent.hex }};
+}

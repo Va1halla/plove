@@ -1,0 +1,20 @@
+# Пример райса: Tokyo Night с плавающей панелью.
+# Попробовать без риска:  plove --root /tmp/plove-test apply examples/tokyo-night.yaml
+version: 1
+name: tokyo-night
+theme:
+  palette:
+    bg: "#1a1b26"
+    fg: "#c0caf5"
+    accent: "#7aa2f7"
+    ansi: ["#15161e", "#f7768e", "#9ece6a", "#e0af68", "#7aa2f7", "#bb9af7", "#7dcfff", "#a9b1d6",
+           "#414868", "#f7768e", "#9ece6a", "#e0af68", "#7aa2f7", "#bb9af7", "#7dcfff", "#c0caf5"]
+  fonts: { ui: "Inter", mono: "JetBrainsMono Nerd Font", size: 11 }
+  geometry: { gaps: 8, border: 2, radius: 10, opacity: 0.92 }
+components:
+  compositor: hyprland
+  bar: waybar
+  terminal: kitty
+overrides:
+  hyprland: { animations: snappy, kb_layout: "us,ru" }
+  waybar: { floating: true }

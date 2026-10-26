@@ -1,0 +1,18 @@
+# Модуль Hyprland: тайловый Wayland-композитор.
+id: hyprland
+role: compositor
+exec: Hyprland
+packages: [hyprland, xdg-desktop-portal-hyprland]
+templates:
+  - src: hyprland.conf.tera
+    dest: ~/.config/hypr/hyprland.conf
+user_files:
+  - ~/.config/hypr/user.conf
+reload: hyprctl reload
+defaults:
+  # snappy — быстрые анимации, smooth — плавные, none — без анимаций.
+  animations: snappy
+  # Раскладки через запятую, например "us,ru".
+  kb_layout: us
+  # Как переключать раскладку.
+  kb_options: grp:alt_shift_toggle

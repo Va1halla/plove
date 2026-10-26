@@ -1,0 +1,22 @@
+# Модуль Waybar: панель сверху или снизу экрана.
+id: waybar
+role: bar
+exec: waybar
+packages: [waybar]
+compatible_with:
+  compositor: [hyprland]
+templates:
+  - src: config.jsonc.tera
+    dest: ~/.config/waybar/config.jsonc
+  - src: style.css.tera
+    dest: ~/.config/waybar/style.css
+reload: pkill -SIGUSR2 waybar
+defaults:
+  # top или bottom
+  position: top
+  # true — панель «парит» с отступами от краёв и скруглёнными углами.
+  floating: false
+  height: 32
+  modules_left: [workspaces]
+  modules_center: [clock]
+  modules_right: [pulseaudio, network, battery]

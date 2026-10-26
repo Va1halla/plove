@@ -1,0 +1,15 @@
+[package]
+name = "plove-cli"
+description = "Командная строка plove"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "plove"
+path = "src/main.rs"
+
+[dependencies]
+plove-core = { path = "../plove-core" }
+anyhow.workspace = true
+clap.workspace = true
