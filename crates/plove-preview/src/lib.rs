@@ -18,8 +18,9 @@ use plove_core::spec::{BarStyle, Color, RiceSpec, Wallpaper};
 use plove_core::system::Env;
 use plove_core::theme::StyleContext;
 use plove_core::wallpaper::{self, paint};
+pub use tiny_skia::Pixmap;
 use tiny_skia::{
-    FillRule, FilterQuality, Mask, Path, PathBuilder, Pixmap, PixmapPaint, Rect, Stroke, Transform,
+    FillRule, FilterQuality, Mask, Path, PathBuilder, PixmapPaint, Rect, Stroke, Transform,
 };
 
 /// Размер превью: обычный Full HD монитор.
@@ -50,6 +51,40 @@ pub fn render(spec: &RiceSpec, registry: &Registry, env: &Env) -> Result<Pixmap>
         draw_bar(&mut canvas, &look, &fonts, bar);
     }
     Ok(canvas)
+}
+
+/// Уменьшить превью до `width`×`height` точек для показа в терминале.
+///
+/// Каждая точка — средний цвет своего прямоугольника исходной картинки,
+/// поэтому тонкие линии (рамки, текст) не пропадают, а смешиваются с фоном.
+pub fn thumbnail(image: &Pixmap, width: u32, height: u32) -> Vec<[u8; 3]> {
+    let (iw, ih) = (image.width(), image.height());
+    let pixels = image.pixels();
+    let mut out = Vec::with_capacity((width * height) as usize);
+    for y in 0..height {
+        let (y0, y1) = (
+            y * ih / height,
+            ((y + 1) * ih / height).max(y * ih / height + 1),
+        );
+        for x in 0..width {
+            let (x0, x1) = (
+                x * iw / width,
+                ((x + 1) * iw / width).max(x * iw / width + 1),
+            );
+            let mut sum = [0u32; 3];
+            for row in y0..y1.min(ih) {
+                for p in &pixels[(row * iw + x0) as usize..(row * iw + x1.min(iw)) as usize] {
+                    // Превью непрозрачное, так что премультипликация не мешает.
+                    sum[0] += p.red() as u32;
+                    sum[1] += p.green() as u32;
+                    sum[2] += p.blue() as u32;
+                }
+            }
+            let n = ((y1.min(ih) - y0) * (x1.min(iw) - x0)).max(1);
+            out.push(sum.map(|c| (c / n) as u8));
+        }
+    }
+    out
 }
 
 // ───────────────────────── тема ─────────────────────────

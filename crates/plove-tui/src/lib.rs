@@ -29,6 +29,7 @@ use plove_core::plan::{self, FileStatus, Plan};
 use plove_core::presets;
 use plove_core::spec::{Color as SpecColor, RiceSpec};
 use plove_core::system::Env;
+use plove_preview::Pixmap;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Style, Stylize};
@@ -45,8 +46,17 @@ pub enum Outcome {
 }
 
 /// Запустить мастер в текущем терминале.
-pub fn run(registry: &Registry, env: &Env) -> Result<Outcome> {
+///
+/// `own` — райс пользователя (`plove edit файл.yaml`): он встаёт первым
+/// в списке и уже выбран, а дальше всё как с готовыми райсами.
+pub fn run(registry: &Registry, env: &Env, own: Option<RiceSpec>) -> Result<Outcome> {
     let mut app = App::new(&LiveProbe)?;
+    if let Some(spec) = own {
+        app.presets.insert(0, spec);
+        app.own = true;
+    }
+    app.sandbox = env.sandbox;
+    app.show_preview = std::env::var("TERM").map_or(true, |term| term != "linux");
     let mut terminal = ratatui::init();
     let result = event_loop(&mut terminal, &mut app, registry, env);
     // Вернуть терминал в обычный режим, даже если была ошибка.
@@ -386,6 +396,17 @@ struct App {
     plan: Option<Plan>,
     /// Ошибка построения плана, показывается на последнем экране.
     error: Option<String>,
+    /// Показывать картинку-превью. В консоли Linux (TTY) выключено:
+    /// там 16 цветов, и вместо картинки вышла бы каша.
+    show_preview: bool,
+    /// Последнее превью и райс, по которому оно нарисовано (в YAML):
+    /// перерисовываем, только когда райс поменялся.
+    preview: Option<(String, Pixmap)>,
+    /// Первый в списке — райс из файла пользователя.
+    own: bool,
+    /// Песочница (`--root`): система не меняется, так что проблемы
+    /// из проверки не мешают пройти дальше.
+    sandbox: bool,
 }
 
 impl App {
@@ -409,6 +430,10 @@ impl App {
             tweaks: BTreeMap::new(),
             plan: None,
             error: None,
+            show_preview: false,
+            preview: None,
+            own: false,
+            sandbox: false,
         })
     }
 
@@ -467,6 +492,23 @@ impl App {
         self.tune_inside = false;
     }
 
+    /// Обновить превью под то, что сейчас на экране.
+    fn refresh_preview(&mut self, registry: &Registry, env: &Env) {
+        let spec = match self.step {
+            Step::Rice => self.selected_rice().clone(),
+            Step::Settings => self.final_spec(),
+            _ => return,
+        };
+        let key = serde_yaml::to_string(&spec).unwrap_or_default();
+        if self.preview.as_ref().is_some_and(|(k, _)| *k == key) {
+            return;
+        }
+        // Не вышло (например, нет файла обоев) — просто без картинки.
+        self.preview = plove_preview::render(&spec, registry, env)
+            .ok()
+            .map(|image| (key, image));
+    }
+
     fn build_plan(&mut self, registry: &Registry, env: &Env) {
         match plan::build(self.final_spec(), registry, env) {
             Ok(plan) => {
@@ -482,6 +524,14 @@ impl App {
     }
 
     fn handle(&mut self, key: KeyCode, registry: &Registry, env: &Env) -> Action {
+        let action = self.handle_key(key, registry, env);
+        if self.show_preview {
+            self.refresh_preview(registry, env);
+        }
+        action
+    }
+
+    fn handle_key(&mut self, key: KeyCode, registry: &Registry, env: &Env) -> Action {
         if key == KeyCode::Char('q') {
             return Action::Quit;
         }
@@ -491,7 +541,9 @@ impl App {
                 KeyCode::Char('f') if self.checks.iter().any(|c| !c.fix.is_empty()) => {
                     return Action::Fix
                 }
-                KeyCode::Enter if !check::has_failures(&self.checks) => self.step = Step::Rice,
+                KeyCode::Enter if self.sandbox || !check::has_failures(&self.checks) => {
+                    self.step = Step::Rice
+                }
                 KeyCode::Esc => return Action::Quit,
                 _ => {}
             },
@@ -620,6 +672,9 @@ impl App {
 
     fn hints(&self) -> &'static str {
         match self.step {
+            Step::Checks if self.sandbox => {
+                " песочница: проблемы системы не мешают · Enter дальше · q выйти"
+            }
             Step::Checks if check::has_failures(&self.checks) => {
                 " есть проблемы, которые нужно исправить вручную · f исправить автоматически · q выйти"
             }
@@ -665,10 +720,14 @@ impl App {
         let items: Vec<ListItem> = self
             .presets
             .iter()
-            .map(|spec| ListItem::new(format!(" {}", spec.name)))
+            .enumerate()
+            .map(|(i, spec)| match i {
+                0 if self.own => ListItem::new(format!(" {} (ваш)", spec.name)).cyan(),
+                _ => ListItem::new(format!(" {}", spec.name)),
+            })
             .collect();
         let list = List::new(items)
-            .block(Block::bordered().title(" Готовые райсы "))
+            .block(Block::bordered().title(" Райсы "))
             .highlight_style(Style::new().reversed().bold())
             .highlight_symbol("›");
         frame.render_stateful_widget(list, list_area, &mut self.rice);
@@ -701,14 +760,51 @@ impl App {
                 g.gaps, g.border, g.radius, g.opacity
             )),
             Line::raw(""),
-            Line::raw(format!(" Картинка: plove preview {}", spec.name)).dark_gray(),
         ];
-        // В TTY цвета будут приблизительными: консоль Linux знает только 16 цветов.
-        lines.push(Line::raw(" (в TTY цвета показываются приблизительно)").dark_gray());
-        let info = Paragraph::new(lines)
-            .wrap(Wrap { trim: false })
-            .block(Block::bordered().title(format!(" {} ", spec.name)));
-        frame.render_widget(info, info_area);
+        if self.show_preview {
+            lines.push(Line::raw(" Ниже — набросок; в полном размере: plove preview").dark_gray());
+        } else {
+            // В TTY цвета приблизительные: консоль Linux знает только 16 цветов.
+            lines.push(Line::raw(format!(" Картинка: plove preview {}", spec.name)).dark_gray());
+            lines.push(Line::raw(" (в TTY цвета показываются приблизительно)").dark_gray());
+        }
+        let block = Block::bordered().title(format!(" {} ", spec.name));
+        let inner = block.inner(info_area);
+        frame.render_widget(block, info_area);
+        // Сверху описание, под ним картинка на всё оставшееся место.
+        let [text_area, picture_area] =
+            Layout::vertical([Constraint::Length(lines.len() as u16), Constraint::Min(0)])
+                .areas(inner);
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), text_area);
+        self.draw_preview(frame, picture_area);
+    }
+
+    /// Картинка-превью полублоками: в одной клетке терминала две точки,
+    /// верхняя — цветом символа «▀», нижняя — цветом фона клетки.
+    fn draw_preview(&self, frame: &mut Frame, area: Rect) {
+        let Some((_, image)) = &self.preview else {
+            return;
+        };
+        // Вписываем 16:9: точек по вертикали вдвое больше, чем строк.
+        let width = area.width.min(area.height * 32 / 9);
+        let rows = width * 9 / 32;
+        if width < 16 || rows < 4 {
+            return;
+        }
+        let x0 = area.x + (area.width - width) / 2;
+        let y0 = area.y + (area.height - rows) / 2;
+        let pixels = plove_preview::thumbnail(image, width.into(), (rows * 2).into());
+        let buffer = frame.buffer_mut();
+        for row in 0..rows {
+            for col in 0..width {
+                let top = pixels[(row * 2 * width + col) as usize];
+                let bottom = pixels[((row * 2 + 1) * width + col) as usize];
+                buffer[(x0 + col, y0 + row)]
+                    .set_char('▀')
+                    .set_fg(Color::Rgb(top[0], top[1], top[2]))
+                    .set_bg(Color::Rgb(bottom[0], bottom[1], bottom[2]));
+            }
+        }
     }
 
     fn draw_settings(&self, frame: &mut Frame, area: Rect) {
@@ -733,10 +829,26 @@ impl App {
             Line::raw(" Остальное можно поменять потом в файле райса или в user.conf.").dark_gray(),
         );
         let title = format!(" Настройки: {} ", self.selected_rice().name);
-        frame.render_widget(
-            Paragraph::new(lines).block(Block::bordered().title(title)),
-            area,
-        );
+        // Справа превью, если хватает ширины: видно, что меняет каждая настройка.
+        if self.preview.is_some() && area.width >= 90 {
+            let [list_area, picture_area] =
+                Layout::horizontal([Constraint::Length(52), Constraint::Min(30)]).areas(area);
+            frame.render_widget(
+                Paragraph::new(lines)
+                    .wrap(Wrap { trim: false })
+                    .block(Block::bordered().title(title)),
+                list_area,
+            );
+            let block = Block::bordered().title(" Как будет выглядеть ");
+            let inner = block.inner(picture_area);
+            frame.render_widget(block, picture_area);
+            self.draw_preview(frame, inner);
+        } else {
+            frame.render_widget(
+                Paragraph::new(lines).block(Block::bordered().title(title)),
+                area,
+            );
+        }
     }
 
     fn draw_tune(&self, frame: &mut Frame, area: Rect) {
@@ -1057,5 +1169,30 @@ mod tests {
             Settings::from_spec(&spec, &registry).russian
                 == !Settings::from_spec(&gruvbox, &registry).russian
         );
+    }
+
+    #[test]
+    fn preview_is_drawn() {
+        let env = Env::sandbox(std::env::temp_dir().join("plove-tui-preview"));
+        let registry = Registry::builtin().unwrap();
+        let mut app = App::new(&Healthy).unwrap();
+        app.show_preview = true;
+        let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+        for key in [KeyCode::Enter, KeyCode::Enter] {
+            app.handle(key, &registry, &env);
+        }
+        assert_eq!(app.step, Step::Settings);
+        assert!(app.preview.is_some());
+        terminal.draw(|f| app.draw(f)).unwrap();
+        let screen = format!("{}", terminal.backend());
+        if std::env::var_os("PLOVE_SHOW_SCREEN").is_some() {
+            println!("{screen}");
+        }
+        assert!(screen.contains('▀'));
+        // Смена настройки перерисовывает превью.
+        let before = app.preview.as_ref().unwrap().0.clone();
+        app.handle(KeyCode::Down, &registry, &env);
+        app.handle(KeyCode::Right, &registry, &env);
+        assert_ne!(app.preview.as_ref().unwrap().0, before);
     }
 }

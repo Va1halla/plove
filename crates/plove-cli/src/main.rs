@@ -52,6 +52,12 @@ enum Command {
         #[arg(long)]
         skip_packages: bool,
     },
+    /// Открыть свой райс в мастере, поменять и сохранить обратно в файл.
+    /// Если файла нет, мастер начнёт с готовых райсов и сохранит выбранный туда
+    Edit {
+        /// Файл райса .yaml
+        file: PathBuf,
+    },
     /// Быстро сменить райс: без вопросов и без установки пакетов.
     /// Если райсу нужны программы, которых нет, подскажет `plove apply`
     Switch {
@@ -133,19 +139,11 @@ fn run(cli: Cli) -> Result<()> {
         // применяет, а возвращает выбранный райс, и применяем мы его здесь,
         // уже в обычном терминале: вывод pacman и вопрос пароля sudo
         // внутри полноэкранного интерфейса не поместились бы.
-        let env = system_env()?;
-        let plove_tui::Outcome::Apply(spec) = plove_tui::run(&registry, &env)? else {
-            return Ok(());
-        };
-        let plan = plan::build(*spec, &registry, &env)?;
-        print_plan(&plan, &env);
-        if plan.is_noop() {
-            return Ok(());
-        }
-        return apply_and_report(&plan, &env, false);
+        return wizard(&registry, &system_env()?, None);
     };
 
     match command {
+        Command::Edit { file } => wizard(&registry, &system_env()?, Some(&file))?,
         Command::Plan { rice } => {
             let env = system_env()?;
             let plan = plan::build(load_rice(&rice)?, &registry, &env)?;
@@ -484,6 +482,46 @@ fn new_from_wallpaper(image: &Path, base: &str, output: Option<PathBuf>) -> Resu
 /// Цветной квадратик в терминале (24-битный цвет, его понимают kitty и TTY с fbterm).
 fn swatch(c: Color) -> String {
     format!("\x1b[48;2;{};{};{}m   \x1b[0m", c.r, c.g, c.b)
+}
+
+/// Мастер; с `file` — редактирование своего райса с сохранением в файл.
+fn wizard(registry: &Registry, env: &Env, file: Option<&Path>) -> Result<()> {
+    let own = match file {
+        Some(file) if file.exists() => Some(RiceSpec::load(file)?),
+        _ => None,
+    };
+    let plove_tui::Outcome::Apply(spec) = plove_tui::run(registry, env, own)? else {
+        return Ok(());
+    };
+    if let Some(file) = file {
+        save_rice(&spec, file)?;
+    }
+    let plan = plan::build(*spec, registry, env)?;
+    print_plan(&plan, env);
+    if plan.is_noop() {
+        return Ok(());
+    }
+    apply_and_report(&plan, env, false)
+}
+
+/// Записать райс в файл. Старый файл остаётся рядом как `.bak`:
+/// комментарии в нём при сохранении теряются, а так их можно вернуть.
+fn save_rice(spec: &RiceSpec, file: &Path) -> Result<()> {
+    if file.exists() {
+        let mut backup = file.as_os_str().to_owned();
+        backup.push(".bak");
+        std::fs::copy(file, &backup)
+            .with_context(|| format!("не удалось сохранить копию {}", file.display()))?;
+    }
+    let text = format!(
+        "# Райс plove. Сохранено командой `plove edit`; применить: plove apply {}\n{}",
+        file.display(),
+        spec.to_yaml()?
+    );
+    std::fs::write(file, text)
+        .with_context(|| format!("не удалось записать {}", file.display()))?;
+    println!("Райс сохранён в {}", file.display());
+    Ok(())
 }
 
 fn load_rice(rice: &str) -> Result<RiceSpec> {

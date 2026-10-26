@@ -811,6 +811,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "plove-core",
+ "plove-preview",
  "ratatui",
  "serde_yaml",
 ]
