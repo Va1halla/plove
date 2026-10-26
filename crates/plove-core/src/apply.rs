@@ -66,10 +66,15 @@ pub fn apply(plan: &Plan, env: &Env, options: &ApplyOptions) -> Result<ApplyRepo
     //    сессии и только если что-то поменялось.
     let mut failed_reloads = Vec::new();
     let wants_reload = !env.sandbox && !changed.is_empty();
-    let reloads_skipped = wants_reload && !system::in_graphical_session();
-    if wants_reload && !reloads_skipped {
+    let session = if wants_reload {
+        system::graphical_session()
+    } else {
+        None
+    };
+    let reloads_skipped = wants_reload && session.is_none();
+    if let Some(session) = &session {
         for command in &plan.reloads {
-            if !system::run_reload(command) {
+            if !system::run_reload(command, session) {
                 failed_reloads.push(command.clone());
             }
         }

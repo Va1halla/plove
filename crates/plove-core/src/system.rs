@@ -74,11 +74,83 @@ pub fn is_root() -> bool {
     std::fs::metadata("/proc/self").is_ok_and(|m| m.uid() == 0)
 }
 
-/// Идёт ли графическая сессия Wayland. Вне её (например, в TTY до запуска
-/// Hyprland) перезагружать программы бессмысленно: они ещё не запущены.
-pub fn in_graphical_session() -> bool {
-    std::env::var_os("WAYLAND_DISPLAY").is_some()
+/// Запущенная графическая сессия Hyprland, к которой можно обращаться.
+///
+/// Если plove запущен в терминале внутри Hyprland, нужные переменные уже
+/// есть в окружении. Если же из соседней TTY (Ctrl+Alt+F3), их нет, но
+/// сессию можно найти по сокетам в `$XDG_RUNTIME_DIR`: тогда передаём
+/// переменные командам перезагрузки сами.
+pub struct Session {
+    vars: Vec<(String, String)>,
+}
+
+/// Найти графическую сессию. `None` — Hyprland не запущен, перезагружать
+/// программы бессмысленно: настройки подхватятся при его старте.
+pub fn graphical_session() -> Option<Session> {
+    if std::env::var_os("WAYLAND_DISPLAY").is_some()
         || std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some()
+    {
+        return Some(Session { vars: Vec::new() });
+    }
+    let runtime = runtime_dir()?;
+    let signature = newest_hyprland_instance(&runtime.join("hypr"))?;
+    let display = wayland_socket(&runtime)?;
+    Some(Session {
+        vars: vec![
+            ("HYPRLAND_INSTANCE_SIGNATURE".into(), signature),
+            ("WAYLAND_DISPLAY".into(), display),
+            ("XDG_RUNTIME_DIR".into(), runtime.display().to_string()),
+        ],
+    })
+}
+
+/// `$XDG_RUNTIME_DIR`, а если он не задан, `/run/user/<uid>`.
+fn runtime_dir() -> Option<PathBuf> {
+    use std::os::unix::fs::MetadataExt;
+    let dir = match std::env::var_os("XDG_RUNTIME_DIR") {
+        Some(dir) => PathBuf::from(dir),
+        None => {
+            let uid = std::fs::metadata("/proc/self").ok()?.uid();
+            PathBuf::from(format!("/run/user/{uid}"))
+        }
+    };
+    dir.is_dir().then_some(dir)
+}
+
+/// Каждый запуск Hyprland создаёт папку `hypr/<подпись>/` с сокетом.
+/// После падений там остаются старые папки, поэтому берём самую свежую.
+fn newest_hyprland_instance(hypr: &Path) -> Option<String> {
+    std::fs::read_dir(hypr)
+        .ok()?
+        .flatten()
+        .filter(|entry| entry.path().join(".socket.sock").exists())
+        .max_by_key(|entry| entry.metadata().and_then(|m| m.modified()).ok())
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+}
+
+/// Сокет Wayland: `wayland-1` и т. п. (рядом лежит `wayland-1.lock`, его пропускаем).
+fn wayland_socket(runtime: &Path) -> Option<String> {
+    let mut names: Vec<String> = std::fs::read_dir(runtime)
+        .ok()?
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with("wayland-") && !name.ends_with(".lock"))
+        .collect();
+    names.sort();
+    names.into_iter().next()
+}
+
+/// Название виртуальной машины, в которой мы работаем (`vmware`, `oracle`,
+/// `kvm`…), или пустая строка на настоящем железе.
+pub fn virtual_machine() -> String {
+    Command::new("systemd-detect-virt")
+        .arg("--vm")
+        .stderr(Stdio::null())
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default()
 }
 
 /// Установлен ли пакет. `None` — не удалось узнать (нет pacman, это не Arch).
@@ -109,11 +181,36 @@ pub fn install_packages(packages: &[&str]) -> Result<()> {
 
 /// Выполнить команду перезагрузки программы. `false`, если не вышло:
 /// например, программа сейчас не запущена. Это не ошибка.
-pub fn run_reload(command: &str) -> bool {
+pub fn run_reload(command: &str, session: &Session) -> bool {
     Command::new("sh")
         .args(["-c", command])
+        .envs(session.vars.iter().map(|(k, v)| (k, v)))
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
         .is_ok_and(|status| status.success())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Так выглядит `$XDG_RUNTIME_DIR` с запущенным Hyprland и папкой
+    /// от прошлого, упавшего запуска (без сокета).
+    #[test]
+    fn finds_hyprland_from_another_tty() {
+        let runtime = tempfile::tempdir().unwrap();
+        let dir = runtime.path();
+        std::fs::create_dir_all(dir.join("hypr/old_crashed")).unwrap();
+        std::fs::create_dir_all(dir.join("hypr/live")).unwrap();
+        std::fs::write(dir.join("hypr/live/.socket.sock"), "").unwrap();
+        std::fs::write(dir.join("wayland-1"), "").unwrap();
+        std::fs::write(dir.join("wayland-1.lock"), "").unwrap();
+
+        assert_eq!(
+            newest_hyprland_instance(&dir.join("hypr")).as_deref(),
+            Some("live")
+        );
+        assert_eq!(wayland_socket(dir).as_deref(), Some("wayland-1"));
+    }
 }
