@@ -28,8 +28,9 @@ struct Cli {
     #[arg(long, global = true, value_name = "ПАПКА")]
     root: Option<PathBuf>,
 
+    /// Без команды открывается мастер: проверка системы, выбор райса, план
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand)]
@@ -99,7 +100,24 @@ fn run(cli: Cli) -> Result<()> {
     };
     let registry = Registry::builtin()?;
 
-    match cli.command {
+    let Some(command) = cli.command else {
+        // `plove` без аргументов: мастер в терминале. Сам он ничего не
+        // применяет, а возвращает выбранный райс, и применяем мы его здесь,
+        // уже в обычном терминале: вывод pacman и вопрос пароля sudo
+        // внутри полноэкранного интерфейса не поместились бы.
+        let env = system_env()?;
+        let plove_tui::Outcome::Apply(spec) = plove_tui::run(&registry, &env)? else {
+            return Ok(());
+        };
+        let plan = plan::build(*spec, &registry, &env)?;
+        print_plan(&plan, &env);
+        if plan.is_noop() {
+            return Ok(());
+        }
+        return apply_and_report(&plan, &env, false);
+    };
+
+    match command {
         Command::Plan { rice } => {
             let env = system_env()?;
             let plan = plan::build(load_rice(&rice)?, &registry, &env)?;
@@ -119,24 +137,7 @@ fn run(cli: Cli) -> Result<()> {
             if plan.is_noop() || !(yes || confirm("Применить?")?) {
                 return Ok(());
             }
-            let report = apply::apply(&plan, &env, &ApplyOptions { skip_packages })?;
-            println!();
-            match report.generation {
-                Some(n) => println!(
-                    "Готово: записано файлов {}, поколение #{n}. Откатить: plove rollback",
-                    report.files_written
-                ),
-                None => println!("Готово."),
-            }
-            if report.reloads_skipped {
-                println!(
-                    "Графическая сессия не запущена: настройки подхватятся при старте Hyprland."
-                );
-                println!("Запустить: start-hyprland");
-            }
-            for command in report.failed_reloads {
-                println!("  не сработало «{command}» (программа, скорее всего, не запущена)");
-            }
+            apply_and_report(&plan, &env, skip_packages)?;
         }
         Command::Rollback { yes } => {
             let env = system_env()?;
@@ -211,6 +212,27 @@ fn run(cli: Cli) -> Result<()> {
 }
 
 /// `plove doctor`: показать все проверки и, с `--fix`, починить что можно.
+/// Применить план и рассказать, что получилось.
+fn apply_and_report(plan: &Plan, env: &Env, skip_packages: bool) -> Result<()> {
+    let report = apply::apply(plan, env, &ApplyOptions { skip_packages })?;
+    println!();
+    match report.generation {
+        Some(n) => println!(
+            "Готово: записано файлов {}, поколение #{n}. Откатить: plove rollback",
+            report.files_written
+        ),
+        None => println!("Готово."),
+    }
+    if report.reloads_skipped {
+        println!("Графическая сессия не запущена: настройки подхватятся при старте Hyprland.");
+        println!("Запустить: start-hyprland");
+    }
+    for command in report.failed_reloads {
+        println!("  не сработало «{command}» (программа, скорее всего, не запущена)");
+    }
+    Ok(())
+}
+
 fn doctor(fix: bool) -> Result<()> {
     let checks = check::run_all(&LiveProbe);
     for c in &checks {

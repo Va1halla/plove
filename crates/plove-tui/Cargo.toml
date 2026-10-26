@@ -1,0 +1,12 @@
+[package]
+name = "plove-tui"
+description = "TUI-мастер plove: проверка системы, выбор райса, настройки и план"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+plove-core = { path = "../plove-core" }
+anyhow.workspace = true
+serde_yaml.workspace = true
+ratatui.workspace = true
