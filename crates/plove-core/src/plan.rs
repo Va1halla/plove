@@ -153,7 +153,15 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
 
     // 4. Команды запуска по ролям, чтобы модули могли ссылаться друг на друга.
     let theme = theme_context(&spec);
-    let base = render::base_context(&theme, &wallpaper_path)?;
+    let mut base = render::base_context(&theme, &wallpaper_path)?;
+    // Виртуальная машина (vmware, oracle, kvm…) или пустая строка.
+    // В песочнице всегда пусто, чтобы результат не зависел от машины.
+    let vm = if env.sandbox {
+        String::new()
+    } else {
+        system::virtual_machine()
+    };
+    base.insert("vm", &vm);
     let mut apps: BTreeMap<String, String> = BTreeMap::new();
     for module in &modules {
         if let Some(exec) = &module.manifest.exec {

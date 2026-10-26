@@ -3,7 +3,11 @@
 # Свои настройки пишите в ~/.config/hypr/user.conf, plove его не трогает.
 
 monitor = , preferred, auto, 1
-
+{% if vm == "vmware" %}
+# VMware: 3D-драйвер виртуалки ломает OpenGL-программы (kitty падает
+# с «unknown object … attach»). Пусть они рисуют программно.
+env = LIBGL_ALWAYS_SOFTWARE,1
+{% endif %}
 {% if apps.wallpaper %}exec-once = {{ apps.wallpaper }}
 {% endif -%}
 {% if apps.bar %}exec-once = {{ apps.bar }}

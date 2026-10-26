@@ -140,6 +140,19 @@ fn wayland_socket(runtime: &Path) -> Option<String> {
     names.into_iter().next()
 }
 
+/// Название виртуальной машины, в которой мы работаем (`vmware`, `oracle`,
+/// `kvm`…), или пустая строка на настоящем железе.
+pub fn virtual_machine() -> String {
+    Command::new("systemd-detect-virt")
+        .arg("--vm")
+        .stderr(Stdio::null())
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default()
+}
+
 /// Установлен ли пакет. `None` — не удалось узнать (нет pacman, это не Arch).
 pub fn package_installed(name: &str) -> Option<bool> {
     // Command — это Process.Start из C# или subprocess.run из Python.
