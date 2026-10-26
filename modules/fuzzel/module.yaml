@@ -1,0 +1,12 @@
+# Модуль fuzzel: лаунчер приложений (меню «запустить программу»).
+# Открывается по Super+D. Он же рисует меню выключения и историю буфера обмена.
+id: fuzzel
+role: launcher
+exec: fuzzel
+packages: [fuzzel]
+compatible_with:
+  compositor: [hyprland]
+templates:
+  - src: fuzzel.ini.tera
+    dest: ~/.config/fuzzel/fuzzel.ini
+# fuzzel читает конфиг при каждом запуске, перезагружать нечего.

@@ -1,0 +1,18 @@
+# Модуль hypridle: что делать, когда компьютер простаивает
+# (заблокировать экран, потом выключить монитор).
+id: hypridle
+role: idle
+exec: hypridle
+packages: [hypridle]
+compatible_with:
+  compositor: [hyprland]
+  lock: [hyprlock]
+templates:
+  - src: hypridle.conf.tera
+    dest: ~/.config/hypr/hypridle.conf
+# hypridle не умеет перечитывать конфиг, поэтому перезапускаем его.
+reload: "pkill -x hypridle; setsid -f {{ exec }} >/dev/null 2>&1"
+defaults:
+  # Через сколько минут простоя заблокировать экран и выключить монитор.
+  lock_after: 5
+  screen_off_after: 10

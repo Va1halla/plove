@@ -1,0 +1,29 @@
+# Сгенерировано plove из райса «{{ name }}».
+# Этот файл перезаписывается при каждом `plove apply`.
+
+[main]
+font={{ fonts.ui }}:size={{ fonts.size + 2 }}
+{% if apps.terminal %}terminal={{ apps.terminal }}
+{% endif -%}
+prompt="❯ "
+width=40
+lines=10
+horizontal-pad=20
+vertical-pad=14
+inner-pad=8
+
+[colors]
+# fuzzel ждёт цвета в формате rrggbbaa.
+background={{ colors.bg.raw }}f2
+text={{ colors.fg.raw }}ff
+prompt={{ colors.accent.raw }}ff
+input={{ colors.fg.raw }}ff
+match={{ colors.accent.raw }}ff
+selection={{ colors.surface.raw }}ff
+selection-text={{ colors.fg.raw }}ff
+selection-match={{ colors.accent.raw }}ff
+border={{ colors.accent.raw }}ff
+
+[border]
+width={{ geometry.border }}
+radius={{ geometry.radius }}

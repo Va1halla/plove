@@ -1,0 +1,10 @@
+# Модуль grim: скриншоты. Print — выделить область, Shift+Print — весь экран.
+# Снимок копируется в буфер обмена и сохраняется в ~/Pictures/Screenshots.
+id: grim
+role: screenshot
+exec: >-
+  mkdir -p ~/Pictures/Screenshots &&
+  grim -g "$(slurp)" - | tee ~/Pictures/Screenshots/$(date +%F_%H-%M-%S).png | wl-copy
+packages: [grim, slurp, wl-clipboard]
+compatible_with:
+  compositor: [hyprland]

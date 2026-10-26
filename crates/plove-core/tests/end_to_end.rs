@@ -30,9 +30,10 @@ fn apply_is_idempotent_and_rollback_restores() {
     fs::create_dir_all(kitty.parent().unwrap()).unwrap();
     fs::write(&kitty, "font_size 20\n").unwrap();
 
-    // Первое применение: обои, hyprland и waybar новые, kitty меняется.
+    // Первое применение: обои, hyprland, waybar, fuzzel, mako, hyprlock
+    // и hypridle новые, kitty меняется.
     let first = plan::build(example_spec(), &registry, &env).unwrap();
-    assert_eq!(first.changed_files().len(), 5);
+    assert_eq!(first.changed_files().len(), 9);
     let report = apply(&first, &env, &options).unwrap();
     assert_eq!(report.generation, Some(1));
 

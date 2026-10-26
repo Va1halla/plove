@@ -65,6 +65,8 @@ pub trait Probe {
     fn groups(&self) -> Vec<String>;
     fn command_exists(&self, name: &str) -> bool;
     fn service_active(&self, name: &str) -> bool;
+    /// Включена ли служба на автозапуск (`systemctl enable`).
+    fn service_enabled(&self, name: &str) -> bool;
     fn path_exists(&self, path: &str) -> bool;
     fn online(&self) -> bool;
 }
@@ -78,6 +80,7 @@ pub fn run_all(probe: &dyn Probe) -> Vec<Check> {
         network(probe),
         gpu(probe),
         seat(probe),
+        login(probe),
         other_desktop(probe),
     ]
 }
@@ -208,6 +211,46 @@ fn seat(probe: &dyn Probe) -> Check {
     }
 }
 
+/// Экран входа. Без него после перезагрузки открывается консоль,
+/// и Hyprland приходится запускать руками.
+fn login(probe: &dyn Probe) -> Check {
+    let managers = ["greetd", "sddm", "gdm", "lightdm", "ly"];
+    if let Some(found) = managers.iter().find(|m| probe.service_enabled(m)) {
+        return Check::ok("Экран входа", format!("{found} включён"));
+    }
+    // greetd с tuigreet: маленький экран входа прямо в консоли,
+    // после ввода пароля сразу запускает Hyprland.
+    let config = "[terminal]\\nvt = 1\\n\\n[default_session]\\n\
+                  command = \"tuigreet --time --remember --cmd start-hyprland\"\\n\
+                  user = \"greeter\"\\n";
+    Check {
+        fix: vec![
+            cmd(&[
+                "sudo",
+                "pacman",
+                "-S",
+                "--needed",
+                "--noconfirm",
+                "greetd",
+                "greetd-tuigreet",
+            ]),
+            cmd(&[
+                "sudo",
+                "sh",
+                "-c",
+                &format!("printf '{config}' > /etc/greetd/config.toml"),
+            ]),
+            cmd(&["sudo", "systemctl", "enable", "greetd"]),
+        ],
+        ..Check::problem(
+            "Экран входа",
+            Level::Warn,
+            "не настроен: после перезагрузки откроется консоль. \
+             Исправление ставит greetd, он заработает после перезагрузки",
+        )
+    }
+}
+
 fn other_desktop(probe: &dyn Probe) -> Check {
     let desktops = [
         ("gnome-shell", "GNOME"),
@@ -296,6 +339,15 @@ impl Probe for LiveProbe {
             .is_ok_and(|s| s.success())
     }
 
+    fn service_enabled(&self, name: &str) -> bool {
+        Command::new("systemctl")
+            .args(["is-enabled", "--quiet", name])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success())
+    }
+
     fn path_exists(&self, path: &str) -> bool {
         Path::new(path).exists()
     }
@@ -329,6 +381,7 @@ mod tests {
         groups: Vec<&'static str>,
         seatd_active: bool,
         commands: Vec<&'static str>,
+        greetd: bool,
     }
 
     impl Default for Fake {
@@ -338,6 +391,7 @@ mod tests {
                 groups: vec!["wheel", "seat"],
                 seatd_active: true,
                 commands: vec!["pacman", "sudo", "seatd"],
+                greetd: true,
             }
         }
     }
@@ -357,6 +411,9 @@ mod tests {
         }
         fn service_active(&self, name: &str) -> bool {
             name == "seatd" && self.seatd_active
+        }
+        fn service_enabled(&self, name: &str) -> bool {
+            name == "greetd" && self.greetd
         }
         fn path_exists(&self, path: &str) -> bool {
             path == "/dev/dri/card0"
@@ -379,6 +436,20 @@ mod tests {
             ..Fake::default()
         };
         assert!(has_failures(&run_all(&fake)));
+    }
+
+    /// И это тоже было в VM: после перезагрузки консоль вместо Hyprland.
+    #[test]
+    fn missing_login_screen_gets_greetd() {
+        let fake = Fake {
+            greetd: false,
+            ..Fake::default()
+        };
+        let checks = run_all(&fake);
+        let login = checks.iter().find(|c| c.title == "Экран входа").unwrap();
+        assert_eq!(login.level, Level::Warn);
+        assert_eq!(login.fix.len(), 3);
+        assert!(login.fix[1][3].contains("start-hyprland"));
     }
 
     /// Ровно та ситуация, что была в VM: seatd установлен, но выключен,

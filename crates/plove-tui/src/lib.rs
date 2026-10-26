@@ -592,6 +592,9 @@ mod tests {
         fn service_active(&self, _: &str) -> bool {
             true
         }
+        fn service_enabled(&self, _: &str) -> bool {
+            true
+        }
         fn path_exists(&self, path: &str) -> bool {
             path == "/dev/dri/card0"
         }

@@ -52,6 +52,25 @@ cargo build --release
 
 Другие команды: `plove history` (история применений), `plove modules` (список модулей), `plove --help`.
 
+## Что входит в готовые райсы
+
+Hyprland, Waybar, kitty и обои (swaybg), а также:
+
+| Клавиши | Что делает | Программа |
+| --- | --- | --- |
+| Super+Enter | терминал | kitty |
+| Super+D | запуск приложений | fuzzel |
+| Super+L | заблокировать экран | hyprlock |
+| Super+Shift+E | меню: заблокировать, выйти, перезагрузить, выключить | fuzzel |
+| Print / Shift+Print | скриншот области / всего экрана (в буфер и в `~/Pictures/Screenshots`) | grim, slurp |
+| Super+Shift+V | история буфера обмена | cliphist |
+| Super+Q | закрыть окно | |
+| Super+1…9 | рабочие столы | |
+
+Уведомления показывает mako. Через 5 минут простоя hypridle блокирует экран, через 10 гасит монитор.
+
+`plove doctor --fix` ставит экран входа greetd, чтобы после перезагрузки сразу открывался вход в Hyprland, а не консоль.
+
 ## Как это работает
 
 ```text

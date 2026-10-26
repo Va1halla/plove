@@ -17,6 +17,13 @@ components:
   bar: waybar
   terminal: kitty
   wallpaper: swaybg
+  launcher: fuzzel
+  notifications: mako
+  lock: hyprlock
+  idle: hypridle
+  power: power-menu
+  screenshot: grim
+  clipboard: cliphist
 overrides:
   hyprland: { animations: snappy, kb_layout: "us,ru" }
   waybar: { floating: true }
