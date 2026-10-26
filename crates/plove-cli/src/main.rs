@@ -93,6 +93,13 @@ enum Command {
         #[arg(long)]
         fix: bool,
     },
+    /// Проверить свой виджет: выполнить его команду и показать, что увидит панель
+    Widget {
+        /// Райс, в котором описан виджет (файл .yaml)
+        rice: String,
+        /// Имя виджета из раздела widgets
+        id: String,
+    },
     /// Показать встроенные модули, а с именем — все настройки модуля
     Modules {
         /// Модуль, например hyprland
@@ -251,6 +258,30 @@ fn run(cli: Cli) -> Result<()> {
             output,
         } => new_from_wallpaper(&image, &base, output)?,
         Command::Doctor { fix } => doctor(fix)?,
+        Command::Widget { rice, id } => {
+            let spec = load_rice(&rice)?;
+            let widget = spec.widgets.get(&id).with_context(|| {
+                let known: Vec<&str> = spec.widgets.keys().map(String::as_str).collect();
+                format!("в райсе нет виджета «{id}». Есть: {}", known.join(", "))
+            })?;
+            println!("$ {}", widget.command);
+            let output = std::process::Command::new("sh")
+                .args(["-c", &widget.command])
+                .output()
+                .context("не удалось запустить sh")?;
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Waybar показывает последнюю строку вывода.
+            let value = stdout.lines().last().unwrap_or("").trim();
+            if !output.status.success() {
+                println!(
+                    "! команда завершилась с ошибкой: {}",
+                    String::from_utf8_lossy(&output.stderr).trim()
+                );
+            }
+            let text = widget.text.replace("{value}", value);
+            println!("На панели: {} {text}", widget.icon);
+            println!("Обновляется раз в {} с", widget.every);
+        }
         Command::Modules { id: Some(id) } => {
             let module = registry
                 .get(&id)

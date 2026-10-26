@@ -80,6 +80,26 @@ overrides:
       - { position: left, monitors: [HDMI-A-1], center: [workspaces, clock] }
 ```
 
+## Свои виджеты
+
+Виджет — это команда, которая раз в несколько секунд выдаёт строку. Его можно поставить на панель или на рабочий стол рядом с готовыми:
+
+```yaml
+widgets:
+  vpn:
+    command: "nmcli -t -f NAME connection show --active | grep -q wg0 && echo on || echo off"
+    every: 5             # секунды
+    icon: "󰖂"
+    text: "VPN {value}"
+    color: green         # accent, fg, muted, red, green, yellow, blue, magenta, cyan
+    click: "nmcli connection up wg0"
+overrides:
+  waybar: { modules_right: [vpn, pulseaudio, clock] }
+  eww: { cards: [clock, system, media, vpn], anchor: top-right }
+```
+
+На рабочем столе (eww) есть готовые карточки: `clock` (часы и дата), `system` (кольца процессора, памяти и диска), `media` (музыка с кнопками). Проверить свой виджет до применения: `plove widget my.yaml vpn`.
+
 ## Тонкая настройка программ
 
 У программ есть описанные настройки: что делает каждая, какие значения можно, что по умолчанию. В мастере (`plove`) это экран «Тонкая настройка»: слева программы райса, справа их настройки по группам — переключатели, списки и ползунки меняются стрелками ←→, под выбранной строкой пояснение. То же списком в терминале:

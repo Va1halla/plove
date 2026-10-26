@@ -1,18 +1,70 @@
 ; Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+{%- set cards = options.cards %}
+{%- if options.anchor == "center" %}{% set anchor = "center" %}{% set x = "0%" %}{% set y = "-10%" %}
+{%- elif options.anchor == "left" %}{% set anchor = "center left" %}{% set x = "4%" %}{% set y = "0%" %}
+{%- elif options.anchor == "right" %}{% set anchor = "center right" %}{% set x = "-4%" %}{% set y = "0%" %}
+{%- else %}{% set anchor = options.anchor | replace(from="-", to=" ") %}{% set x = "3%" %}{% set y = "6%" %}
+{%- if options.anchor is ending_with("right") %}{% set x = "-3%" %}{% endif %}
+{%- if options.anchor is starting_with("bottom") %}{% set y = "-6%" %}{% endif %}
+{%- endif %}
+{%- if "clock" in cards %}
 
 (defpoll time :interval "5s" "date '+%H:%M'")
 (defpoll date :interval "60s" "date '+%A, %d %B'")
+{%- endif %}
+{%- if "system" in cards %}
+
+(defpoll disk :interval "60s" "df --output=pcent / | tail -1 | tr -dc 0-9")
+{%- endif %}
+{%- if "media" in cards %}
+
+(deflisten song :initial ""
+  "playerctl --follow metadata --format '{{ "{{" }} artist {{ "}}" }} — {{ "{{" }} title {{ "}}" }}' 2>/dev/null || true")
+{%- endif %}
+{%- for id in cards %}{% if id in widgets %}
+
+(defpoll w_{{ id }} :interval "{{ widgets[id].every }}s" {{ widgets[id].command | json_encode() }})
+{%- endif %}{% endfor %}
 
 (defwindow desktop
   :monitor 0
-  :geometry (geometry :x "0%" :y "-15%" :anchor "center")
+  :geometry (geometry :x "{{ x }}" :y "{{ y }}" :anchor "{{ anchor }}")
   :stacking "bg"
   :exclusive false
-  (box :class "desktop" :orientation "v" :space-evenly false
-    (label :class "time" :text time)
-    (label :class "date" :text date)
-{%- if options.stats %}
-    (box :class "stats" :spacing 24 :halign "center" :space-evenly false
-      (label :text "cpu ${round(EWW_CPU.avg, 0)}%")
-      (label :text "ram ${round(EWW_RAM.used_mem_perc, 0)}%"))
-{%- endif %}))
+  (box :class "desktop" :orientation "v" :space-evenly false :spacing 18
+{%- for card in cards %}
+{%- if card == "clock" %}
+    (box :class "card clock" :orientation "v" :space-evenly false
+      (label :class "time" :text time)
+      (label :class "date" :text date))
+{%- elif card == "system" %}
+    (box :class "card system" :spacing 22 :halign "center" :space-evenly false
+      (box :orientation "v" :space-evenly false
+        (circular-progress :class "ring" :value {EWW_CPU.avg} :thickness 6 :start-at 75
+          (label :class "ring-text" :text "${round(EWW_CPU.avg, 0)}"))
+        (label :class "ring-label" :text "cpu"))
+      (box :orientation "v" :space-evenly false
+        (circular-progress :class "ring" :value {EWW_RAM.used_mem_perc} :thickness 6 :start-at 75
+          (label :class "ring-text" :text "${round(EWW_RAM.used_mem_perc, 0)}"))
+        (label :class "ring-label" :text "ram"))
+      (box :orientation "v" :space-evenly false
+        (circular-progress :class "ring" :value disk :thickness 6 :start-at 75
+          (label :class "ring-text" :text disk))
+        (label :class "ring-label" :text "disk")))
+{%- elif card == "media" %}
+    (box :class "card media" :orientation "v" :space-evenly false :visible {song != ""}
+      (label :class "song" :limit-width 40 :text song)
+      (box :class "buttons" :halign "center" :spacing 18 :space-evenly false
+        (button :onclick "playerctl previous" "󰒮")
+        (button :onclick "playerctl play-pause" "󰐎")
+        (button :onclick "playerctl next" "󰒭")))
+{%- elif card in widgets %}
+{#- Подпись делим на части до и после {value}: значение подставляет сам eww. #}
+{%- set w = widgets[card] %}
+{%- set parts = w.text | replace(from='"', to='\\"') | split(pat="{value}") %}
+{%- if parts | length > 1 %}{% set before = parts | first %}{% set after = parts | last %}
+{%- else %}{% set first = parts | first %}{% set before = first ~ " " %}{% set after = "" %}{% endif %}
+    (box :class "card widget w_{{ card }}" :halign "center" :space-evenly false
+      (label :text "{% if w.icon %}{{ w.icon }} {% endif %}{{ before }}${w_{{ card }}}{{ after }}"))
+{%- endif %}
+{%- endfor %}))

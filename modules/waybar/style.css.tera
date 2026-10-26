@@ -107,3 +107,9 @@ tooltip {
     border: 1px solid {{ colors.surface.hex }};
     border-radius: {{ style.radius_box }}px;
 }
+{% for id, w in widgets %}
+#custom-{{ id }} {
+    color: {{ w.color }};
+    padding: 0 {{ style.pad }}px;
+}
+{%- endfor %}

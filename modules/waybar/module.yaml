@@ -61,12 +61,15 @@ settings:
     group: Модули
     title: Слева
     about: "Из: launcher, workspaces, window, clock, media, cpu, memory, backlight, pulseaudio, network, battery, language, tray, power."
+    items: [launcher, workspaces, window, clock, media, cpu, memory, backlight, pulseaudio, network, battery, language, tray, power]
     default: [workspaces]
   - id: modules_center
     group: Модули
     title: По центру
+    items: [launcher, workspaces, window, clock, media, cpu, memory, backlight, pulseaudio, network, battery, language, tray, power]
     default: [clock]
   - id: modules_right
     group: Модули
     title: Справа
+    items: [launcher, workspaces, window, clock, media, cpu, memory, backlight, pulseaudio, network, battery, language, tray, power]
     default: [pulseaudio, network, battery]

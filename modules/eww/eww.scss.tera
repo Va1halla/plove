@@ -9,25 +9,63 @@ window {
 }
 
 .desktop {
-  font-family: "{{ fonts.ui }}";
+  font-family: "{{ fonts.ui }}", "{{ fonts.mono }}";
   color: {{ colors.fg.hex }};
 }
 
+.card {
+  padding: {{ style.pad }}px {{ style.pad * 2 }}px;
+{%- if style.glass != "none" %}
+  background-color: rgba({{ colors.bg.rgb }}, {{ style.bg_alpha - 0.25 }});
+  border-radius: {{ style.radius_box }}px;
+{%- endif %}
+}
+
+.clock {
+  background-color: transparent;
+}
+
 .time {
-  font-size: 110px;
+  font-size: {{ options.clock_size }}px;
   font-weight: bold;
   color: {{ colors.accent.hex }};
   text-shadow: 0 4px 16px rgba({{ colors.bg.rgb }}, 0.6);
 }
 
 .date {
-  font-size: 22px;
+  font-size: {{ (options.clock_size / 5) | round }}px;
   margin-top: -8px;
 }
 
-.stats {
-  margin-top: 12px;
+.ring {
+  min-width: 64px;
+  min-height: 64px;
+  color: {{ colors.accent.hex }};
+  background-color: {{ colors.surface.hex }};
+}
+
+.ring-text {
   font-family: "{{ fonts.mono }}";
-  font-size: 14px;
+  font-size: 15px;
+}
+
+.ring-label,
+.song {
+  margin-top: 6px;
   color: {{ colors.muted.hex }};
 }
+
+.buttons button {
+  font-size: 22px;
+  color: {{ colors.fg.hex }};
+}
+
+.buttons button:hover {
+  color: {{ colors.accent.hex }};
+}
+{% for id, w in widgets %}
+.w_{{ id }} {
+  color: {{ w.color }};
+  font-size: 16px;
+}
+{%- endfor %}

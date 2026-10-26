@@ -17,8 +17,20 @@ autostart: true
 reload: "pgrep -x eww >/dev/null && eww reload || eww open desktop"
 process: "eww"
 settings:
-  - id: stats
-    group: Часы на столе
-    title: Загрузка под часами
-    about: Процессор и память мелким текстом под датой.
-    default: true
+  - id: cards
+    group: Рабочий стол
+    title: Карточки
+    about: "Что лежит на рабочем столе, сверху вниз: clock (часы и дата), system (процессор, память, диск), media (музыка с кнопками) или свои виджеты из widgets."
+    items: [clock, system, media]
+    default: [clock, system]
+  - id: anchor
+    group: Рабочий стол
+    title: Где на экране
+    choices: [center, top-left, top-right, bottom-left, bottom-right, left, right]
+    default: center
+  - id: clock_size
+    group: Рабочий стол
+    title: Размер часов, px
+    range: [48, 200]
+    step: 4
+    default: 110

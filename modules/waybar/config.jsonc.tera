@@ -4,7 +4,7 @@
 {%- elif m == "window" -%}hyprland/window
 {%- elif m == "language" -%}hyprland/language
 {%- elif m == "media" -%}mpris
-{%- elif m == "power" or m == "launcher" -%}custom/{{ m }}
+{%- elif m == "power" or m == "launcher" or m in widgets -%}custom/{{ m }}
 {%- else -%}{{ m }}{%- endif -%}
 {%- endmacro module_name %}
 {#- Список модулей части панели; между ними — разделители custom/sep#<часть><номер>. -#}
@@ -110,6 +110,20 @@
     },
     "mpris": { "format": "{{ self::label(compact=vertical, glyph="󰝚", word="", value="{artist} — {title}") | trim }}", "max-length": 40 },
     "tray": { "spacing": {{ style.pad }} },
+{%- for id, w in widgets %}
+{%- set text = w.text | replace(from="{value}", to="{}") %}
+{%- if vertical and w.icon != "" %}{% set text = w.icon %}
+{%- elif w.icon != "" and style.labels != "text" %}{% set text = w.icon ~ " " ~ text %}{% endif %}
+    "custom/{{ id }}": {
+      "exec": {{ w.command | json_encode() }},
+      "interval": {{ w.every }},
+      "format": {{ text | json_encode() }},
+{%- if w.click %}
+      "on-click": {{ w.click | json_encode() }},
+{%- endif %}
+      "tooltip": false
+    },
+{%- endfor %}
     "custom/launcher": {
       "format": "{% if style.labels == "text" %}apps{% else %}{% endif %}",
       "on-click": "{{ apps.launcher | default(value="") | replace(from='"', to='\\"') }}",

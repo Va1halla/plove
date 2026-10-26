@@ -33,6 +33,84 @@ pub struct RiceSpec {
     /// Тонкие настройки модулей: id модуля → ключи из его `defaults`.
     #[serde(default)]
     pub overrides: BTreeMap<String, serde_yaml::Mapping>,
+    /// Свои виджеты: id → команда и оформление. Ставятся на панель или
+    /// рабочий стол по id, как готовые (`modules_right: [vpn, clock]`).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub widgets: BTreeMap<String, Widget>,
+}
+
+/// Свой виджет: что показывает команда, раз в сколько секунд, как выглядит.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Widget {
+    /// Команда оболочки; её последняя строка вывода — значение виджета.
+    pub command: String,
+    /// Как часто обновлять, секунды.
+    #[serde(default = "default_every")]
+    pub every: u32,
+    /// Значок Nerd Font перед текстом.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub icon: String,
+    /// Подпись; `{value}` заменяется выводом команды.
+    #[serde(default = "default_widget_text")]
+    pub text: String,
+    /// Цвет: accent, fg, muted, red, green, yellow, blue, magenta, cyan.
+    #[serde(default = "default_widget_color")]
+    pub color: String,
+    /// Команда по щелчку.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub click: Option<String>,
+}
+
+/// Готовые виджеты панели: их имена нельзя занять своими.
+pub const BUILTIN_WIDGETS: [&str; 14] = [
+    "launcher",
+    "workspaces",
+    "window",
+    "clock",
+    "media",
+    "cpu",
+    "memory",
+    "backlight",
+    "pulseaudio",
+    "network",
+    "battery",
+    "language",
+    "tray",
+    "power",
+];
+
+fn default_every() -> u32 {
+    5
+}
+
+fn default_widget_text() -> String {
+    "{value}".into()
+}
+
+fn default_widget_color() -> String {
+    "fg".into()
+}
+
+impl Widget {
+    /// Цвет виджета как `#rrggbb` из палитры райса.
+    pub fn resolve_color(&self, palette: &Palette) -> Result<Color> {
+        let ansi = |i: usize| palette.ansi.get(i).copied().unwrap_or(palette.accent);
+        Ok(match self.color.as_str() {
+            "accent" => palette.accent,
+            "fg" => palette.fg,
+            "muted" => palette.bg.mix(palette.fg, 0.5),
+            "red" => ansi(1),
+            "green" => ansi(2),
+            "yellow" => ansi(3),
+            "blue" => ansi(4),
+            "magenta" => ansi(5),
+            "cyan" => ansi(6),
+            other => bail!(
+                "у виджета цвет «{other}»: можно accent, fg, muted, red, green, yellow, blue, magenta, cyan"
+            ),
+        })
+    }
 }
 
 /// Дизайн-токены: всё, что описывает внешний вид, но не конкретные программы.
@@ -323,6 +401,24 @@ impl RiceSpec {
         if !self.components.contains_key("compositor") {
             bail!("в components обязательно должен быть compositor");
         }
+        for (id, widget) in &self.widgets {
+            let simple = !id.is_empty()
+                && id
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+            if !simple {
+                bail!("имя виджета «{id}»: только строчные латинские буквы, цифры и _");
+            }
+            if BUILTIN_WIDGETS.contains(&id.as_str()) {
+                bail!("виджет «{id}» уже есть среди готовых, назовите свой иначе");
+            }
+            if widget.every == 0 {
+                bail!("виджет «{id}»: every должен быть хотя бы 1 секунда");
+            }
+            widget
+                .resolve_color(&self.theme.palette)
+                .with_context(|| format!("виджет «{id}»"))?;
+        }
         Ok(())
     }
 }
@@ -351,5 +447,16 @@ mod tests {
     fn unknown_key_is_an_error() {
         let yaml = "version: 1\nname: x\ncolour: red\ntheme: {palette: {bg: '#000000', fg: '#ffffff', accent: '#ff0000'}, fonts: {ui: a, mono: b}}\ncomponents: {compositor: hyprland}\n";
         assert!(RiceSpec::from_yaml(yaml).is_err());
+    }
+
+    #[test]
+    fn widget_names_and_colors_are_checked() {
+        let base = "version: 1\nname: x\ntheme: {palette: {bg: '#000000', fg: '#ffffff', accent: '#ff0000'}, fonts: {ui: a, mono: b}}\ncomponents: {compositor: hyprland}\n";
+        let ok = format!("{base}widgets: {{vpn: {{command: 'echo on', color: accent}}}}\n");
+        assert!(RiceSpec::from_yaml(&ok).is_ok());
+        let taken = format!("{base}widgets: {{clock: {{command: date}}}}\n");
+        assert!(RiceSpec::from_yaml(&taken).is_err());
+        let color = format!("{base}widgets: {{vpn: {{command: date, color: pink}}}}\n");
+        assert!(RiceSpec::from_yaml(&color).is_err());
     }
 }

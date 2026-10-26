@@ -195,3 +195,44 @@ fn several_bars() {
     // Часы на вертикальной панели — в две строки.
     assert!(text.contains("\"format\": \"{:%H\\n%M}\""));
 }
+
+/// Свой виджет попадает и на панель, и на рабочий стол; опечатка в списке — ошибка.
+#[test]
+fn custom_widgets() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let mut spec = example_spec();
+    spec.widgets.insert(
+        "vpn".into(),
+        serde_yaml::from_str(
+            "{command: \"echo on\", icon: X, text: \"VPN {value}\", color: green}",
+        )
+        .unwrap(),
+    );
+    let waybar = spec.overrides.get_mut("waybar").unwrap();
+    waybar.insert(
+        "modules_right".into(),
+        serde_yaml::from_str("[vpn, clock]").unwrap(),
+    );
+    spec.overrides.insert(
+        "eww".into(),
+        serde_yaml::from_str("{cards: [clock, vpn]}").unwrap(),
+    );
+    let plan = plan::build(spec.clone(), &registry, &env).unwrap();
+    let text = |end: &str| {
+        let file = plan.files.iter().find(|f| f.path.ends_with(end)).unwrap();
+        String::from_utf8(file.content.clone()).unwrap()
+    };
+    assert!(text(".config/waybar/config.jsonc").contains("\"custom/vpn\": {"));
+    assert!(text(".config/waybar/style.css").contains("#custom-vpn {\n    color: #9ece6a;"));
+    assert!(text(".config/eww/eww.yuck").contains("(label :text \"X VPN ${w_vpn}\")"));
+
+    let waybar = spec.overrides.get_mut("waybar").unwrap();
+    waybar.insert(
+        "modules_right".into(),
+        serde_yaml::from_str("[vnp]").unwrap(),
+    );
+    let error = plan::build(spec, &registry, &env).err().unwrap();
+    assert!(error.to_string().contains("vnp"));
+}

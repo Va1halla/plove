@@ -177,6 +177,26 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         system::virtual_machine()
     };
     base.insert("vm", &vm);
+    // Свои виджеты: цвет уже из палитры, подпись в виде «{}» для Waybar.
+    let widgets: BTreeMap<&String, serde_json::Value> = spec
+        .widgets
+        .iter()
+        .map(|(id, w)| {
+            let color = w.resolve_color(&spec.theme.palette)?;
+            Ok((
+                id,
+                serde_json::json!({
+                    "command": w.command,
+                    "every": w.every,
+                    "icon": w.icon,
+                    "text": w.text,
+                    "color": color.hex(),
+                    "click": w.click,
+                }),
+            ))
+        })
+        .collect::<Result<_>>()?;
+    base.insert("widgets", &widgets);
     // Домашняя папка: для программ, которые не понимают ~ в путях.
     base.insert("home", &env.home.display().to_string());
     // Режим «выбрать из списка» у лаунчера. Нужен до команд запуска:
@@ -248,6 +268,7 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
     // 5. Рендерим конфиги и сравниваем с тем, что сейчас на диске.
     for module in &modules {
         let options = module_options(module, spec.overrides.get(&module.manifest.id))?;
+        check_items(module, &options, &spec)?;
         for rendered in render::render_module(module, &base, &apps, &options)? {
             let path = env.expand(&rendered.dest);
             if files.iter().any(|f| f.path == path) {
@@ -395,6 +416,34 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
 }
 
 /// Сравнить новое содержимое файла с тем, что сейчас на диске.
+/// Списки вроде `modules_right` собираются только из известных частей:
+/// опечатка иначе всплыла бы ошибкой уже в самой программе.
+fn check_items(module: &Module, options: &serde_json::Value, spec: &RiceSpec) -> Result<()> {
+    for setting in module
+        .manifest
+        .settings
+        .iter()
+        .filter(|s| !s.items.is_empty())
+    {
+        let Some(values) = options[&setting.id].as_array() else {
+            continue;
+        };
+        for value in values.iter().filter_map(|v| v.as_str()) {
+            let known =
+                setting.items.iter().any(|i| i == value) || spec.widgets.contains_key(value);
+            if !known {
+                bail!(
+                    "{}: в «{}» нет «{value}». Можно: {} или свой виджет из widgets",
+                    module.manifest.id,
+                    setting.title,
+                    setting.items.join(", ")
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Модули последнего применённого райса (пусто, если применений не было).
 fn previous_modules(env: &Env) -> Vec<String> {
     let last = state::list(env).ok().and_then(|mut g| g.pop());
