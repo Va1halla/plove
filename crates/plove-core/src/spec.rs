@@ -43,8 +43,106 @@ pub struct Theme {
     pub fonts: Fonts,
     #[serde(default)]
     pub geometry: Geometry,
+    /// Форма и стиль элементов: общие для всех программ.
+    #[serde(default)]
+    pub style: Style,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wallpaper: Option<Wallpaper>,
+}
+
+/// Стиль райса: несколько крупных решений, которые все модули понимают
+/// одинаково. Точные числа (радиус, рамка) по-прежнему в `geometry`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct Style {
+    pub shape: Shape,
+    pub bar: BarStyle,
+    pub separators: Separators,
+    pub borders: Borders,
+    pub density: Density,
+    pub labels: Labels,
+    pub glass: Glass,
+}
+
+/// `rename_all = "lowercase"`: в YAML пишется `pill`, а не `Pill`.
+/// `#[default]` — вариант, если ключ не указан.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Shape {
+    /// Прямые углы.
+    Sharp,
+    #[default]
+    Rounded,
+    /// Кнопки и модули панели — «таблетки» с полукруглыми краями.
+    Pill,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BarStyle {
+    /// Сплошная полоса вдоль края.
+    #[default]
+    Solid,
+    /// Полоса с отступами от краёв экрана.
+    Floating,
+    /// Без общего фона: каждая группа модулей в своей плашке.
+    Islands,
+    /// Без фона вовсе, только текст.
+    Minimal,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Separators {
+    #[default]
+    None,
+    Dots,
+    Line,
+    /// Стрелки powerline.
+    Arrows,
+    Slants,
+    Round,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Borders {
+    None,
+    Thin,
+    /// Рамка цвета акцента толщиной `geometry.border`.
+    #[default]
+    Accent,
+    /// Переливающаяся рамка из двух цветов палитры.
+    Gradient,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Density {
+    Compact,
+    #[default]
+    Normal,
+    Spacious,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Labels {
+    /// Значки Nerd Font.
+    #[default]
+    Glyphs,
+    Text,
+    Both,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Glass {
+    /// Непрозрачные фоны.
+    None,
+    #[default]
+    Light,
+    Strong,
 }
 
 /// Обои: свой файл или картинка, нарисованная из палитры.

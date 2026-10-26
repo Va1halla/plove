@@ -14,8 +14,9 @@ use anyhow::{anyhow, Result};
 use fontdue::{Font, FontSettings};
 use plove_core::modules::Registry;
 use plove_core::plan::module_options;
-use plove_core::spec::{Color, RiceSpec, Wallpaper};
+use plove_core::spec::{BarStyle, Color, RiceSpec, Wallpaper};
 use plove_core::system::Env;
+use plove_core::theme::StyleContext;
 use plove_core::wallpaper::{self, paint};
 use tiny_skia::{
     FillRule, FilterQuality, Mask, Path, PathBuilder, Pixmap, PixmapPaint, Rect, Stroke, Transform,
@@ -66,6 +67,8 @@ struct Look {
     radius: f32,
     opacity: f32,
     opacity_inactive: f32,
+    /// Стиль райса: форма, вид панели, отступы — как в шаблонах.
+    style: StyleContext,
     /// Размер шрифта в пикселях: пункты × 4/3 при обычных 96 dpi.
     font_px: f32,
 }
@@ -85,6 +88,7 @@ impl Look {
             let colors: Vec<Color> = base.iter().map(|c| Color::parse(c).unwrap()).collect();
             colors.iter().chain(colors.iter()).copied().collect()
         };
+        let style = StyleContext::new(spec.theme.style, g);
         Look {
             bg: p.bg,
             fg: p.fg,
@@ -94,8 +98,9 @@ impl Look {
             muted: p.bg.mix(p.fg, 0.5),
             ansi,
             gaps: g.gaps as f32,
-            border: g.border as f32,
-            radius: g.radius as f32,
+            border: style.border as f32,
+            radius: style.radius_window as f32,
+            style,
             opacity: g.opacity as f32,
             opacity_inactive: (g.opacity as f32 - 0.05).max(0.0),
             font_px: spec.theme.fonts.size as f32 * 4.0 / 3.0,
@@ -375,6 +380,7 @@ const ARCH_LOGO: [&str; 19] = [
 struct Bar {
     top: bool,
     floating: bool,
+    style: BarStyle,
     height: f32,
     /// Отступ панели от края экрана (только у плавающей).
     margin: f32,
@@ -401,11 +407,13 @@ impl Bar {
                 })
                 .unwrap_or_default()
         };
-        let floating = options["floating"].as_bool().unwrap_or(false);
+        let style = spec.theme.style.bar;
+        let floating = style != BarStyle::Solid || options["floating"].as_bool().unwrap_or(false);
         Ok(Bar {
             top: options["position"].as_str() != Some("bottom"),
             floating,
-            height: options["height"].as_f64().unwrap_or(32.0) as f32,
+            style,
+            height: look.style.bar_height as f32,
             margin: if floating { look.gaps } else { 0.0 },
             left: list("modules_left"),
             center: list("modules_center"),
@@ -422,14 +430,28 @@ fn draw_bar(canvas: &mut Pixmap, look: &Look, fonts: &Fonts, bar: &Bar) {
         HEIGHT as f32 - bar.margin - bar.height
     };
     let area = rect(x, y, WIDTH as f32 - 2.0 * bar.margin, bar.height);
-    let radius = if bar.floating { look.radius } else { 0.0 };
-    canvas.fill_path(
-        &rounded_rect(area, radius),
-        &paint(look.bg, look.opacity),
-        FillRule::Winding,
-        Transform::identity(),
-        None,
-    );
+    let alpha = look.style.bg_alpha as f32;
+    let fill = |canvas: &mut Pixmap, area: Rect, radius: f32| {
+        canvas.fill_path(
+            &rounded_rect(area, radius.min(area.height() / 2.0)),
+            &paint(look.bg, alpha),
+            FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
+    };
+    match bar.style {
+        BarStyle::Solid | BarStyle::Floating => {
+            let radius = if bar.floating {
+                look.style.radius_box as f32
+            } else {
+                0.0
+            };
+            fill(canvas, area, radius);
+        }
+        // Острова рисуются ниже, под каждой частью панели. У минимализма фона нет.
+        BarStyle::Islands | BarStyle::Minimal => {}
+    }
 
     let px = look.font_px;
     let baseline = y + bar.height / 2.0 + px * 0.35;
@@ -441,17 +463,38 @@ fn draw_bar(canvas: &mut Pixmap, look: &Look, fonts: &Fonts, bar: &Bar) {
         height: bar.height,
     };
 
+    // Острова: плашка под каждой непустой частью панели.
+    let island = |canvas: &mut Pixmap, start: f32, width: f32| {
+        if bar.style == BarStyle::Islands && width > 0.0 {
+            let radius = if look.style.radius_chip > 100 {
+                bar.height / 2.0
+            } else {
+                look.style.radius_box as f32
+            };
+            fill(
+                canvas,
+                rect(start - 6.0, y, width + 12.0, bar.height),
+                radius,
+            );
+        }
+    };
+    let width = |list: &[String]| -> f32 { list.iter().map(|n| ctx.module_width(n)).sum() };
+
+    let left_width = width(&bar.left);
+    island(canvas, x + 8.0, left_width);
     let mut pen = x + 8.0;
     for name in &bar.left {
         pen = ctx.module(canvas, look, name, pen);
     }
-    let center_width: f32 = bar.center.iter().map(|n| ctx.module_width(n)).sum();
+    let center_width = width(&bar.center);
     let mut pen = x + (area.width() - center_width) / 2.0;
+    island(canvas, pen, center_width);
     for name in &bar.center {
         pen = ctx.module(canvas, look, name, pen);
     }
-    let right_width: f32 = bar.right.iter().map(|n| ctx.module_width(n)).sum();
+    let right_width = width(&bar.right);
     let mut pen = x + area.width() - 8.0 - right_width;
+    island(canvas, pen, right_width);
     for name in &bar.right {
         pen = ctx.module(canvas, look, name, pen);
     }
@@ -477,6 +520,15 @@ impl BarText<'_> {
             "pulseaudio" => "vol 64%",
             "network" => "home-wifi",
             "battery" => "87%",
+            "cpu" => "cpu 12%",
+            "memory" => "ram 41%",
+            "window" => "nvim ~/plove",
+            "media" => "lofi beats",
+            "language" => "us",
+            "backlight" => "70%",
+            "launcher" => "apps",
+            "power" => "off",
+            "tray" => "",
             other => other,
         }
     }
@@ -502,7 +554,7 @@ impl BarText<'_> {
                 let label = i.to_string();
                 let color = if i == 1 {
                     let pill = rect(pen, self.y + 4.0, w, self.height - 8.0);
-                    let r = look.radius.min((self.height - 8.0) / 2.0);
+                    let r = (look.style.radius_chip as f32).min((self.height - 8.0) / 2.0);
                     canvas.fill_path(
                         &rounded_rect(pill, r),
                         &paint(look.accent, 1.0),

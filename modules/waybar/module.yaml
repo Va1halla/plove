@@ -13,11 +13,12 @@ templates:
 reload: pkill -SIGUSR2 waybar
 autostart: true
 defaults:
-  # top или bottom
+  # top, bottom, left или right (вертикальная панель).
   position: top
-  # true — панель «парит» с отступами от краёв и скруглёнными углами.
+  # true — панель «парит» с отступами от краёв. То же, что style.bar: floating.
   floating: false
-  height: 32
+  # Модули: launcher, workspaces, window, clock, media, cpu, memory, backlight,
+  # pulseaudio, network, battery, language, tray, power.
   modules_left: [workspaces]
   modules_center: [clock]
   modules_right: [pulseaudio, network, battery]

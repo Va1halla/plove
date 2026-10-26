@@ -9,8 +9,8 @@ button {
     font-family: "{{ fonts.ui }}";
     font-size: {{ fonts.size + 3 }}pt;
     background-color: {{ colors.surface.hex }};
-    border: {{ geometry.border }}px solid transparent;
-    border-radius: {{ geometry.radius }}px;
+    border: {{ style.border }}px solid transparent;
+    border-radius: {{ style.radius_box }}px;
     margin: 12px;
     background-repeat: no-repeat;
     background-position: center;

@@ -26,9 +26,9 @@ configuration {
 window {
     width: 36%;
     background-color: @bg;
-    border: {{ geometry.border }}px;
+    border: {{ style.border }}px;
     border-color: @accent;
-    border-radius: {{ geometry.radius }}px;
+    border-radius: {{ style.radius_box }}px;
     padding: 18px;
 }
 
@@ -36,7 +36,7 @@ mainbox { spacing: 12px; children: [ inputbar, listview ]; }
 
 inputbar {
     background-color: @bg-alt;
-    border-radius: {{ geometry.radius }}px;
+    border-radius: {{ style.radius_chip_px }}px;
     padding: 10px 14px;
     spacing: 10px;
     children: [ prompt, entry ];
@@ -49,7 +49,7 @@ listview { lines: 8; spacing: 4px; scrollbar: false; }
 
 element {
     padding: 8px 12px;
-    border-radius: {{ geometry.radius }}px;
+    border-radius: {{ style.radius_chip_px }}px;
     spacing: 12px;
 }
 element-icon { size: 24px; }

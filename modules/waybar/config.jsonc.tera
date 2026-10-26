@@ -1,32 +1,94 @@
 // Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
 {%- macro module_name(m) -%}
-{%- if m == "workspaces" -%}hyprland/workspaces{%- else -%}{{ m }}{%- endif -%}
+{%- if m == "workspaces" -%}hyprland/workspaces
+{%- elif m == "window" -%}hyprland/window
+{%- elif m == "language" -%}hyprland/language
+{%- elif m == "media" -%}mpris
+{%- elif m == "power" or m == "launcher" -%}custom/{{ m }}
+{%- else -%}{{ m }}{%- endif -%}
 {%- endmacro module_name %}
-{%- macro module_list(list) -%}
-[{% for m in list %}"{{ self::module_name(m=m) }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{#- Список модулей части панели; между ними — разделители custom/sep#<часть><номер>. -#}
+{%- macro module_list(list, side) -%}
+[{% for m in list %}"{{ self::module_name(m=m) }}"{% if not loop.last %}, {% if style.separators != "none" %}"custom/sep#{{ side }}{{ loop.index }}", {% endif %}{% endif %}{% endfor %}]
 {%- endmacro module_list %}
+{#- Подпись в стиле райса: значок, слово или оба. -#}
+{%- macro label(glyph, word, value) -%}
+{%- if style.labels == "glyphs" -%}{{ glyph }} {{ value }}
+{%- elif style.labels == "text" -%}{{ word }} {{ value }}
+{%- else -%}{{ glyph }} {{ word }} {{ value }}{%- endif -%}
+{%- endmacro label %}
+{%- set floats = style.bar != "solid" or options.floating %}
+{%- set vertical = options.position == "left" or options.position == "right" %}
 {
   "layer": "top",
   "position": "{{ options.position }}",
-  "height": {{ options.height }},
-{%- if options.floating %}
+{%- if vertical %}
+  "width": {{ style.bar_height + 12 }},
+{%- else %}
+  "height": {{ style.bar_height }},
+{%- endif %}
+{%- if floats %}
 {%- if options.position == "bottom" %}
   "margin": "0 {{ geometry.gaps }} {{ geometry.gaps }} {{ geometry.gaps }}",
+{%- elif options.position == "left" %}
+  "margin": "{{ geometry.gaps }} 0 {{ geometry.gaps }} {{ geometry.gaps }}",
+{%- elif options.position == "right" %}
+  "margin": "{{ geometry.gaps }} {{ geometry.gaps }} {{ geometry.gaps }} 0",
 {%- else %}
   "margin": "{{ geometry.gaps }} {{ geometry.gaps }} 0 {{ geometry.gaps }}",
 {%- endif %}
 {%- endif %}
-  "modules-left": {{ self::module_list(list=options.modules_left) }},
-  "modules-center": {{ self::module_list(list=options.modules_center) }},
-  "modules-right": {{ self::module_list(list=options.modules_right) }},
+  "spacing": {{ style.pad_small }},
+  "modules-left": {{ self::module_list(list=options.modules_left, side="l") }},
+  "modules-center": {{ self::module_list(list=options.modules_center, side="c") }},
+  "modules-right": {{ self::module_list(list=options.modules_right, side="r") }},
+{% for side in ["l", "c", "r"] %}
+{%- if side == "l" %}{% set list = options.modules_left %}{% set glyph = style.sep_left %}
+{%- elif side == "c" %}{% set list = options.modules_center %}{% set glyph = style.sep_center %}
+{%- else %}{% set list = options.modules_right %}{% set glyph = style.sep_right %}{% endif %}
+{%- if style.separators != "none" %}{% for m in list %}{% if not loop.last %}
+  "custom/sep#{{ side }}{{ loop.index }}": { "format": "{{ glyph }}", "tooltip": false },
+{%- endif %}{% endfor %}{% endif %}
+{%- endfor %}
 
   "hyprland/workspaces": { "format": "{id}" },
-  "clock": { "format": "{:%H:%M}", "tooltip-format": "{:%d.%m.%Y}" },
-  "battery": { "format": "{capacity}%" },
-  "network": {
-    "format-wifi": "{essid}",
-    "format-ethernet": "eth",
-    "format-disconnected": "offline"
+  "hyprland/window": { "max-length": 40, "separate-outputs": true },
+  "hyprland/language": { "format": "{{ self::label(glyph="󰌌", word="", value="{short}") }}" },
+  "clock": {
+    "format": "{{ self::label(glyph="󰅐", word="", value="{:%H:%M}") | trim }}",
+    "tooltip-format": "<big>{:%d.%m.%Y}</big>\n<tt>{calendar}</tt>"
   },
-  "pulseaudio": { "format": "vol {volume}%", "format-muted": "muted" }
+  "cpu": { "format": "{{ self::label(glyph="󰻠", word="cpu", value="{usage}%") }}", "interval": 3 },
+  "memory": { "format": "{{ self::label(glyph="󰍛", word="ram", value="{percentage}%") }}", "interval": 5 },
+  "backlight": { "format": "{{ self::label(glyph="󰃟", word="свет", value="{percent}%") }}" },
+  "battery": {
+    "format": "{{ self::label(glyph="{icon}", word="бат", value="{capacity}%") }}",
+    "format-charging": "{{ self::label(glyph="󰂄", word="заряд", value="{capacity}%") }}",
+    "format-icons": ["󰁺", "󰁼", "󰁾", "󰂀", "󰂂", "󰁹"],
+    "states": { "warning": 25, "critical": 10 }
+  },
+  "network": {
+    "format-wifi": "{{ self::label(glyph="󰖩", word="", value="{essid}") | trim }}",
+    "format-ethernet": "{{ self::label(glyph="󰈀", word="", value="eth") | trim }}",
+    "format-disconnected": "{{ self::label(glyph="󰖪", word="", value="offline") | trim }}",
+    "tooltip-format": "{ipaddr}"
+  },
+  "pulseaudio": {
+    "format": "{{ self::label(glyph="{icon}", word="vol", value="{volume}%") }}",
+    "format-muted": "{{ self::label(glyph="󰖁", word="vol", value="muted") }}",
+    "format-icons": { "default": ["󰕿", "󰖀", "󰕾"] },
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+  },
+  "mpris": { "format": "{{ self::label(glyph="󰝚", word="", value="{artist} — {title}") | trim }}", "max-length": 40 },
+  "tray": { "spacing": {{ style.pad }} },
+  "custom/launcher": {
+    "format": "{% if style.labels == "text" %}apps{% else %}{% endif %}",
+    "on-click": "{{ apps.launcher | default(value="") | replace(from='"', to='\\"') }}",
+    "tooltip": false
+  },
+  "custom/power": {
+    "format": "{% if style.labels == "text" %}off{% else %}󰐥{% endif %}",
+    "on-click": "{{ apps.power | default(value="") | replace(from='"', to='\\"') }}",
+    "tooltip": false
+  }
 }

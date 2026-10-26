@@ -33,21 +33,28 @@ exec-once = {{ command }}
 general {
     gaps_in = {{ geometry.gaps_in }}
     gaps_out = {{ geometry.gaps }}
-    border_size = {{ geometry.border }}
+    border_size = {{ style.border }}
+{%- if style.borders == "gradient" %}
+{%- if ansi | length == 16 %}{% set second = ansi.5.raw %}{% else %}{% set second = colors.muted.raw %}{% endif %}
+    col.active_border = rgb({{ colors.accent.raw }}) rgb({{ second }}) 45deg
+{%- elif style.borders == "thin" %}
+    col.active_border = rgb({{ colors.muted.raw }})
+{%- else %}
     col.active_border = rgb({{ colors.accent.raw }})
+{%- endif %}
     col.inactive_border = rgb({{ colors.surface.raw }})
     layout = dwindle
 }
 
 decoration {
-    rounding = {{ geometry.radius }}
+    rounding = {{ style.radius_window }}
     active_opacity = {{ geometry.opacity }}
     inactive_opacity = {{ geometry.opacity_inactive }}
 
     blur {
-        enabled = true
+        enabled = {{ style.blur }}
         size = 6
-        passes = 2
+        passes = {{ style.blur_passes }}
         popups = true
     }
 
@@ -83,6 +90,10 @@ animations {
     bezier = overshot, 0.05, 0.9, 0.1, 1.05
     animation = layers, 1, {{ speed }}, overshot, popin 90%
     animation = border, 1, {{ speed * 2 }}, ease
+{%- if style.borders == "gradient" %}
+    # Градиент рамки медленно вращается по кругу.
+    animation = borderangle, 1, 60, ease, loop
+{%- endif %}
     animation = workspaces, 1, {{ speed }}, ease, {{ options.workspace_animation }}
 {%- endif %}
 }

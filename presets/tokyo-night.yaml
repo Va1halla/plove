@@ -11,6 +11,7 @@ theme:
            "#414868", "#f7768e", "#9ece6a", "#e0af68", "#7aa2f7", "#bb9af7", "#7dcfff", "#c0caf5"]
   fonts: { ui: "Inter", mono: "JetBrainsMono Nerd Font", size: 11 }
   geometry: { gaps: 8, border: 2, radius: 10, opacity: 0.92 }
+  style: { shape: rounded, bar: islands, separators: none, borders: gradient, density: normal, labels: glyphs, glass: light }
   wallpaper: { generate: hills }
 components:
   compositor: hyprland
@@ -41,4 +42,7 @@ components:
   emoji: rofimoji
 overrides:
   hyprland: { animations: snappy, kb_layout: "us,ru" }
-  waybar: { floating: true }
+  waybar:
+    modules_left: [launcher, workspaces, window]
+    modules_center: [clock]
+    modules_right: [media, pulseaudio, network, battery, tray, power]

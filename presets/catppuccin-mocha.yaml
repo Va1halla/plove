@@ -11,6 +11,7 @@ theme:
            "#585b70", "#f38ba8", "#a6e3a1", "#f9e2af", "#89b4fa", "#f5c2e7", "#94e2d5", "#a6adc8"]
   fonts: { ui: "Inter", mono: "FiraCode Nerd Font", size: 11 }
   geometry: { gaps: 10, border: 2, radius: 14, opacity: 0.94 }
+  style: { shape: pill, bar: islands, separators: none, borders: accent, density: spacious, labels: glyphs, glass: strong }
   wallpaper: { generate: waves }
 components:
   compositor: hyprland
@@ -41,4 +42,8 @@ components:
   emoji: rofimoji
 overrides:
   hyprland: { animations: smooth, kb_layout: "us,ru" }
-  waybar: { position: bottom, floating: true }
+  waybar:
+    position: bottom
+    modules_left: [launcher, workspaces]
+    modules_center: [clock]
+    modules_right: [cpu, memory, pulseaudio, network, battery, power]

@@ -1,25 +1,51 @@
 /* Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`. */
+{%- set floats = style.bar != "solid" or options.floating %}
+{%- set panel_bg = "rgba(" ~ colors.bg.rgb ~ ", " ~ style.bg_alpha ~ ")" %}
 
 * {
-    font-family: "{{ fonts.ui }}";
+    /* Моноширинный Nerd Font — запасной: из него берутся значки. */
+    font-family: "{{ fonts.ui }}", "{{ fonts.mono }}";
     font-size: {{ fonts.size }}pt;
     border: none;
     min-height: 0;
 }
 
 window#waybar {
-    background: rgba({{ colors.bg.rgb }}, {{ geometry.opacity }});
+{%- if style.bar == "solid" or style.bar == "floating" %}
+    background: {{ panel_bg }};
+{%- else %}
+    background: transparent;
+{%- endif %}
     color: {{ colors.fg.hex }};
-{%- if options.floating %}
-    border-radius: {{ geometry.radius }}px;
+{%- if style.bar == "floating" or (style.bar == "solid" and floats) %}
+    border-radius: {{ style.radius_box }}px;
+{%- if style.border > 0 %}
+    border: {{ style.border }}px solid {{ colors.surface.hex }};
+{%- endif %}
 {%- endif %}
 }
 
+{%- if style.bar == "islands" %}
+
+/* Острова: каждая часть панели в своей плашке. */
+.modules-left,
+.modules-center,
+.modules-right {
+    background: {{ panel_bg }};
+    border-radius: {% if style.shape == "pill" %}999{% else %}{{ style.radius_box }}{% endif %}px;
+    padding: 0 {{ style.pad_small }}px;
+{%- if style.border > 0 %}
+    border: {{ style.border }}px solid {{ colors.surface.hex }};
+{%- endif %}
+}
+{%- endif %}
+
 #workspaces button {
-    padding: 0 8px;
+    padding: 0 {{ style.pad }}px;
+    margin: {{ (style.pad_small / 2) | round(method="floor") }}px 1px;
     color: {{ colors.muted.hex }};
     background: transparent;
-    border-radius: {{ geometry.radius }}px;
+    border-radius: {{ style.radius_chip }}px;
 }
 
 #workspaces button.active {
@@ -27,13 +53,57 @@ window#waybar {
     background: {{ colors.accent.hex }};
 }
 
-#clock,
-#battery,
-#network,
-#pulseaudio {
-    padding: 0 10px;
+#workspaces button:hover {
+    background: {{ colors.surface.hex }};
+    color: {{ colors.fg.hex }};
 }
 
-#clock {
+#window,
+#language,
+#clock,
+#cpu,
+#memory,
+#backlight,
+#battery,
+#network,
+#pulseaudio,
+#mpris,
+#tray,
+#custom-launcher,
+#custom-power {
+    padding: 0 {{ style.pad }}px;
+    border-radius: {{ style.radius_chip }}px;
+}
+
+#clock,
+#custom-launcher {
     color: {{ colors.accent.hex }};
+}
+
+#custom-launcher {
+    font-size: {{ fonts.size + 3 }}pt;
+}
+
+#custom-power {
+    color: {% if ansi | length == 16 %}{{ ansi.1.hex }}{% else %}{{ colors.accent.hex }}{% endif %};
+}
+
+#custom-sep {
+    color: {{ colors.surface.hex }};
+    padding: 0 2px;
+}
+
+#battery.warning {
+    color: {% if ansi | length == 16 %}{{ ansi.3.hex }}{% else %}{{ colors.accent.hex }}{% endif %};
+}
+
+#battery.critical,
+#pulseaudio.muted {
+    color: {% if ansi | length == 16 %}{{ ansi.1.hex }}{% else %}{{ colors.muted.hex }}{% endif %};
+}
+
+tooltip {
+    background: {{ colors.bg.hex }};
+    border: 1px solid {{ colors.surface.hex }};
+    border-radius: {{ style.radius_box }}px;
 }

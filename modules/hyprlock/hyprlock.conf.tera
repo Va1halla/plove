@@ -39,8 +39,8 @@ label {
 
 input-field {
     size = 320, 56
-    outline_thickness = {{ geometry.border }}
-    rounding = {{ geometry.radius }}
+    outline_thickness = {{ style.border }}
+    rounding = {% if style.shape == "pill" %}-1{% else %}{{ style.radius_box }}{% endif %}
     outer_color = rgb({{ colors.accent.raw }})
     inner_color = rgb({{ colors.bg.raw }})
     font_color = rgb({{ colors.fg.raw }})

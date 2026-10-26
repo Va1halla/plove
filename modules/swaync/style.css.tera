@@ -9,8 +9,8 @@
 .notification {
     background: rgba({{ colors.bg.rgb }}, 0.95);
     color: {{ colors.fg.hex }};
-    border: {{ geometry.border }}px solid {{ colors.accent.hex }};
-    border-radius: {{ geometry.radius }}px;
+    border: {{ style.border }}px solid {{ colors.accent.hex }};
+    border-radius: {{ style.radius_box }}px;
 }
 
 .notification-row { outline: none; }
@@ -25,8 +25,8 @@
 .widget-dnd > switch {
     background: {{ colors.surface.hex }};
     color: {{ colors.fg.hex }};
-    border-radius: {{ geometry.radius }}px;
+    border-radius: {{ style.radius_box }}px;
     border: none;
 }
 .widget-dnd > switch:checked { background: {{ colors.accent.hex }}; }
-.widget-mpris { background: {{ colors.surface.hex }}; border-radius: {{ geometry.radius }}px; margin: 8px; }
+.widget-mpris { background: {{ colors.surface.hex }}; border-radius: {{ style.radius_chip_px }}px; margin: 8px; }

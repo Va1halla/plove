@@ -25,5 +25,5 @@ selection-match={{ colors.accent.raw }}ff
 border={{ colors.accent.raw }}ff
 
 [border]
-width={{ geometry.border }}
-radius={{ geometry.radius }}
+width={{ style.border }}
+radius={{ style.radius_box }}

@@ -54,6 +54,24 @@ cargo build --release
 
 Другие команды: `plove history` (история применений), `plove modules` (список модулей), `plove --help`.
 
+## Стиль
+
+Кроме цветов, у райса есть стиль: несколько крупных решений, которые сразу меняют панель, меню, уведомления, экран блокировки и рамки окон.
+
+```yaml
+theme:
+  style:
+    shape: pill        # sharp, rounded, pill — углы и «таблетки»
+    bar: islands       # solid, floating, islands, minimal
+    separators: none   # none, dots, line, arrows, slants, round
+    borders: gradient  # none, thin, accent, gradient (вращается)
+    density: normal    # compact, normal, spacious
+    labels: glyphs     # glyphs, text, both — значки или слова на панели
+    glass: light       # none, light, strong — прозрачность и размытие
+```
+
+Состав панели задаётся в `overrides.waybar`: `modules_left`, `modules_center`, `modules_right` из launcher, workspaces, window, clock, media, cpu, memory, backlight, pulseaudio, network, battery, language, tray, power. Панель можно поставить и вертикально: `position: left`.
+
 ## Что входит в готовые райсы
 
 Райсы отличаются не только цветами, но и набором программ:
