@@ -2,12 +2,16 @@
 
 Конструктор райсов для Arch Linux: описываешь рабочий стол одним YAML-файлом, plove ставит пакеты и пишет конфиги.
 
-> Ранняя версия: ядро, CLI, 4 готовых райса и превью. TUI-мастер появится следом.
+> Ранняя версия: ядро, CLI, TUI-мастер, 4 готовых райса и превью.
 
 ## Быстрый старт
 
 ```sh
 cargo build --release
+# Мастер: проверка системы, выбор райса и настроек, план, применение:
+./target/release/plove
+# Проверить систему отдельно (и починить то, что можно, с --fix):
+./target/release/plove doctor
 # Готовые райсы:
 ./target/release/plove presets
 # Нарисовать превью в tokyo-night.png:
@@ -57,6 +61,8 @@ rice.yaml ──► spec    разбор и проверка райса
 | `crates/plove-core/src/presets.rs` | встроенные райсы |
 | `crates/plove-core/src/wallpaper.rs` | обои, нарисованные из палитры |
 | `crates/plove-preview/src/lib.rs` | превью райса |
+| `crates/plove-core/src/check.rs` | проверка системы (`plove doctor`) |
+| `crates/plove-tui/src/lib.rs` | мастер в терминале |
 | `crates/plove-cli/src/main.rs` | командная строка |
 | `modules/` | модули программ |
 | `presets/` | готовые райсы |

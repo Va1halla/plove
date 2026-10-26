@@ -12,5 +12,6 @@ path = "src/main.rs"
 [dependencies]
 plove-core = { path = "../plove-core" }
 plove-preview = { path = "../plove-preview" }
+plove-tui = { path = "../plove-tui" }
 anyhow.workspace = true
 clap.workspace = true
