@@ -19,7 +19,17 @@ pub struct Env {
 
 impl Env {
     /// Настоящая система текущего пользователя.
+    /// От root не работаем: Hyprland не рассчитан на запуск от root,
+    /// а конфиги оказались бы в /root, а не у пользователя.
     pub fn real() -> Result<Env> {
+        if is_root() {
+            bail!(
+                "plove нельзя запускать от root. Создайте обычного пользователя с sudo:\n\
+                 \n  useradd -m -G wheel <имя>\n  passwd <имя>\n  EDITOR=nano visudo   \
+                 # раскомментируйте строку %wheel ALL=(ALL:ALL) ALL\n\n\
+                 затем войдите под ним и запустите plove снова"
+            );
+        }
         let home = std::env::var_os("HOME").context("переменная HOME не задана")?;
         Ok(Env {
             home: PathBuf::from(home),
@@ -55,6 +65,20 @@ impl Env {
     pub fn state_dir(&self) -> PathBuf {
         self.home.join(".local/state/plove")
     }
+}
+
+/// Запущены ли мы от root. Владелец папки `/proc/self` — это пользователь
+/// текущего процесса, так что обходимся без системных вызовов.
+pub fn is_root() -> bool {
+    use std::os::unix::fs::MetadataExt;
+    std::fs::metadata("/proc/self").is_ok_and(|m| m.uid() == 0)
+}
+
+/// Идёт ли графическая сессия Wayland. Вне её (например, в TTY до запуска
+/// Hyprland) перезагружать программы бессмысленно: они ещё не запущены.
+pub fn in_graphical_session() -> bool {
+    std::env::var_os("WAYLAND_DISPLAY").is_some()
+        || std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some()
 }
 
 /// Установлен ли пакет. `None` — не удалось узнать (нет pacman, это не Arch).
