@@ -160,17 +160,27 @@ fn draw_windows(
     spec: &RiceSpec,
 ) {
     // Панель резервирует место у края экрана вместе со своим отступом.
-    let (mut top, mut bottom) = (0.0, 0.0);
+    let (mut top, mut bottom, mut left, mut right) = (0.0, 0.0, 0.0, 0.0);
     if let Some(bar) = bar {
         let reserved = bar.margin + bar.height;
-        if bar.top {
+        if let Some(on_left) = bar.side {
+            let reserved = bar.margin + bar.height + 12.0;
+            if on_left {
+                left = reserved;
+            } else {
+                right = reserved;
+            }
+        } else if bar.top {
             top = reserved;
         } else {
             bottom = reserved;
         }
     }
-    let (x0, y0) = (look.gaps, top + look.gaps);
-    let (x1, y1) = (WIDTH as f32 - look.gaps, HEIGHT as f32 - bottom - look.gaps);
+    let (x0, y0) = (left + look.gaps, top + look.gaps);
+    let (x1, y1) = (
+        WIDTH as f32 - right - look.gaps,
+        HEIGHT as f32 - bottom - look.gaps,
+    );
     let (margin_x, margin_y) = ((x1 - x0) * 0.06, (y1 - y0) * 0.08);
 
     let (w, h) = window_size(fonts, look, 60, 17);
@@ -379,6 +389,8 @@ const ARCH_LOGO: [&str; 19] = [
 
 struct Bar {
     top: bool,
+    /// Вертикальная панель: Some(true) — слева, Some(false) — справа.
+    side: Option<bool>,
     floating: bool,
     style: BarStyle,
     height: f32,
@@ -411,6 +423,11 @@ impl Bar {
         let floating = style != BarStyle::Solid || options["floating"].as_bool().unwrap_or(false);
         Ok(Bar {
             top: options["position"].as_str() != Some("bottom"),
+            side: match options["position"].as_str() {
+                Some("left") => Some(true),
+                Some("right") => Some(false),
+                _ => None,
+            },
             floating,
             style,
             height: look.style.bar_height as f32,
@@ -423,6 +440,10 @@ impl Bar {
 }
 
 fn draw_bar(canvas: &mut Pixmap, look: &Look, fonts: &Fonts, bar: &Bar) {
+    if let Some(on_left) = bar.side {
+        draw_vertical_bar(canvas, look, fonts, bar, on_left);
+        return;
+    }
     let x = bar.margin;
     let y = if bar.top {
         bar.margin
@@ -498,6 +519,81 @@ fn draw_bar(canvas: &mut Pixmap, look: &Look, fonts: &Fonts, bar: &Bar) {
     for name in &bar.right {
         pen = ctx.module(canvas, look, name, pen);
     }
+}
+
+/// Вертикальная панель: рабочие столы сверху, часы в две строки внизу.
+fn draw_vertical_bar(canvas: &mut Pixmap, look: &Look, fonts: &Fonts, bar: &Bar, on_left: bool) {
+    let width = bar.height + 12.0;
+    let x = if on_left {
+        bar.margin
+    } else {
+        WIDTH as f32 - bar.margin - width
+    };
+    let area = rect(x, bar.margin, width, HEIGHT as f32 - 2.0 * bar.margin);
+    if bar.style != BarStyle::Minimal {
+        let radius = if bar.floating {
+            look.style.radius_box as f32
+        } else {
+            0.0
+        };
+        canvas.fill_path(
+            &rounded_rect(area, radius),
+            &paint(look.bg, look.style.bg_alpha as f32),
+            FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
+    }
+    let px = look.font_px;
+    let cell = fonts.char_width(px);
+    let center = |text: &str| x + (width - cell * text.chars().count() as f32) / 2.0;
+    let mut y = bar.margin + 16.0;
+    for i in 1..=5 {
+        let label = i.to_string();
+        let color = if i == 1 {
+            let pill = rect(x + 6.0, y, width - 12.0, px * 2.0);
+            let r = (look.style.radius_chip as f32).min(px);
+            canvas.fill_path(
+                &rounded_rect(pill, r),
+                &paint(look.accent, 1.0),
+                FillRule::Winding,
+                Transform::identity(),
+                None,
+            );
+            look.bg
+        } else {
+            look.muted
+        };
+        fonts.text(
+            canvas,
+            &fonts.regular,
+            &label,
+            px,
+            center(&label),
+            y + px * 1.35,
+            color,
+        );
+        y += px * 2.4;
+    }
+    let bottom = HEIGHT as f32 - bar.margin - 20.0;
+    fonts.text(
+        canvas,
+        &fonts.bold,
+        "21",
+        px,
+        center("21"),
+        bottom - px * 1.4,
+        look.accent,
+    );
+    fonts.text(
+        canvas,
+        &fonts.bold,
+        "37",
+        px,
+        center("37"),
+        bottom,
+        look.accent,
+    );
 }
 
 /// Помощник для текста на панели: шрифт, размер и вертикальное положение.

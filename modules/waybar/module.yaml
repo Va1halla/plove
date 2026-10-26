@@ -21,6 +21,16 @@ settings:
     about: left и right — вертикальная панель вдоль края.
     choices: [top, bottom, left, right]
     default: top
+  - id: monitors
+    group: Панель
+    title: На каких мониторах
+    about: Имена из `hyprctl monitors`. Пусто — на всех.
+    default: []
+  - id: bars
+    group: Панель
+    title: Дополнительные панели
+    about: "Ещё панели, например вертикальная на втором мониторе: [{ position: left, monitors: [HDMI-A-1], center: [workspaces] }]. Задаётся в файле райса."
+    default: []
   - id: floating
     group: Панель
     title: Отступ от краёв

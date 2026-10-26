@@ -70,7 +70,15 @@ theme:
     glass: light       # none, light, strong — прозрачность и размытие
 ```
 
-Состав панели задаётся в `overrides.waybar`: `modules_left`, `modules_center`, `modules_right` из launcher, workspaces, window, clock, media, cpu, memory, backlight, pulseaudio, network, battery, language, tray, power. Панель можно поставить и вертикально: `position: left`.
+Состав панели задаётся в `overrides.waybar`: `modules_left`, `modules_center`, `modules_right` из launcher, workspaces, window, clock, media, cpu, memory, backlight, pulseaudio, network, battery, language, tray, power. Панель можно поставить и вертикально: `position: left`. Панелей может быть несколько, в том числе свои на разных мониторах:
+
+```yaml
+overrides:
+  waybar:
+    monitors: [eDP-1]                 # главная панель только на ноутбуке
+    bars:
+      - { position: left, monitors: [HDMI-A-1], center: [workspaces, clock] }
+```
 
 ## Тонкая настройка программ
 

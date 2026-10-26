@@ -12,8 +12,10 @@
 [{% for m in list %}"{{ self::module_name(m=m) }}"{% if not loop.last %}, {% if style.separators != "none" %}"custom/sep#{{ side }}{{ loop.index }}", {% endif %}{% endif %}{% endfor %}]
 {%- endmacro module_list %}
 {#- Подпись в стиле райса: значок, слово или оба. -#}
-{%- macro label(glyph, word, value) -%}
-{%- if style.labels == "glyphs" -%}{{ glyph }} {{ value }}
+{#- На вертикальной панели места мало: только значок. -#}
+{%- macro label(compact, glyph, word, value) -%}
+{%- if compact and glyph != "" -%}{{ glyph }}
+{%- elif style.labels == "glyphs" -%}{{ glyph }} {{ value }}
 {%- elif style.labels == "text" -%}{{ word }} {{ value }}
 {%- else -%}{{ glyph }} {{ word }} {{ value }}{%- endif -%}
 {%- endmacro label %}
@@ -21,85 +23,103 @@
 {%- set date = "" %}{% if options.clock_date %}{% set date = "%d.%m  " %}{% endif %}
 {%- set seconds = "" %}{% if options.clock_seconds %}{% set seconds = ":%S" %}{% endif %}
 {%- set clock = "{:" ~ date ~ "%H:%M" ~ seconds ~ "}" %}
-{%- set vertical = options.position == "left" or options.position == "right" %}
-{
-  "layer": "top",
-  "position": "{{ options.position }}",
-{%- if vertical %}
-  "width": {{ style.bar_height + 12 }},
+{#- Панели: первая — из настроек выше, остальные — из списка bars. #}
+[
+{%- set count = options.bars | length %}
+{%- for i in range(end=count + 1) %}
+{%- if i == 0 %}
+{%- set position = options.position %}{% set outputs = options.monitors %}
+{%- set left = options.modules_left %}{% set center = options.modules_center %}{% set right = options.modules_right %}
 {%- else %}
-  "height": {{ style.bar_height }},
+{%- set j = i - 1 %}{% set b = options.bars[j] %}
+{%- set position = b.position | default(value="top") %}{% set outputs = b.monitors | default(value=[]) %}
+{%- set left = b.left | default(value=[]) %}{% set center = b.center | default(value=[]) %}{% set right = b.right | default(value=[]) %}
+{%- endif %}
+{%- set vertical = position == "left" or position == "right" %}
+{%- if vertical %}{% set bar_clock = "{:%H\n%M}" %}{% else %}{% set bar_clock = clock %}{% endif %}
+  {
+    "layer": "top",
+{%- if outputs | length > 0 %}
+    "output": [{% for o in outputs %}"{{ o }}"{% if not loop.last %}, {% endif %}{% endfor %}],
+{%- endif %}
+    "position": "{{ position }}",
+{%- if vertical %}
+    "width": {{ style.bar_height + 12 }},
+{%- else %}
+    "height": {{ style.bar_height }},
 {%- endif %}
 {%- if floats %}
-{%- if options.position == "bottom" %}
-  "margin": "0 {{ geometry.gaps }} {{ geometry.gaps }} {{ geometry.gaps }}",
-{%- elif options.position == "left" %}
-  "margin": "{{ geometry.gaps }} 0 {{ geometry.gaps }} {{ geometry.gaps }}",
-{%- elif options.position == "right" %}
-  "margin": "{{ geometry.gaps }} {{ geometry.gaps }} {{ geometry.gaps }} 0",
+{%- if position == "bottom" %}
+    "margin": "0 {{ geometry.gaps }} {{ geometry.gaps }} {{ geometry.gaps }}",
+{%- elif position == "left" %}
+    "margin": "{{ geometry.gaps }} 0 {{ geometry.gaps }} {{ geometry.gaps }}",
+{%- elif position == "right" %}
+    "margin": "{{ geometry.gaps }} {{ geometry.gaps }} {{ geometry.gaps }} 0",
 {%- else %}
-  "margin": "{{ geometry.gaps }} {{ geometry.gaps }} 0 {{ geometry.gaps }}",
+    "margin": "{{ geometry.gaps }} {{ geometry.gaps }} 0 {{ geometry.gaps }}",
 {%- endif %}
 {%- endif %}
-  "spacing": {{ style.pad_small }},
-  "modules-left": {{ self::module_list(list=options.modules_left, side="l") }},
-  "modules-center": {{ self::module_list(list=options.modules_center, side="c") }},
-  "modules-right": {{ self::module_list(list=options.modules_right, side="r") }},
+    "spacing": {{ style.pad_small }},
+    "modules-left": {{ self::module_list(list=left, side="l") }},
+    "modules-center": {{ self::module_list(list=center, side="c") }},
+    "modules-right": {{ self::module_list(list=right, side="r") }},
 {% for side in ["l", "c", "r"] %}
-{%- if side == "l" %}{% set list = options.modules_left %}{% set glyph = style.sep_left %}
-{%- elif side == "c" %}{% set list = options.modules_center %}{% set glyph = style.sep_center %}
-{%- else %}{% set list = options.modules_right %}{% set glyph = style.sep_right %}{% endif %}
+{%- if side == "l" %}{% set list = left %}{% set glyph = style.sep_left %}
+{%- elif side == "c" %}{% set list = center %}{% set glyph = style.sep_center %}
+{%- else %}{% set list = right %}{% set glyph = style.sep_right %}{% endif %}
 {%- if style.separators != "none" %}{% for m in list %}{% if not loop.last %}
-  "custom/sep#{{ side }}{{ loop.index }}": { "format": "{{ glyph }}", "tooltip": false },
+    "custom/sep#{{ side }}{{ loop.index }}": { "format": "{{ glyph }}", "tooltip": false },
 {%- endif %}{% endfor %}{% endif %}
 {%- endfor %}
 
-  "hyprland/workspaces": {
-    "format": "{id}"
+    "hyprland/workspaces": {
+      "format": "{id}"
 {%- if options.workspace_count > 0 %},
-    "persistent-workspaces": { "*": {{ options.workspace_count }} }
+      "persistent-workspaces": { "*": {{ options.workspace_count }} }
 {%- endif %}
-  },
-  "hyprland/window": { "max-length": {{ options.window_length }}, "separate-outputs": true },
-  "hyprland/language": { "format": "{{ self::label(glyph="󰌌", word="", value="{short}") }}" },
-  "clock": {
+    },
+    "hyprland/window": { "max-length": {{ options.window_length }}, "separate-outputs": true },
+    "hyprland/language": { "format": "{{ self::label(compact=vertical, glyph="󰌌", word="", value="{short}") }}" },
+    "clock": {
 {%- if options.clock_seconds %}
-    "interval": 1,
+      "interval": 1,
 {%- endif %}
-    "format": "{{ self::label(glyph="󰅐", word="", value=clock) | trim }}",
-    "tooltip-format": "<big>{:%d.%m.%Y}</big>\n<tt>{calendar}</tt>"
-  },
-  "cpu": { "format": "{{ self::label(glyph="󰻠", word="cpu", value="{usage}%") }}", "interval": 3 },
-  "memory": { "format": "{{ self::label(glyph="󰍛", word="ram", value="{percentage}%") }}", "interval": 5 },
-  "backlight": { "format": "{{ self::label(glyph="󰃟", word="свет", value="{percent}%") }}" },
-  "battery": {
-    "format": "{{ self::label(glyph="{icon}", word="бат", value="{capacity}%") }}",
-    "format-charging": "{{ self::label(glyph="󰂄", word="заряд", value="{capacity}%") }}",
-    "format-icons": ["󰁺", "󰁼", "󰁾", "󰂀", "󰂂", "󰁹"],
-    "states": { "warning": 25, "critical": 10 }
-  },
-  "network": {
-    "format-wifi": "{{ self::label(glyph="󰖩", word="", value="{essid}") | trim }}",
-    "format-ethernet": "{{ self::label(glyph="󰈀", word="", value="eth") | trim }}",
-    "format-disconnected": "{{ self::label(glyph="󰖪", word="", value="offline") | trim }}",
-    "tooltip-format": "{ipaddr}"
-  },
-  "pulseaudio": {
-    "format": "{{ self::label(glyph="{icon}", word="vol", value="{volume}%") }}",
-    "format-muted": "{{ self::label(glyph="󰖁", word="vol", value="muted") }}",
-    "format-icons": { "default": ["󰕿", "󰖀", "󰕾"] },
-    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
-  },
-  "mpris": { "format": "{{ self::label(glyph="󰝚", word="", value="{artist} — {title}") | trim }}", "max-length": 40 },
-  "tray": { "spacing": {{ style.pad }} },
-  "custom/launcher": {
-    "format": "{% if style.labels == "text" %}apps{% else %}{% endif %}",
-    "on-click": "{{ apps.launcher | default(value="") | replace(from='"', to='\\"') }}",
-    "tooltip": false
-  },
-  "custom/power": {
-    "format": "{% if style.labels == "text" %}off{% else %}󰐥{% endif %}",
-    "on-click": "{{ apps.power | default(value="") | replace(from='"', to='\\"') }}",
-    "tooltip": false
-  }
-}
+      "format": "{% if vertical %}{{ bar_clock }}{% else %}{{ self::label(compact=false, glyph="󰅐", word="", value=bar_clock) | trim }}{% endif %}",
+      "tooltip-format": "<big>{:%d.%m.%Y}</big>\n<tt>{calendar}</tt>"
+    },
+    "cpu": { "format": "{{ self::label(compact=vertical, glyph="󰻠", word="cpu", value="{usage}%") }}", "interval": 3 },
+    "memory": { "format": "{{ self::label(compact=vertical, glyph="󰍛", word="ram", value="{percentage}%") }}", "interval": 5 },
+    "backlight": { "format": "{{ self::label(compact=vertical, glyph="󰃟", word="свет", value="{percent}%") }}" },
+    "battery": {
+      "format": "{{ self::label(compact=vertical, glyph="{icon}", word="бат", value="{capacity}%") }}",
+      "format-charging": "{{ self::label(compact=vertical, glyph="󰂄", word="заряд", value="{capacity}%") }}",
+      "format-icons": ["󰁺", "󰁼", "󰁾", "󰂀", "󰂂", "󰁹"],
+      "states": { "warning": 25, "critical": 10 }
+    },
+    "network": {
+      "format-wifi": "{{ self::label(compact=vertical, glyph="󰖩", word="", value="{essid}") | trim }}",
+      "format-ethernet": "{{ self::label(compact=vertical, glyph="󰈀", word="", value="eth") | trim }}",
+      "format-disconnected": "{{ self::label(compact=vertical, glyph="󰖪", word="", value="offline") | trim }}",
+      "tooltip-format": "{ipaddr}"
+    },
+    "pulseaudio": {
+      "format": "{{ self::label(compact=vertical, glyph="{icon}", word="vol", value="{volume}%") }}",
+      "format-muted": "{{ self::label(compact=vertical, glyph="󰖁", word="vol", value="muted") }}",
+      "format-icons": { "default": ["󰕿", "󰖀", "󰕾"] },
+      "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+    },
+    "mpris": { "format": "{{ self::label(compact=vertical, glyph="󰝚", word="", value="{artist} — {title}") | trim }}", "max-length": 40 },
+    "tray": { "spacing": {{ style.pad }} },
+    "custom/launcher": {
+      "format": "{% if style.labels == "text" %}apps{% else %}{% endif %}",
+      "on-click": "{{ apps.launcher | default(value="") | replace(from='"', to='\\"') }}",
+      "tooltip": false
+    },
+    "custom/power": {
+      "format": "{% if style.labels == "text" %}off{% else %}󰐥{% endif %}",
+      "on-click": "{{ apps.power | default(value="") | replace(from='"', to='\\"') }}",
+      "tooltip": false
+    }
+  }{% if not loop.last %},{% endif %}
+{%- endfor %}
+]

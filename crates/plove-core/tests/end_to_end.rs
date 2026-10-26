@@ -165,3 +165,33 @@ fn monitors_above_and_rotated() {
     assert!(text.contains("monitor = DP-1, preferred, auto-up, 1\n"));
     assert!(text.contains("monitor = HDMI-A-1, preferred, auto-left, 1, transform, 1\n"));
 }
+
+/// Несколько панелей: главная на одном мониторе, вертикальная на другом.
+#[test]
+fn several_bars() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let mut spec = example_spec();
+    let waybar = spec.overrides.get_mut("waybar").unwrap();
+    waybar.insert("monitors".into(), serde_yaml::from_str("[eDP-1]").unwrap());
+    waybar.insert(
+        "bars".into(),
+        serde_yaml::from_str(
+            "[{position: left, monitors: [HDMI-A-1], center: [workspaces, clock]}]",
+        )
+        .unwrap(),
+    );
+    let plan = plan::build(spec, &registry, &env).unwrap();
+    let config = plan
+        .files
+        .iter()
+        .find(|f| f.path.ends_with(".config/waybar/config.jsonc"))
+        .unwrap();
+    let text = String::from_utf8(config.content.clone()).unwrap();
+    assert!(text.contains("\"output\": [\"eDP-1\"]"));
+    assert!(text.contains("\"output\": [\"HDMI-A-1\"]"));
+    assert!(text.contains("\"position\": \"left\""));
+    // Часы на вертикальной панели — в две строки.
+    assert!(text.contains("\"format\": \"{:%H\\n%M}\""));
+}
