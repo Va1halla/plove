@@ -8,3 +8,5 @@ compatible_with:
   compositor: [hyprland]
 autostart: true
 stops: [polkit-gnome-authentication-agent-1, lxpolkit]
+# Фоновый процесс: plove остановит его, если модуль уберут из райса.
+process: "hyprpolkitagent"

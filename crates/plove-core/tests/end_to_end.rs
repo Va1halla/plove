@@ -118,3 +118,50 @@ fn all_presets_build() {
         );
     }
 }
+
+/// Убранная из райса фоновая программа останавливается при следующем применении.
+#[test]
+fn removed_daemon_is_stopped() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let options = ApplyOptions {
+        skip_packages: true,
+    };
+    let first = plan::build(example_spec(), &registry, &env).unwrap();
+    apply(&first, &env, &options).unwrap();
+
+    let mut spec = example_spec();
+    spec.components.remove("widgets");
+    let second = plan::build(spec, &registry, &env).unwrap();
+    assert!(second.reloads.contains(&"pkill -x 'eww'; true".to_string()));
+    // Оставшиеся программы не трогаем.
+    assert!(!second.reloads.iter().any(|r| r.contains("'waybar'")));
+}
+
+/// Мониторы: строка Hyprland как есть, описание — с позицией и поворотом.
+#[test]
+fn monitors_above_and_rotated() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let mut spec = example_spec();
+    let monitors: serde_yaml::Value = serde_yaml::from_str(
+        "[\"eDP-1, 1920x1080@60, 0x0, 1\", {name: DP-1, position: above}, {name: HDMI-A-1, position: left, rotate: 90}]",
+    )
+    .unwrap();
+    spec.overrides
+        .get_mut("hyprland")
+        .unwrap()
+        .insert("monitors".into(), monitors);
+    let plan = plan::build(spec, &registry, &env).unwrap();
+    let hypr = plan
+        .files
+        .iter()
+        .find(|f| f.path.ends_with(".config/hypr/hyprland.conf"))
+        .unwrap();
+    let text = String::from_utf8(hypr.content.clone()).unwrap();
+    assert!(text.contains("monitor = eDP-1, 1920x1080@60, 0x0, 1\n"));
+    assert!(text.contains("monitor = DP-1, preferred, auto-up, 1\n"));
+    assert!(text.contains("monitor = HDMI-A-1, preferred, auto-left, 1, transform, 1\n"));
+}

@@ -14,3 +14,5 @@ defaults:
 reload: >-
   pgrep -x swww-daemon >/dev/null || { setsid -f swww-daemon >/dev/null 2>&1; sleep 1; };
   {% if wallpaper %}swww img '{{ wallpaper }}' --transition-type grow --transition-pos top-right --transition-fps 60 --transition-duration 1.2{% else %}swww clear {{ colors.bg.raw }}{% endif %}
+# Фоновый процесс: plove остановит его, если модуль уберут из райса.
+process: "swww-daemon"

@@ -11,3 +11,5 @@ compatible_with:
   launcher: [fuzzel, rofi]
 # Своего конфига нет; при первом применении запускаем сборщик истории.
 reload: "pgrep -f 'cliphist store' >/dev/null || setsid -f {{ exec }} >/dev/null 2>&1"
+# Фоновый процесс: plove остановит его, если модуль уберут из райса.
+process: "wl-paste --watch cliphist"

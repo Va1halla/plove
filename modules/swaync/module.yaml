@@ -16,3 +16,5 @@ stops: [mako, dunst]
 reload: "swaync-client -R -rs || setsid -f {{ exec }} >/dev/null 2>&1"
 binds:
   - "$mod, N, exec, swaync-client -t -sw"
+# Фоновый процесс: plove остановит его, если модуль уберут из райса.
+process: "swaync"

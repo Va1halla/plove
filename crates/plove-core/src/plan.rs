@@ -10,6 +10,7 @@ use anyhow::{anyhow, bail, Result};
 
 use crate::modules::{Module, Registry};
 use crate::render;
+use crate::state;
 use crate::spec::{RiceSpec, Wallpaper};
 use crate::system::{self, Env};
 use crate::theme::{font_package, theme_context};
@@ -329,16 +330,28 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         .filter_map(|exec| exec.split_whitespace().next())
         .collect();
     let mut reloads = Vec::new();
+    let mut stop = |name: &str| {
+        let command = stop_command(name);
+        if !chosen.contains(&name) && !reloads.contains(&command) {
+            reloads.push(command);
+        }
+    };
+    // Программы, которые были в прошлом применённом райсе, а теперь убраны:
+    // иначе они так и висели бы до перезахода (например, виджеты eww).
+    for id in previous_modules(env) {
+        if spec.components.values().any(|c| *c == id) {
+            continue;
+        }
+        if let Some(process) = registry.get(&id).and_then(|m| m.manifest.process.as_ref()) {
+            stop(process);
+        }
+    }
     for module in &modules {
         for name in &module.manifest.stops {
-            // Linux хранит имя процесса только до 15 символов, поэтому
-            // длинные имена ищем по командной строке.
-            let flag = if name.len() > 15 { "-f" } else { "-x" };
-            let stop = format!("pkill {flag} {name}; true");
-            if !chosen.contains(&name.as_str()) && !reloads.contains(&stop) {
-                reloads.push(stop);
-            }
+            stop(name);
         }
+    }
+    for module in &modules {
         for package in &module.manifest.conflicts {
             if system::package_installed(package) == Some(true) {
                 warnings.push(format!(
@@ -376,6 +389,27 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
 }
 
 /// Сравнить новое содержимое файла с тем, что сейчас на диске.
+/// Модули последнего применённого райса (пусто, если применений не было).
+fn previous_modules(env: &Env) -> Vec<String> {
+    let last = state::list(env).ok().and_then(|mut g| g.pop());
+    last.and_then(|g| std::fs::read_to_string(g.dir.join("spec.yaml")).ok())
+        .and_then(|text| RiceSpec::from_yaml(&text).ok())
+        .map(|spec| spec.components.into_values().collect())
+        .unwrap_or_default()
+}
+
+/// Команда, которая останавливает процесс и не считается ошибкой, если его нет.
+fn stop_command(name: &str) -> String {
+    // Linux хранит имя процесса только до 15 символов, поэтому длинные
+    // имена и имена с аргументами ищем по всей командной строке.
+    let flag = if name.len() > 15 || name.contains(' ') {
+        "-f"
+    } else {
+        "-x"
+    };
+    format!("pkill {flag} '{name}'; true")
+}
+
 /// Сочетание клавиш из строки `bind`: «$mod SHIFT, E, exec, …» → «$MOD+SHIFT+E».
 /// Модификаторы сортируются, чтобы «SHIFT $mod» и «$mod SHIFT» совпали.
 fn bind_key(bind: &str) -> String {

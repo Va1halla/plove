@@ -21,3 +21,5 @@ defaults:
   modules_left: [workspaces]
   modules_center: [clock]
   modules_right: [pulseaudio, network, battery]
+# Фоновый процесс: plove остановит его, если модуль уберут из райса.
+process: "waybar"

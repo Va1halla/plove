@@ -13,3 +13,5 @@ compatible_with:
   compositor: [hyprland]
 # swaybg не умеет перечитывать картинку, поэтому перезапускаем его.
 reload: "pkill -x swaybg; setsid -f {{ exec }} >/dev/null 2>&1"
+# Фоновый процесс: plove остановит его, если модуль уберут из райса.
+process: "swaybg"

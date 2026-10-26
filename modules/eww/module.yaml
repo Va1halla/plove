@@ -18,3 +18,5 @@ reload: "pgrep -x eww >/dev/null && eww reload || eww open desktop"
 defaults:
   # Показывать загрузку процессора и памяти под часами.
   stats: true
+# Фоновый процесс: plove остановит его, если модуль уберут из райса.
+process: "eww"
