@@ -13,3 +13,19 @@ templates:
 binds:
   - "$mod, D, exec, {{ exec }}"
   - "$mod, Tab, exec, rofi -show window"
+settings:
+  - id: width
+    group: Лаунчер
+    title: Ширина окна, % экрана
+    range: [20, 80]
+    step: 2
+    default: 36
+  - id: lines
+    group: Лаунчер
+    title: Строк в списке
+    range: [4, 20]
+    default: 8
+  - id: icons
+    group: Лаунчер
+    title: Значки приложений
+    default: true

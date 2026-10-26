@@ -11,7 +11,9 @@ cursor {{ colors.accent.hex }}
 selection_background {{ colors.accent.hex }}
 selection_foreground {{ colors.bg.hex }}
 background_opacity {{ geometry.opacity }}
-window_padding_width {{ geometry.gaps }}
+window_padding_width {{ options.padding }}
+cursor_shape {{ options.cursor_shape }}
+cursor_blink_interval {% if options.cursor_blink %}-1{% else %}0{% endif %}
 confirm_os_window_close 0
 {% if apps.shell %}shell {{ apps.shell }}
 {% endif %}{% for color in ansi %}

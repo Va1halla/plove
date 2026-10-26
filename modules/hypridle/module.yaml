@@ -13,9 +13,17 @@ templates:
     dest: ~/.config/hypr/hypridle.conf
 # hypridle не умеет перечитывать конфиг, поэтому перезапускаем его.
 reload: "pkill -x hypridle; setsid -f {{ exec }} >/dev/null 2>&1"
-defaults:
-  # Через сколько минут простоя заблокировать экран и выключить монитор.
-  lock_after: 5
-  screen_off_after: 10
-# Фоновый процесс: plove остановит его, если модуль уберут из райса.
 process: "hypridle"
+settings:
+  - id: lock_after
+    group: Простой
+    title: Блокировать через, мин
+    about: Сколько минут без движения мыши и клавиш до блокировки экрана.
+    range: [1, 60]
+    default: 5
+  - id: screen_off_after
+    group: Простой
+    title: Гасить экран через, мин
+    about: Должно быть больше, чем время блокировки.
+    range: [1, 120]
+    default: 10

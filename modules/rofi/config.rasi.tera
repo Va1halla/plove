@@ -2,7 +2,7 @@
 
 configuration {
     modi: "drun,run,window";
-    show-icons: true;
+    show-icons: {{ options.icons }};
     display-drun: "";
     display-run: "";
     display-window: "";
@@ -24,7 +24,7 @@ configuration {
 }
 
 window {
-    width: 36%;
+    width: {{ options.width }}%;
     background-color: @bg;
     border: {{ style.border }}px;
     border-color: @accent;
@@ -45,7 +45,7 @@ inputbar {
 prompt { text-color: @accent; }
 entry { placeholder: "Поиск…"; placeholder-color: @muted; }
 
-listview { lines: 8; spacing: 4px; scrollbar: false; }
+listview { lines: {{ options.lines }}; spacing: 4px; scrollbar: false; }
 
 element {
     padding: 8px 12px;

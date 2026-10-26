@@ -376,6 +376,8 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         if let Some(reload) = &module.manifest.reload {
             let mut context = base.clone();
             context.insert("exec", &apps.get(&module.manifest.role));
+            let options = module_options(module, spec.overrides.get(&module.manifest.id))?;
+            context.insert("options", &options);
             let what = format!("{}/module.yaml (reload)", module.manifest.id);
             reloads.push(render::render_str(reload, &context, &what)?);
         }

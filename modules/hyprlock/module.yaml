@@ -10,3 +10,20 @@ compatible_with:
 templates:
   - src: hyprlock.conf.tera
     dest: ~/.config/hypr/hyprlock.conf
+settings:
+  - id: blur
+    group: Экран блокировки
+    title: Размытие обоев
+    about: 0 — обои как есть.
+    range: [0, 6]
+    default: 3
+  - id: brightness
+    group: Экран блокировки
+    title: Яркость обоев
+    range: [0.2, 1]
+    step: 0.1
+    default: 0.6
+  - id: seconds
+    group: Экран блокировки
+    title: Секунды на часах
+    default: false

@@ -8,8 +8,8 @@ general {
 background {
 {%- if wallpaper %}
     path = {{ wallpaper }}
-    blur_passes = 3
-    brightness = 0.6
+    blur_passes = {{ options.blur }}
+    brightness = {{ options.brightness }}
 {%- else %}
     color = rgb({{ colors.bg.raw }})
 {%- endif %}
@@ -17,7 +17,7 @@ background {
 
 # Часы
 label {
-    text = cmd[update:1000] date +%H:%M
+    text = cmd[update:1000] date +%H:%M{% if options.seconds %}:%S{% endif %}
     color = rgb({{ colors.fg.raw }})
     font_family = {{ fonts.ui }}
     font_size = 96

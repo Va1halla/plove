@@ -12,9 +12,20 @@ templates:
 autostart: true
 process: hyprsunset
 reload: "pkill -x hyprsunset; setsid -f hyprsunset >/dev/null 2>&1"
-defaults:
-  # Когда включать и выключать тёплый режим.
-  evening: "21:00"
-  morning: "7:00"
-  # Температура вечером в кельвинах: чем меньше, тем теплее (обычный цвет — 6500).
-  temperature: 4500
+settings:
+  - id: evening
+    group: Ночной режим
+    title: Включать в
+    about: Время в формате ЧЧ:ММ.
+    default: "21:00"
+  - id: morning
+    group: Ночной режим
+    title: Выключать в
+    default: "7:00"
+  - id: temperature
+    group: Ночной режим
+    title: Теплота вечером, K
+    about: Чем меньше, тем теплее и желтее; обычный цвет — 6500.
+    range: [2500, 6000]
+    step: 250
+    default: 4500

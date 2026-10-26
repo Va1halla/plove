@@ -18,3 +18,14 @@ binds:
   - "$mod, N, exec, swaync-client -t -sw"
 # Фоновый процесс: plove остановит его, если модуль уберут из райса.
 process: "swaync"
+settings:
+  - id: corner
+    group: Уведомления
+    title: Угол экрана
+    choices: [top-right, top-left, bottom-right, bottom-left]
+    default: top-right
+  - id: timeout
+    group: Уведомления
+    title: Сколько висит, с
+    range: [1, 30]
+    default: 5

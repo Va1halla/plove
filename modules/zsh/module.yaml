@@ -14,6 +14,9 @@ user_files:
 ensure_lines:
   - file: ~/.zshrc
     line: "source ~/.config/zsh/plove.zsh"
-defaults:
-  # Показывать fastfetch при открытии терминала (если он есть в райсе).
-  fetch_on_start: true
+settings:
+  - id: fetch_on_start
+    group: Терминал
+    title: Сводка о системе при открытии
+    about: Показывать fastfetch в каждом новом терминале (если он есть в райсе).
+    default: true

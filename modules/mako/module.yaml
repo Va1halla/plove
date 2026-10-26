@@ -13,10 +13,16 @@ templates:
     dest: ~/.config/mako/config
 # Если mako ещё не запущен (райс применён впервые), запускаем его.
 reload: "makoctl reload || setsid -f {{ exec }} >/dev/null 2>&1"
-defaults:
-  # В каком углу показывать: top-right, top-left, bottom-right, bottom-left.
-  anchor: top-right
-  # Сколько миллисекунд висит уведомление.
-  timeout: 5000
-# Фоновый процесс: plove остановит его, если модуль уберут из райса.
 process: "mako"
+settings:
+  - id: anchor
+    group: Уведомления
+    title: Угол экрана
+    choices: [top-right, top-left, bottom-right, bottom-left, top-center]
+    default: top-right
+  - id: timeout
+    group: Уведомления
+    title: Сколько висит, мс
+    range: [1000, 20000]
+    step: 1000
+    default: 5000

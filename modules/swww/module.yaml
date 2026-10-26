@@ -8,11 +8,21 @@ compatible_with:
   compositor: [hyprland]
 autostart: true
 stops: [swaybg, hyprpaper]
-defaults:
-  # Анимация смены: grow, wipe, wave, outer, any, fade, simple.
-  transition: grow
 reload: >-
   pgrep -x swww-daemon >/dev/null || { setsid -f swww-daemon >/dev/null 2>&1; sleep 1; };
-  {% if wallpaper %}swww img '{{ wallpaper }}' --transition-type grow --transition-pos top-right --transition-fps 60 --transition-duration 1.2{% else %}swww clear {{ colors.bg.raw }}{% endif %}
+  {% if wallpaper %}swww img '{{ wallpaper }}' --transition-type {{ options.transition }} --transition-pos top-right --transition-fps 60 --transition-duration {{ options.transition_duration }}{% else %}swww clear {{ colors.bg.raw }}{% endif %}
 # Фоновый процесс: plove остановит его, если модуль уберут из райса.
 process: "swww-daemon"
+settings:
+  - id: transition
+    group: Обои
+    title: Анимация смены обоев
+    about: Как новые обои появляются при применении райса.
+    choices: [grow, outer, wipe, wave, fade, simple, any]
+    default: grow
+  - id: transition_duration
+    group: Обои
+    title: Длительность анимации, с
+    range: [0.2, 4]
+    step: 0.2
+    default: 1.2
