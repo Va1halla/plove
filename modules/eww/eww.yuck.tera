@@ -7,6 +7,17 @@
 {%- if options.anchor is ending_with("right") %}{% set x = "-3%" %}{% endif %}
 {%- if options.anchor is starting_with("bottom") %}{% set y = "-6%" %}{% endif %}
 {%- endif %}
+{#- Размер окна задаём явно: без него eww делает окно по минимуму,
+    и GTK обрезает подписи до «…». #}
+{%- set width = options.clock_size * 3.6 %}{% set width = width | round %}{% if width < 380 %}{% set width = 380 %}{% endif %}
+{%- set height = 0 %}
+{%- for card in cards %}
+{%- if card == "clock" %}{% set_global height = height + options.clock_size * 1.6 %}
+{%- elif card == "system" %}{% set_global height = height + 140 %}
+{%- elif card == "media" %}{% set_global height = height + 100 %}
+{%- else %}{% set_global height = height + 60 %}{% endif %}
+{%- endfor %}
+{%- set count = cards | length %}{% set height = height + 18 * count | round %}
 {%- if "clock" in cards %}
 
 (defpoll time :interval "5s" "date '+%H:%M'")
@@ -28,7 +39,7 @@
 
 (defwindow desktop
   :monitor 0
-  :geometry (geometry :x "{{ x }}" :y "{{ y }}" :anchor "{{ anchor }}")
+  :geometry (geometry :x "{{ x }}" :y "{{ y }}" :width "{{ width }}px" :height "{{ height }}px" :anchor "{{ anchor }}")
   :stacking "bg"
   :exclusive false
   (box :class "desktop" :orientation "v" :space-evenly false :spacing 18
@@ -40,15 +51,15 @@
 {%- elif card == "system" %}
     (box :class "card system" :spacing 22 :halign "center" :space-evenly false
       (box :orientation "v" :space-evenly false
-        (circular-progress :class "ring" :value {EWW_CPU.avg} :thickness 6 :start-at 75
+        (circular-progress :class "ring" :value {EWW_CPU.avg} :thickness 6 :start-at 75 :width 64 :height 64
           (label :class "ring-text" :text "${round(EWW_CPU.avg, 0)}"))
         (label :class "ring-label" :text "cpu"))
       (box :orientation "v" :space-evenly false
-        (circular-progress :class "ring" :value {EWW_RAM.used_mem_perc} :thickness 6 :start-at 75
+        (circular-progress :class "ring" :value {EWW_RAM.used_mem_perc} :thickness 6 :start-at 75 :width 64 :height 64
           (label :class "ring-text" :text "${round(EWW_RAM.used_mem_perc, 0)}"))
         (label :class "ring-label" :text "ram"))
       (box :orientation "v" :space-evenly false
-        (circular-progress :class "ring" :value disk :thickness 6 :start-at 75
+        (circular-progress :class "ring" :value disk :thickness 6 :start-at 75 :width 64 :height 64
           (label :class "ring-text" :text disk))
         (label :class "ring-label" :text "disk")))
 {%- elif card == "media" %}

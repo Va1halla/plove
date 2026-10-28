@@ -513,7 +513,7 @@ impl App {
     fn refresh_preview(&mut self, registry: &Registry, env: &Env) {
         let spec = match self.step {
             Step::Rice => self.selected_rice().clone(),
-            Step::Settings => self.final_spec(),
+            Step::Settings | Step::Tune => self.final_spec(),
             _ => return,
         };
         let key = serde_yaml::to_string(&spec).unwrap_or_default();
@@ -894,9 +894,33 @@ impl App {
         }
     }
 
-    fn draw_tune(&self, frame: &mut Frame, area: Rect) {
-        let [list_area, info_area] =
+    fn draw_tune(&mut self, frame: &mut Frame, area: Rect) {
+        let [list_area, mut info_area] =
             Layout::horizontal([Constraint::Length(22), Constraint::Min(40)]).areas(area);
+        // Превью справа от настроек, если хватает ширины, иначе под ними.
+        if self.preview.is_some() {
+            let picture_area = if info_area.width >= 64 + 40 {
+                let [settings, picture] =
+                    Layout::horizontal([Constraint::Length(64), Constraint::Min(40)])
+                        .areas(info_area);
+                info_area = settings;
+                Some(picture)
+            } else if info_area.height >= 30 {
+                let [settings, picture] =
+                    Layout::vertical([Constraint::Min(14), Constraint::Percentage(40)])
+                        .areas(info_area);
+                info_area = settings;
+                Some(picture)
+            } else {
+                None
+            };
+            if let Some(picture_area) = picture_area {
+                let block = Block::bordered().title(" Как будет выглядеть ");
+                let inner = block.inner(picture_area);
+                frame.render_widget(block, picture_area);
+                self.draw_preview(frame, inner);
+            }
+        }
 
         let items: Vec<ListItem> = self
             .tune

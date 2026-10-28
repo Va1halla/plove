@@ -14,10 +14,11 @@ use anyhow::{anyhow, Result};
 use fontdue::{Font, FontSettings};
 use plove_core::modules::Registry;
 use plove_core::plan::module_options;
-use plove_core::spec::{BarStyle, Color, RiceSpec, Wallpaper};
+use plove_core::spec::{BarStyle, Color, Labels, Palette, RiceSpec, Separators, Wallpaper, Widget};
 use plove_core::system::Env;
 use plove_core::theme::StyleContext;
 use plove_core::wallpaper::{self, paint};
+use std::collections::BTreeMap;
 pub use tiny_skia::Pixmap;
 use tiny_skia::{
     FillRule, FilterQuality, Mask, Path, PathBuilder, PixmapPaint, Rect, Stroke, Transform,
@@ -36,9 +37,25 @@ pub fn render_png(spec: &RiceSpec, registry: &Registry, env: &Env) -> Result<Vec
 
 /// Нарисовать превью.
 pub fn render(spec: &RiceSpec, registry: &Registry, env: &Env) -> Result<Pixmap> {
-    let look = Look::new(spec);
+    // Настройки композитора (тени, размытие) — с тонкой настройки райса.
+    let compositor = match spec
+        .components
+        .get("compositor")
+        .and_then(|id| registry.get(id))
+    {
+        Some(module) => module_options(module, spec.overrides.get(&module.manifest.id))?,
+        None => serde_json::Value::Null,
+    };
+    let look = Look::new(spec, &compositor);
     let fonts = Fonts::load()?;
     let mut canvas = background(spec, env)?;
+    // Виджеты eww лежат на обоях под окнами (stacking "bg").
+    if let Some(id) = spec.components.get("widgets") {
+        if let Some(module) = registry.get(id) {
+            let options = module_options(module, spec.overrides.get(id))?;
+            draw_desktop(&mut canvas, &look, &fonts, &options, spec);
+        }
+    }
 
     let bar = match spec.components.get("bar") {
         Some(id) => Some(Bar::from_spec(spec, registry, id, &look)?),
@@ -48,7 +65,7 @@ pub fn render(spec: &RiceSpec, registry: &Registry, env: &Env) -> Result<Pixmap>
         draw_windows(&mut canvas, &look, &fonts, bar.as_ref(), spec);
     }
     if let Some(bar) = &bar {
-        draw_bar(&mut canvas, &look, &fonts, bar);
+        draw_bar(&mut canvas, &look, &fonts, bar, spec);
     }
     Ok(canvas)
 }
@@ -106,10 +123,14 @@ struct Look {
     style: StyleContext,
     /// Размер шрифта в пикселях: пункты × 4/3 при обычных 96 dpi.
     font_px: f32,
+    /// Тень под окнами: размер и смещение вниз, None — без тени.
+    shadow: Option<(f32, f32)>,
+    /// Радиус размытия под прозрачными окнами, 0 — без размытия.
+    blur: usize,
 }
 
 impl Look {
-    fn new(spec: &RiceSpec) -> Look {
+    fn new(spec: &RiceSpec, compositor: &serde_json::Value) -> Look {
         let p = &spec.theme.palette;
         let g = &spec.theme.geometry;
         // Если цвета терминала не заданы, берём нейтральный набор.
@@ -124,6 +145,12 @@ impl Look {
             colors.iter().chain(colors.iter()).copied().collect()
         };
         let style = StyleContext::new(spec.theme.style, g);
+        // blur_size в Hyprland — радиус одного прохода; у нас проходов три.
+        let blur = if style.blur {
+            (compositor["blur_size"].as_f64().unwrap_or(6.0) * 1.6).round() as usize
+        } else {
+            0
+        };
         Look {
             bg: p.bg,
             fg: p.fg,
@@ -139,6 +166,14 @@ impl Look {
             opacity: g.opacity as f32,
             opacity_inactive: (g.opacity as f32 - 0.05).max(0.0),
             font_px: spec.theme.fonts.size as f32 * 4.0 / 3.0,
+            shadow: match compositor["shadows"].as_bool() {
+                Some(false) => None,
+                _ => Some((
+                    compositor["shadow_range"].as_f64().unwrap_or(18.0) as f32,
+                    compositor["shadow_offset"].as_f64().unwrap_or(0.0) as f32,
+                )),
+            },
+            blur,
         }
     }
 }
@@ -261,9 +296,12 @@ fn window<'a>(
     } else {
         look.opacity_inactive
     };
+    if let Some((range, offset)) = look.shadow {
+        draw_shadow(canvas, area, look.radius, range, offset, look.bg);
+    }
     // Полупрозрачное окно в Hyprland размывает то, что под ним.
-    if opacity < 1.0 {
-        blur_under(canvas, area, &shape);
+    if opacity < 1.0 && look.blur > 0 {
+        blur_under(canvas, area, &shape, look.blur);
     }
     canvas.fill_path(
         &shape,
@@ -474,7 +512,7 @@ impl Bar {
     }
 }
 
-fn draw_bar(canvas: &mut Pixmap, look: &Look, fonts: &Fonts, bar: &Bar) {
+fn draw_bar(canvas: &mut Pixmap, look: &Look, fonts: &Fonts, bar: &Bar, spec: &RiceSpec) {
     if let Some(on_left) = bar.side {
         draw_vertical_bar(canvas, look, fonts, bar, on_left);
         return;
@@ -517,6 +555,9 @@ fn draw_bar(canvas: &mut Pixmap, look: &Look, fonts: &Fonts, bar: &Bar) {
         baseline,
         y,
         height: bar.height,
+        labels: look.style.raw.labels,
+        widgets: &spec.widgets,
+        palette: &spec.theme.palette,
     };
 
     // Острова: плашка под каждой непустой частью панели.
@@ -534,26 +575,46 @@ fn draw_bar(canvas: &mut Pixmap, look: &Look, fonts: &Fonts, bar: &Bar) {
             );
         }
     };
-    let width = |list: &[String]| -> f32 { list.iter().map(|n| ctx.module_width(n)).sum() };
+    // Разделители между модулями, как custom/sep#… в config.jsonc.tera.
+    let separators = look.style.raw.separators != Separators::None;
+    let sep_width = fonts.char_width(px) * 2.0;
+    let width = |list: &[String]| -> f32 {
+        let gaps = if separators {
+            list.len().saturating_sub(1) as f32 * sep_width
+        } else {
+            0.0
+        };
+        list.iter().map(|n| ctx.module_width(n)).sum::<f32>() + gaps
+    };
+    let part = |canvas: &mut Pixmap, list: &[String], mut pen: f32, glyph: &str| {
+        for (i, name) in list.iter().enumerate() {
+            if i > 0 && separators {
+                fonts.text(
+                    canvas,
+                    &fonts.regular,
+                    glyph,
+                    px,
+                    pen + sep_width / 4.0,
+                    baseline,
+                    look.muted,
+                );
+                pen += sep_width;
+            }
+            pen = ctx.module(canvas, look, name, pen);
+        }
+    };
 
     let left_width = width(&bar.left);
     island(canvas, x + 8.0, left_width);
-    let mut pen = x + 8.0;
-    for name in &bar.left {
-        pen = ctx.module(canvas, look, name, pen);
-    }
+    part(canvas, &bar.left, x + 8.0, look.style.sep_left);
     let center_width = width(&bar.center);
-    let mut pen = x + (area.width() - center_width) / 2.0;
+    let pen = x + (area.width() - center_width) / 2.0;
     island(canvas, pen, center_width);
-    for name in &bar.center {
-        pen = ctx.module(canvas, look, name, pen);
-    }
+    part(canvas, &bar.center, pen, look.style.sep_center);
     let right_width = width(&bar.right);
-    let mut pen = x + area.width() - 8.0 - right_width;
+    let pen = x + area.width() - 8.0 - right_width;
     island(canvas, pen, right_width);
-    for name in &bar.right {
-        pen = ctx.module(canvas, look, name, pen);
-    }
+    part(canvas, &bar.right, pen, look.style.sep_right);
 }
 
 /// Вертикальная панель: рабочие столы сверху, часы в две строки внизу.
@@ -638,30 +699,70 @@ struct BarText<'a> {
     baseline: f32,
     y: f32,
     height: f32,
+    /// Как подписаны модули: значки, слова или оба (style.labels).
+    labels: Labels,
+    /// Свои виджеты райса: модуль custom/<id>.
+    widgets: &'a BTreeMap<String, Widget>,
+    palette: &'a Palette,
 }
 
 impl BarText<'_> {
     const PADDING: f32 = 10.0;
     const WORKSPACES: usize = 5;
 
-    /// Что показывает модуль Waybar. Совпадает с форматами в config.jsonc.tera.
-    fn label(name: &str) -> &str {
-        match name {
-            "clock" => "21:37",
-            "pulseaudio" => "vol 64%",
-            "network" => "home-wifi",
-            "battery" => "87%",
-            "cpu" => "cpu 12%",
-            "memory" => "ram 41%",
-            "window" => "nvim ~/plove",
-            "media" => "lofi beats",
-            "language" => "us",
-            "backlight" => "70%",
-            "launcher" => "apps",
-            "power" => "off",
-            "tray" => "",
-            other => other,
-        }
+    /// Что показывает модуль Waybar и каким цветом (None — обычным).
+    /// Совпадает с форматами в config.jsonc.tera: значок, слово, значение.
+    fn label(&self, name: &str) -> (String, Option<Color>) {
+        let (glyph, word, value) = match name {
+            "clock" => ("\u{f0150}", "", "21:37"),
+            "pulseaudio" => ("\u{f057e}", "vol", "64%"),
+            "network" => ("\u{f05a9}", "", "home-wifi"),
+            "battery" => ("\u{f0082}", "бат", "87%"),
+            "cpu" => ("\u{f0ee0}", "cpu", "12%"),
+            "memory" => ("\u{f035b}", "ram", "41%"),
+            "media" => ("\u{f075a}", "", "lofi beats"),
+            "language" => ("\u{f030c}", "", "us"),
+            "backlight" => ("\u{f00df}", "свет", "70%"),
+            "window" => ("", "", "nvim ~/plove"),
+            "tray" => ("", "", ""),
+            "launcher" => {
+                let text = if self.labels == Labels::Text {
+                    "apps"
+                } else {
+                    "\u{f303}"
+                };
+                return (text.to_string(), None);
+            }
+            "power" => {
+                let text = if self.labels == Labels::Text {
+                    "off"
+                } else {
+                    "\u{f0425}"
+                };
+                return (text.to_string(), None);
+            }
+            id => match self.widgets.get(id) {
+                Some(w) => {
+                    let text = w.text.replace("{value}", "42");
+                    let text = if w.icon.is_empty() || self.labels == Labels::Text {
+                        text
+                    } else {
+                        format!("{} {text}", w.icon)
+                    };
+                    return (text, w.resolve_color(self.palette).ok());
+                }
+                None => ("", "", id),
+            },
+        };
+        let text = match self.labels {
+            _ if glyph.is_empty() => value.to_string(),
+            Labels::Glyphs => format!("{glyph} {value}"),
+            Labels::Text if word.is_empty() => value.to_string(),
+            Labels::Text => format!("{word} {value}"),
+            Labels::Both if word.is_empty() => format!("{glyph} {value}"),
+            Labels::Both => format!("{glyph} {word} {value}"),
+        };
+        (text, None)
     }
 
     fn workspace_width(&self) -> f32 {
@@ -672,7 +773,7 @@ impl BarText<'_> {
         if name == "workspaces" {
             return self.workspace_width() * Self::WORKSPACES as f32 + 2.0 * 4.0;
         }
-        self.fonts.char_width(self.px) * Self::label(name).chars().count() as f32
+        self.fonts.char_width(self.px) * self.label(name).0.chars().count() as f32
             + 2.0 * Self::PADDING
     }
 
@@ -710,10 +811,11 @@ impl BarText<'_> {
             }
             return pen + 4.0;
         }
-        let color = if name == "clock" {
-            look.accent
-        } else {
-            look.fg
+        let (text, custom) = self.label(name);
+        let color = match name {
+            "clock" => look.accent,
+            "power" => look.ansi[1],
+            _ => custom.unwrap_or(look.fg),
         };
         let font = if name == "clock" {
             &self.fonts.bold
@@ -723,7 +825,7 @@ impl BarText<'_> {
         self.fonts.text(
             canvas,
             font,
-            Self::label(name),
+            &text,
             self.px,
             x + Self::PADDING,
             self.baseline,
@@ -733,11 +835,214 @@ impl BarText<'_> {
     }
 }
 
+// ───────────────────────── виджеты на рабочем столе ─────────────────────────
+
+/// Карточки eww: часы, загрузка системы, музыка, свои виджеты.
+/// Размеры и расположение — как в eww.yuck.tera.
+fn draw_desktop(
+    canvas: &mut Pixmap,
+    look: &Look,
+    fonts: &Fonts,
+    options: &serde_json::Value,
+    spec: &RiceSpec,
+) {
+    let cards: Vec<&str> = options["cards"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
+        .unwrap_or_default();
+    if cards.is_empty() {
+        return;
+    }
+    let clock_px = options["clock_size"].as_f64().unwrap_or(110.0) as f32;
+    let card_height = |card: &str| match card {
+        "clock" => clock_px * 1.6,
+        "system" => 140.0,
+        "media" => 100.0,
+        _ => 60.0,
+    };
+    let spacing = 18.0;
+    let width = (clock_px * 3.6).max(380.0);
+    let height: f32 = cards.iter().map(|c| card_height(c) + spacing).sum();
+    let (sw, sh) = (WIDTH as f32, HEIGHT as f32);
+    let anchor = options["anchor"].as_str().unwrap_or("center");
+    let x = if anchor.ends_with("left") {
+        sw * if anchor == "left" { 0.04 } else { 0.03 }
+    } else if anchor.ends_with("right") {
+        sw - width - sw * if anchor == "right" { 0.04 } else { 0.03 }
+    } else {
+        (sw - width) / 2.0
+    };
+    let y = if anchor.starts_with("top") {
+        sh * 0.06
+    } else if anchor.starts_with("bottom") {
+        sh - height - sh * 0.06
+    } else if anchor == "center" {
+        (sh - height) / 2.0 - sh * 0.10
+    } else {
+        (sh - height) / 2.0
+    };
+
+    let center_text =
+        |canvas: &mut Pixmap, font: &Font, text: &str, px: f32, baseline: f32, color| {
+            let w = fonts.char_width(px) * text.chars().count() as f32;
+            fonts.text(
+                canvas,
+                font,
+                text,
+                px,
+                x + (width - w) / 2.0,
+                baseline,
+                color,
+            );
+        };
+    let mut top = y;
+    for card in cards {
+        let h = card_height(card);
+        // Подложка карточки — только со «стеклом», у часов её нет вовсе.
+        if card != "clock" && look.style.raw.glass != plove_core::spec::Glass::None {
+            let area = rect(x, top, width, h - 10.0);
+            canvas.fill_path(
+                &rounded_rect(area, look.style.radius_box as f32),
+                &paint(look.bg, (look.style.bg_alpha as f32 - 0.25).max(0.15)),
+                FillRule::Winding,
+                Transform::identity(),
+                None,
+            );
+        }
+        match card {
+            "clock" => {
+                center_text(
+                    canvas,
+                    &fonts.bold,
+                    "21:37",
+                    clock_px,
+                    top + clock_px,
+                    look.accent,
+                );
+                let date_px = (clock_px / 5.0).round();
+                center_text(
+                    canvas,
+                    &fonts.regular,
+                    "Среда, 28 октября",
+                    date_px,
+                    top + clock_px * 1.15 + date_px,
+                    look.fg,
+                );
+            }
+            "system" => {
+                let gap = 22.0;
+                let ring = 64.0;
+                let start = x + (width - 3.0 * ring - 2.0 * gap) / 2.0;
+                for (i, (label, value)) in [("cpu", 0.12), ("ram", 0.41), ("disk", 0.63)]
+                    .into_iter()
+                    .enumerate()
+                {
+                    let cx = start + i as f32 * (ring + gap) + ring / 2.0;
+                    let cy = top + 14.0 + ring / 2.0;
+                    draw_ring(canvas, cx, cy, ring / 2.0 - 3.0, value, look);
+                    let number = format!("{}", (value * 100.0) as u32);
+                    let px = 15.0;
+                    let w = fonts.char_width(px) * number.len() as f32;
+                    fonts.text(
+                        canvas,
+                        &fonts.regular,
+                        &number,
+                        px,
+                        cx - w / 2.0,
+                        cy + 5.0,
+                        look.fg,
+                    );
+                    let w = fonts.char_width(px) * label.len() as f32;
+                    fonts.text(
+                        canvas,
+                        &fonts.regular,
+                        label,
+                        px,
+                        cx - w / 2.0,
+                        cy + ring / 2.0 + 24.0,
+                        look.muted,
+                    );
+                }
+            }
+            "media" => {
+                center_text(
+                    canvas,
+                    &fonts.regular,
+                    "Nujabes — Aruarian Dance",
+                    15.0,
+                    top + 34.0,
+                    look.muted,
+                );
+                center_text(
+                    canvas,
+                    &fonts.bold,
+                    "\u{f04ae}    \u{f040e}    \u{f04ad}",
+                    22.0,
+                    top + 72.0,
+                    look.fg,
+                );
+            }
+            id => {
+                let text = match spec.widgets.get(id) {
+                    Some(w) if !w.icon.is_empty() => {
+                        format!("{} {}", w.icon, w.text.replace("{value}", "42"))
+                    }
+                    Some(w) => w.text.replace("{value}", "42"),
+                    None => id.to_string(),
+                };
+                let color = spec
+                    .widgets
+                    .get(id)
+                    .and_then(|w| w.resolve_color(&spec.theme.palette).ok())
+                    .unwrap_or(look.fg);
+                center_text(canvas, &fonts.regular, &text, 16.0, top + 32.0, color);
+            }
+        }
+        top += h + spacing;
+    }
+}
+
+/// Кольцо загрузки: серый круг и дуга цвета акцента от «12 часов» по часовой.
+fn draw_ring(canvas: &mut Pixmap, cx: f32, cy: f32, r: f32, value: f32, look: &Look) {
+    let stroke = Stroke {
+        width: 6.0,
+        ..Stroke::default()
+    };
+    let arc = |part: f32| {
+        let mut pb = PathBuilder::new();
+        let steps = (64.0 * part).max(2.0) as usize;
+        for i in 0..=steps {
+            let a = -std::f32::consts::FRAC_PI_2
+                + std::f32::consts::TAU * part * i as f32 / steps as f32;
+            let (px, py) = (cx + r * a.cos(), cy + r * a.sin());
+            if i == 0 {
+                pb.move_to(px, py);
+            } else {
+                pb.line_to(px, py);
+            }
+        }
+        pb.finish()
+    };
+    for (part, color) in [(1.0, look.surface), (value, look.accent)] {
+        if let Some(path) = arc(part) {
+            canvas.stroke_path(
+                &path,
+                &paint(color, 1.0),
+                &stroke,
+                Transform::identity(),
+                None,
+            );
+        }
+    }
+}
+
 // ───────────────────────── текст ─────────────────────────
 
 struct Fonts {
     regular: Font,
     bold: Font,
+    /// Значки Nerd Font: их нет в JetBrains Mono, берём отсюда.
+    symbols: Font,
 }
 
 impl Fonts {
@@ -749,6 +1054,7 @@ impl Fonts {
         Ok(Fonts {
             regular: load(include_bytes!("../fonts/JetBrainsMono-Regular.ttf"))?,
             bold: load(include_bytes!("../fonts/JetBrainsMono-Bold.ttf"))?,
+            symbols: load(include_bytes!("../fonts/SymbolsNerdFontMono-Regular.ttf"))?,
         })
     }
 
@@ -771,6 +1077,13 @@ impl Fonts {
     ) {
         let mut pen = x;
         for ch in text.chars() {
+            // Буквы — из основного шрифта, значки — из шрифта значков.
+            let font =
+                if font.lookup_glyph_index(ch) == 0 && self.symbols.lookup_glyph_index(ch) != 0 {
+                    &self.symbols
+                } else {
+                    font
+                };
             glyph(canvas, font, ch, px, pen, baseline, color);
             pen += self.char_width(px);
         }
@@ -947,9 +1260,38 @@ fn rounded_rect(area: Rect, r: f32) -> Path {
     pb.finish().expect("путь прямоугольника не пустой")
 }
 
+/// Мягкая тень: несколько всё более широких полупрозрачных подложек
+/// цвета фона (как `shadow { color = bg }` в hyprland.conf).
+fn draw_shadow(
+    canvas: &mut Pixmap,
+    area: Rect,
+    radius: f32,
+    range: f32,
+    offset: f32,
+    color: Color,
+) {
+    let steps = 8;
+    for i in (1..=steps).rev() {
+        let grow = range * i as f32 / steps as f32;
+        let r = rect(
+            area.x() - grow,
+            area.y() - grow + offset,
+            area.width() + 2.0 * grow,
+            area.height() + 2.0 * grow,
+        );
+        canvas.fill_path(
+            &rounded_rect(r, radius + grow),
+            &paint(color, 0.8 / steps as f32),
+            FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
+    }
+}
+
 /// Размыть то, что уже нарисовано под окном, и вернуть на место
 /// только внутри его скруглённой формы.
-fn blur_under(canvas: &mut Pixmap, area: Rect, shape: &Path) {
+fn blur_under(canvas: &mut Pixmap, area: Rect, shape: &Path, radius: usize) {
     let (x, y) = (area.x().floor() as i32, area.y().floor() as i32);
     let Some(mut piece) = Pixmap::new(
         area.width().ceil() as u32 + 1,
@@ -966,7 +1308,7 @@ fn blur_under(canvas: &mut Pixmap, area: Rect, shape: &Path) {
         None,
     );
     for _ in 0..3 {
-        box_blur(&mut piece, 10);
+        box_blur(&mut piece, radius);
     }
     let Some(mut mask) = Mask::new(canvas.width(), canvas.height()) else {
         return;
