@@ -37,7 +37,7 @@ fn apply_is_idempotent_and_rollback_restores() {
     // Первое применение: все конфиги новые, kitty и ~/.zshrc меняются.
     let first = plan::build(example_spec(), &registry, &env).unwrap();
     assert!(first.warnings.iter().all(|w| !w.contains("занята")));
-    assert_eq!(first.changed_files().len(), 29);
+    assert_eq!(first.changed_files().len(), 30);
     let report = apply(&first, &env, &options).unwrap();
     assert_eq!(report.generation, Some(1));
 
@@ -45,7 +45,7 @@ fn apply_is_idempotent_and_rollback_restores() {
     assert!(hypr.contains("col.active_border = rgb(7aa2f7)"));
     assert!(hypr.contains("bind = $mod, Return, exec, kitty"));
     assert!(hypr.contains("kb_layout = us,ru"));
-    assert!(hypr.contains("exec-once = swww-daemon"));
+    assert!(hypr.contains("exec-once = sh ~/.local/share/plove/swww.sh"));
     assert!(hypr.contains("bind = $mod SHIFT, F, exec, kitty yazi"));
     // Строка дописана в конец, свои настройки пользователя на месте.
     assert_eq!(
