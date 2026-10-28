@@ -19,7 +19,10 @@ else
     exit 1
 fi
 
-pgrep -x "$cli-daemon" >/dev/null || setsid -f "$cli-daemon"
+# --no-cache: иначе только что запущенный демон сам достаёт из кэша
+# прошлые обои и успевает показать их уже после наших (при переходе со
+# swaybg оставалась старая картинка).
+pgrep -x "$cli-daemon" >/dev/null || setsid -f "$cli-daemon" --no-cache
 # На медленной машине (виртуалка без 3D) демон стартует дольше секунды.
 tries=0
 until "$cli" query >/dev/null 2>&1; do
