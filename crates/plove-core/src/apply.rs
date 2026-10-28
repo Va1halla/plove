@@ -21,6 +21,8 @@ use crate::system::{self, Env};
 pub struct ApplyOptions {
     /// Не ставить пакеты (например, их уже поставили вручную).
     pub skip_packages: bool,
+    /// Ставить пакеты без вопросов pacman и paru (`plove apply -y`).
+    pub no_confirm: bool,
 }
 
 pub struct ApplyReport {
@@ -42,7 +44,7 @@ pub fn apply(plan: &Plan, env: &Env, options: &ApplyOptions) -> Result<ApplyRepo
         }
         let missing = plan.missing_from(false);
         if !missing.is_empty() {
-            system::install_packages(&missing)?;
+            system::install_packages(&missing, options.no_confirm)?;
         }
         let missing_aur = plan.missing_from(true);
         if !missing_aur.is_empty() {
@@ -50,7 +52,7 @@ pub fn apply(plan: &Plan, env: &Env, options: &ApplyOptions) -> Result<ApplyRepo
                 println!("Для пакетов из AUR нужен paru, собираю его (несколько минут).");
                 system::install_paru()?;
             }
-            system::install_aur(&missing_aur)?;
+            system::install_aur(&missing_aur, options.no_confirm)?;
         }
     }
 

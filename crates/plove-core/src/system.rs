@@ -153,6 +153,19 @@ pub fn virtual_machine() -> String {
         .unwrap_or_default()
 }
 
+/// Установлен ли пакет именно с этим именем. `pacman -Q` находит и пакет,
+/// который его заменил (`pacman -Q p7zip` отвечает «7zip …»), а для
+/// конфликтов важно точное имя.
+pub fn package_installed_exact(name: &str) -> bool {
+    Command::new("pacman")
+        .args(["-Q", name])
+        .stderr(Stdio::null())
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .is_some_and(|o| String::from_utf8_lossy(&o.stdout).split_whitespace().next() == Some(name))
+}
+
 /// Установлен ли пакет. `None` — не удалось узнать (нет pacman, это не Arch).
 pub fn package_installed(name: &str) -> Option<bool> {
     // Command — это Process.Start из C# или subprocess.run из Python.
@@ -166,10 +179,12 @@ pub fn package_installed(name: &str) -> Option<bool> {
 }
 
 /// Поставить пакеты через `sudo pacman`. Вывод pacman и вопрос пароля
-/// идут прямо в терминал пользователя.
-pub fn install_packages(packages: &[&str]) -> Result<()> {
+/// идут прямо в терминал пользователя. `no_confirm` — без вопроса
+/// «Приступить к установке?»: иначе `plove apply -y` ждал бы ответа.
+pub fn install_packages(packages: &[&str], no_confirm: bool) -> Result<()> {
     let status = Command::new("sudo")
         .args(["pacman", "-S", "--needed"])
+        .args(no_confirm.then_some("--noconfirm"))
         .args(packages)
         .status()
         .context("не удалось запустить sudo pacman")?;
@@ -180,9 +195,10 @@ pub fn install_packages(packages: &[&str]) -> Result<()> {
 }
 
 /// Поставить пакеты из AUR через paru. paru сам спросит пароль sudo.
-pub fn install_aur(packages: &[&str]) -> Result<()> {
+pub fn install_aur(packages: &[&str], no_confirm: bool) -> Result<()> {
     let status = Command::new("paru")
         .args(["-S", "--needed"])
+        .args(no_confirm.then_some("--noconfirm"))
         .args(packages)
         .status()
         .context("не удалось запустить paru")?;

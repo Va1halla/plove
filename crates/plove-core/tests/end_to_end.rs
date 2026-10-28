@@ -23,6 +23,7 @@ fn apply_is_idempotent_and_rollback_restores() {
     let registry = Registry::builtin().unwrap();
     let options = ApplyOptions {
         skip_packages: true,
+        no_confirm: true,
     };
 
     // Пусть у пользователя уже есть свой конфиг kitty.
@@ -127,6 +128,7 @@ fn removed_daemon_is_stopped() {
     let registry = Registry::builtin().unwrap();
     let options = ApplyOptions {
         skip_packages: true,
+        no_confirm: true,
     };
     let first = plan::build(example_spec(), &registry, &env).unwrap();
     apply(&first, &env, &options).unwrap();

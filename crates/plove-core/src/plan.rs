@@ -399,8 +399,14 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         }
     }
     for module in &modules {
+        // Если пакеты модуля уже стоят, pacman их не ставит и ничего не спросит.
+        let installed = module
+            .manifest
+            .packages
+            .iter()
+            .all(|p| system::package_installed(p) == Some(true));
         for package in &module.manifest.conflicts {
-            if system::package_installed(package) == Some(true) {
+            if !installed && system::package_installed_exact(package) {
                 warnings.push(format!(
                     "{} конфликтует с установленным пакетом {package}: pacman предложит его удалить",
                     module.manifest.id

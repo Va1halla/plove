@@ -163,7 +163,7 @@ fn run(cli: Cli) -> Result<()> {
             if plan.is_noop() || !(yes || confirm("Применить?")?) {
                 return Ok(());
             }
-            apply_and_report(&plan, &env, skip_packages)?;
+            apply_and_report(&plan, &env, skip_packages, yes)?;
         }
         Command::Switch { rice } => {
             let env = system_env()?;
@@ -189,7 +189,7 @@ fn run(cli: Cli) -> Result<()> {
                 println!("«{}» уже применён.", plan.spec.name);
                 return Ok(());
             }
-            apply_and_report(&plan, &env, true)?;
+            apply_and_report(&plan, &env, true, false)?;
         }
         Command::Rollback { yes } => {
             let env = system_env()?;
@@ -355,8 +355,12 @@ fn print_settings(module: &plove_core::modules::Module) {
 
 /// `plove doctor`: показать все проверки и, с `--fix`, починить что можно.
 /// Применить план и рассказать, что получилось.
-fn apply_and_report(plan: &Plan, env: &Env, skip_packages: bool) -> Result<()> {
-    let report = apply::apply(plan, env, &ApplyOptions { skip_packages })?;
+fn apply_and_report(plan: &Plan, env: &Env, skip_packages: bool, no_confirm: bool) -> Result<()> {
+    let options = ApplyOptions {
+        skip_packages,
+        no_confirm,
+    };
+    let report = apply::apply(plan, env, &options)?;
     println!();
     match report.generation {
         Some(n) => println!(
@@ -510,7 +514,7 @@ fn wizard(registry: &Registry, env: &Env, file: Option<&Path>) -> Result<()> {
     if plan.is_noop() {
         return Ok(());
     }
-    apply_and_report(&plan, env, false)
+    apply_and_report(&plan, env, false, false)
 }
 
 /// Записать райс в файл. Старый файл остаётся рядом как `.bak`:
