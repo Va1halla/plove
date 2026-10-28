@@ -490,6 +490,35 @@ struct Bar {
     left: Vec<String>,
     center: Vec<String>,
     right: Vec<String>,
+    /// Фон панели (настройка background): цвета начала и конца градиента,
+    /// у сплошного фона они одинаковые. Картинки превью не рисует.
+    fill: (Color, Color),
+}
+
+impl Bar {
+    /// Кисть фона панели для плашки `area`: градиент слева направо, как
+    /// linear-gradient(90deg, …) в style.css.tera.
+    fn paint(&self, area: Rect, alpha: f32) -> tiny_skia::Paint<'static> {
+        let (from, to) = self.fill;
+        let shader = tiny_skia::LinearGradient::new(
+            tiny_skia::Point::from_xy(area.left(), 0.0),
+            tiny_skia::Point::from_xy(area.right(), 0.0),
+            vec![
+                tiny_skia::GradientStop::new(0.0, wallpaper::sk(from, alpha)),
+                tiny_skia::GradientStop::new(1.0, wallpaper::sk(to, alpha)),
+            ],
+            tiny_skia::SpreadMode::Pad,
+            Transform::identity(),
+        );
+        match shader {
+            Some(shader) if from != to => tiny_skia::Paint {
+                shader,
+                anti_alias: true,
+                ..tiny_skia::Paint::default()
+            },
+            _ => paint(from, alpha),
+        }
+    }
 }
 
 impl Bar {
@@ -510,6 +539,29 @@ impl Bar {
                 })
                 .unwrap_or_default()
         };
+        let p = &spec.theme.palette;
+        let color = |key: &str| {
+            options[key]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .and_then(|s| Color::parse(s).ok())
+        };
+        let magenta = p.ansi.get(5).copied().unwrap_or(p.accent);
+        let fill = match options["background"].as_str() {
+            Some("tint") => {
+                let c = p.bg.mix(p.accent, 0.22);
+                (c, c)
+            }
+            Some("gradient") => (
+                color("background_color").unwrap_or(p.bg.mix(p.accent, 0.35)),
+                color("background_color2").unwrap_or(p.bg.mix(magenta, 0.35)),
+            ),
+            Some("color") => {
+                let c = color("background_color").unwrap_or(p.bg);
+                (c, c)
+            }
+            _ => (p.bg, p.bg),
+        };
         let style = spec.theme.style.bar;
         let floating = style != BarStyle::Solid || options["floating"].as_bool().unwrap_or(false);
         Ok(Bar {
@@ -526,6 +578,7 @@ impl Bar {
             left: list("modules_left"),
             center: list("modules_center"),
             right: list("modules_right"),
+            fill,
         })
     }
 }
@@ -546,7 +599,7 @@ fn draw_bar(canvas: &mut Pixmap, look: &Look, fonts: &Fonts, bar: &Bar, spec: &R
     let fill = |canvas: &mut Pixmap, area: Rect, radius: f32| {
         canvas.fill_path(
             &rounded_rect(area, radius.min(area.height() / 2.0)),
-            &paint(look.bg, alpha),
+            &bar.paint(area, alpha),
             FillRule::Winding,
             Transform::identity(),
             None,
@@ -652,7 +705,7 @@ fn draw_vertical_bar(canvas: &mut Pixmap, look: &Look, fonts: &Fonts, bar: &Bar,
         };
         canvas.fill_path(
             &rounded_rect(area, radius),
-            &paint(look.bg, look.style.bg_alpha as f32),
+            &bar.paint(area, look.style.bg_alpha as f32),
             FillRule::Winding,
             Transform::identity(),
             None,

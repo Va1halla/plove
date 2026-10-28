@@ -75,3 +75,24 @@ settings:
     title: Справа
     items: [launcher, workspaces, window, clock, media, cpu, memory, backlight, pulseaudio, network, battery, language, tray, power]
     default: [pulseaudio, network, battery]
+  - id: background
+    group: Фон панели
+    title: Фон
+    about: "theme — цвет темы; tint — с оттенком акцента; gradient — переход между двумя цветами; wallpaper — кусок обоев; color и image — свой цвет или картинка (задаются ниже, в файле райса). Прозрачность — из стиля glass. У панели minimal фона нет."
+    choices: [theme, tint, gradient, wallpaper, color, image]
+    default: theme
+  - id: background_color
+    group: Фон панели
+    title: Свой цвет
+    about: "Для color и как первый цвет gradient: #rrggbb. Пусто — по палитре райса."
+    default: ""
+  - id: background_color2
+    group: Фон панели
+    title: Второй цвет градиента
+    about: "#rrggbb. Пусто — по палитре райса."
+    default: ""
+  - id: background_image
+    group: Фон панели
+    title: Картинка
+    about: "Путь к картинке для image, например ~/Pictures/bar.png."
+    default: ""

@@ -1,6 +1,31 @@
 /* Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`. */
 {%- set floats = style.bar != "solid" or options.floating %}
 {%- set panel_bg = "rgba(" ~ colors.bg.rgb ~ ", " ~ style.bg_alpha ~ ")" %}
+{#- Фон панели (настройка background). alpha() и mix() — функции CSS в GTK. -#}
+{%- set a = style.bg_alpha %}
+{%- set magenta = colors.accent.hex %}{% if ansi | length == 16 %}{% set magenta = ansi.5.hex %}{% endif %}
+{%- set c1 = options.background_color | default(value="") %}
+{%- set c2 = options.background_color2 | default(value="") %}
+{%- if c1 == "" %}{% set c1 = "mix(" ~ colors.bg.hex ~ ", " ~ colors.accent.hex ~ ", 0.35)" %}{% endif %}
+{%- if c2 == "" %}{% set c2 = "mix(" ~ colors.bg.hex ~ ", " ~ magenta ~ ", 0.35)" %}{% endif %}
+{%- set image = "" %}
+{%- if options.background == "wallpaper" %}{% set image = wallpaper %}
+{%- elif options.background == "image" %}{% set image = options.background_image | default(value="") %}{% endif %}
+{%- if image is starting_with("~/") %}{% set rest = image | trim_start_matches(pat="~") %}{% set image = home ~ rest %}{% endif %}
+{%- if options.background == "tint" %}{% set panel_bg = "alpha(mix(" ~ colors.bg.hex ~ ", " ~ colors.accent.hex ~ ", 0.22), " ~ a ~ ")" %}
+{%- elif options.background == "gradient" %}{% set panel_bg = "linear-gradient(90deg, alpha(" ~ c1 ~ ", " ~ a ~ "), alpha(" ~ c2 ~ ", " ~ a ~ "))" %}
+{%- elif options.background == "color" and options.background_color %}{% set panel_bg = "alpha(" ~ options.background_color ~ ", " ~ a ~ ")" %}
+{%- endif %}
+{%- macro panel_background(panel_bg, image) %}
+    background: {{ panel_bg }};
+{%- if image != "" %}
+    /* Картинка поверх цвета: если файла нет, виден цвет. Сверху её
+       притеняет фон темы, чтобы подписи читались на любой картинке. */
+    background-image: linear-gradient(alpha({{ colors.bg.hex }}, 0.45), alpha({{ colors.bg.hex }}, 0.45)), url("{{ image }}");
+    background-size: cover;
+    background-position: center;
+{%- endif %}
+{%- endmacro panel_background %}
 
 * {
     /* Моноширинный Nerd Font — запасной: из него берутся значки. */
@@ -12,7 +37,7 @@
 
 window#waybar {
 {%- if style.bar == "solid" or style.bar == "floating" %}
-    background: {{ panel_bg }};
+{{- self::panel_background(panel_bg=panel_bg, image=image) }}
 {%- else %}
     background: transparent;
 {%- endif %}
@@ -31,7 +56,7 @@ window#waybar {
 .modules-left,
 .modules-center,
 .modules-right {
-    background: {{ panel_bg }};
+{{- self::panel_background(panel_bg=panel_bg, image=image) }}
     border-radius: {% if style.shape == "pill" %}999{% else %}{{ style.radius_box }}{% endif %}px;
     padding: 0 {{ style.pad_small }}px;
 {%- if style.border > 0 %}
