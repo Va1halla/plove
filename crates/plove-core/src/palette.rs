@@ -82,6 +82,60 @@ pub const BACKGROUNDS: [(&str, &str); 3] = [
 ];
 pub const TERMINALS: [(&str, &str); 2] = [("soft", "мягкие"), ("vivid", "яркие")];
 
+/// Акцент для райса без картинки (готовые райсы): переставить на
+/// противоположный оттенок или на один из ярких цветов терминала.
+pub const SHIFTS: [&str; 8] = [
+    "как в райсе",
+    "контрастный",
+    "красный",
+    "зелёный",
+    "жёлтый",
+    "синий",
+    "пурпурный",
+    "голубой",
+];
+
+/// Акцент палитры по номеру из [`SHIFTS`]. Всегда читается на фоне.
+pub fn shift_accent(palette: &Palette, shift: usize) -> Color {
+    let bg = palette.bg;
+    match shift {
+        0 => palette.accent,
+        1 => {
+            let hsl = Hsl::from(palette.accent);
+            // У серого акцента оттенка нет: берём тёплый оранжевый.
+            let h = if hsl.s < 0.15 { 30.0 } else { hsl.h + 180.0 };
+            readable(
+                Hsl {
+                    h,
+                    s: hsl.s.clamp(0.55, 0.85),
+                    l: hsl.l.clamp(0.6, 0.72),
+                },
+                bg,
+                4.5,
+            )
+        }
+        n => {
+            let i = (n - 2).min(5);
+            // Яркие цвета терминала (color9–14) уже подобраны под фон.
+            match palette.ansi.get(9 + i) {
+                Some(&c) => readable(Hsl::from(c), bg, 4.5),
+                None => {
+                    let hues = [0.0, 120.0, 50.0, 220.0, 300.0, 185.0];
+                    readable(
+                        Hsl {
+                            h: hues[i],
+                            s: 0.65,
+                            l: 0.68,
+                        },
+                        bg,
+                        4.5,
+                    )
+                }
+            }
+        }
+    }
+}
+
 impl Accent {
     /// `auto`, `contrast`, `dominant` или цвет `#rrggbb`.
     pub fn parse(text: &str) -> Result<Accent> {
@@ -634,6 +688,18 @@ mod tests {
         );
         assert!(luminance(deep.bg) < luminance(from_pixels(&boards()).bg));
         assert!(Accent::parse("blue").is_err());
+    }
+
+    #[test]
+    fn shifted_accent_stays_readable() {
+        let palette = from_pixels(&[repeat("#4fb3d9", 900), repeat("#f0f0f0", 100)].concat());
+        assert_eq!(shift_accent(&palette, 0), palette.accent);
+        let opposite = shift_accent(&palette, 1);
+        let auto = Hsl::from(palette.accent).h;
+        assert!(hue_distance(Hsl::from(opposite).h, auto) > 150.0);
+        for shift in 1..SHIFTS.len() {
+            assert!(contrast(shift_accent(&palette, shift), palette.bg) >= 4.5);
+        }
     }
 
     #[test]

@@ -237,6 +237,8 @@ struct Settings {
     programs: Vec<Program>,
     /// Подбор цветов из обоев, если обои райса — картинка.
     colors: Option<ColorPick>,
+    /// Для райса без картинки: номер в palette::SHIFTS.
+    accent: usize,
 }
 
 /// Как подбирать цвета из картинки: строки «Акцент», «Фон», «Терминал»
@@ -329,11 +331,13 @@ impl Settings {
             style: indexes,
             programs,
             colors: ColorPick::for_spec(spec),
+            accent: 0,
         }
     }
 
     fn len(&self) -> usize {
-        Self::SWITCHES + self.programs.len() + self.colors.as_ref().map_or(0, |_| ColorPick::ROWS)
+        // У райса с картинкой три строки цветов, у остальных — одна «Акцент».
+        Self::SWITCHES + self.programs.len() + self.colors.as_ref().map_or(1, |_| ColorPick::ROWS)
     }
 
     /// Записать настройки в райс.
@@ -358,6 +362,9 @@ impl Settings {
         }
         if let Some(colors) = self.colors.as_ref().filter(|c| c.touched) {
             spec.theme.palette = palette::from_pixels_with(&colors.pixels, colors.options());
+        }
+        if self.colors.is_none() {
+            spec.theme.palette.accent = palette::shift_accent(&spec.theme.palette, self.accent);
         }
     }
 
@@ -384,6 +391,7 @@ impl Settings {
             }
             r => {
                 let Some(colors) = &mut self.colors else {
+                    self.accent = cycle(self.accent, palette::SHIFTS.len());
                     return;
                 };
                 let i = r - Self::SWITCHES - self.programs.len();
@@ -422,6 +430,8 @@ impl Settings {
             rows.push(("Акцент", palette::ACCENTS[a].1.to_string()));
             rows.push(("Фон", palette::BACKGROUNDS[b].1.to_string()));
             rows.push(("Цвета терминала", palette::TERMINALS[t].1.to_string()));
+        } else {
+            rows.push(("Акцент", palette::SHIFTS[self.accent].to_string()));
         }
         rows
     }
@@ -584,6 +594,7 @@ impl App {
                 style: [0; 7],
                 programs: Vec::new(),
                 colors: None,
+                accent: 0,
             },
             setting_row: 0,
             tune: Vec::new(),
@@ -1470,6 +1481,26 @@ mod tests {
         settings.apply_to(&mut spec);
         let red = spec.theme.palette.accent;
         assert!(red.r > red.b, "{}", red.hex());
+    }
+
+    /// У готового райса последняя строка — «Акцент»: как в райсе или другой.
+    #[test]
+    fn preset_accent_can_be_changed() {
+        let registry = Registry::builtin().unwrap();
+        let spec = presets::get("tokyo-night").unwrap().unwrap();
+        let mut settings = Settings::from_spec(&spec, &registry);
+        let last = settings.len() - 1;
+        assert_eq!(settings.rows()[last].0, "Акцент");
+        let mut same = spec.clone();
+        settings.apply_to(&mut same);
+        assert_eq!(same.theme.palette.accent, spec.theme.palette.accent);
+        settings.change(last, true);
+        let mut other = spec.clone();
+        settings.apply_to(&mut other);
+        assert_ne!(other.theme.palette.accent, spec.theme.palette.accent);
+        settings.change(last, false);
+        settings.change(last, false);
+        assert_eq!(settings.rows()[last].1, "голубой");
     }
 
     /// Числа двигаются шагом и не выходят за границы, списки идут по кругу.
