@@ -449,16 +449,32 @@ impl Probe for LiveProbe {
             .trim_end_matches('%')
             .parse()
             .ok()?;
-        let hyprland_logs = std::fs::read_dir(Path::new(&path).join("hypr"))
-            .into_iter()
-            .flatten()
-            .flatten()
-            .map(|entry| entry.path().join("hyprland.log"))
-            .filter_map(|log| {
-                let size = log.metadata().ok()?.len();
-                Some((log.display().to_string(), size))
-            })
-            .collect();
+        let mut hyprland_logs: Vec<(String, u64)> =
+            std::fs::read_dir(Path::new(&path).join("hypr"))
+                .into_iter()
+                .flatten()
+                .flatten()
+                .map(|entry| entry.path().join("hyprland.log"))
+                .filter_map(|log| {
+                    let size = log.metadata().ok()?.len();
+                    Some((log.display().to_string(), size))
+                })
+                .collect();
+        // Лог уже удалили, а Hyprland держит его открытым: место занято,
+        // пока файл не очистить через /proc/<pid>/fd/<n>.
+        for pid in output("pgrep", &["-x", "Hyprland"]).split_whitespace() {
+            let fds = std::fs::read_dir(format!("/proc/{pid}/fd"));
+            for fd in fds.into_iter().flatten().flatten() {
+                let Ok(target) = std::fs::read_link(fd.path()) else {
+                    continue;
+                };
+                let target = target.display().to_string();
+                if target.ends_with("hyprland.log (deleted)") {
+                    let size = fd.path().metadata().map_or(0, |m| m.len());
+                    hyprland_logs.push((fd.path().display().to_string(), size));
+                }
+            }
+        }
         Some(RuntimeDir {
             path,
             used_percent,
