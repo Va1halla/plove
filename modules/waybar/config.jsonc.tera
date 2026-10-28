@@ -20,6 +20,8 @@
 {%- else -%}{{ glyph }} {{ word }} {{ value }}{%- endif -%}
 {%- endmacro label %}
 {%- set floats = style.bar != "solid" or options.floating %}
+{#- Модули, которые waybar прячет, когда показывать нечего. #}
+{%- set hideable = ["media", "battery", "backlight", "tray"] %}
 {%- set date = "" %}{% if options.clock_date %}{% set date = "%d.%m  " %}{% endif %}
 {%- set seconds = "" %}{% if options.clock_seconds %}{% set seconds = ":%S" %}{% endif %}
 {%- set clock = "{:" ~ date ~ "%H:%M" ~ seconds ~ "}" %}
@@ -68,7 +70,21 @@
 {%- elif side == "c" %}{% set list = center %}{% set glyph = style.sep_center %}
 {%- else %}{% set list = right %}{% set glyph = style.sep_right %}{% endif %}
 {%- if style.separators != "none" %}{% for m in list %}{% if not loop.last %}
-    "custom/sep#{{ side }}{{ loop.index }}": { "format": "{{ glyph }}", "tooltip": false },
+{#- Разделитель перед list[n]. Если рядом модули, которые waybar прячет,
+    разделитель показывается, только когда с обеих сторон что-то видно. -#}
+{%- set n = loop.index %}
+{%- set_global all_hide = true %}
+{%- for p in list | slice(end=n) %}{% if p not in hideable %}{% set_global all_hide = false %}{% endif %}{% endfor %}
+{%- if list[n] in hideable or all_hide %}
+    "custom/sep#{{ side }}{{ n }}": {
+      "format": "{{ glyph }}",
+      "exec": "sh ~/.local/share/plove/waybar-sep.sh {{ n }} {{ list | join(sep=" ") }}",
+      "interval": 5,
+      "tooltip": false
+    },
+{%- else %}
+    "custom/sep#{{ side }}{{ n }}": { "format": "{{ glyph }}", "tooltip": false },
+{%- endif %}
 {%- endif %}{% endfor %}{% endif %}
 {%- endfor %}
 

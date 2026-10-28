@@ -50,7 +50,7 @@ pub fn load(path: &std::path::Path) -> Result<Pixmap> {
     // tiny-skia хранит цвета, уже умноженные на прозрачность
     // («premultiplied alpha»), поэтому пересчитываем каждую точку.
     let mut data = image.into_raw();
-    for pixel in data.chunks_exact_mut(4) {
+    for pixel in data.as_chunks_mut::<4>().0 {
         let alpha = pixel[3] as u16;
         for channel in &mut pixel[..3] {
             *channel = ((*channel as u16 * alpha + 127) / 255) as u8;

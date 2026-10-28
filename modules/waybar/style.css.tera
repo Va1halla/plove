@@ -89,6 +89,9 @@ window#waybar {
 }
 
 #custom-sep {
+    /* Только Nerd Font: в Inter и других шрифтах интерфейса на тех же
+       кодах (U+E0B0–E0BF) свои значки, и вместо стрелок выходил мусор. */
+    font-family: "{{ fonts.mono }}";
     color: {{ colors.surface.hex }};
     padding: 0 2px;
 }

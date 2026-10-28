@@ -1,0 +1,41 @@
+#!/bin/sh
+# Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+# Нужен ли разделитель перед модулем панели. Waybar прячет модули media,
+# battery, backlight и tray, когда показывать нечего, а разделитель — это
+# отдельный модуль, и без проверки он остался бы висеть сам по себе.
+# Вызов: waybar-sep.sh <номер> <модуль> <модуль>...; разделитель стоит перед
+# модулем с этим номером (с нуля). Печатает «1», если разделитель нужен.
+
+visible() {
+    case "$1" in
+        # playerctld сам висит на шине как плеер, даже когда плееров нет.
+        media)
+            busctl --user list 2>/dev/null | grep 'org\.mpris\.MediaPlayer2\.' |
+                grep -qv 'MediaPlayer2\.playerctld '
+            ;;
+        battery) ls /sys/class/power_supply 2>/dev/null | grep -q '^BAT' ;;
+        backlight) [ -n "$(ls /sys/class/backlight 2>/dev/null)" ] ;;
+        tray)
+            busctl --user get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher \
+                org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems 2>/dev/null |
+                grep -q '^as [1-9]'
+            ;;
+        *) true ;;
+    esac
+}
+
+n=$1
+shift
+i=0
+before=false
+for m in "$@"; do
+    if [ "$i" -eq "$n" ]; then
+        # Разделитель нужен, если виден и сам модуль, и хоть кто-то до него.
+        $before && visible "$m" && echo 1
+        exit 0
+    fi
+    if ! $before && visible "$m"; then
+        before=true
+    fi
+    i=$((i + 1))
+done
