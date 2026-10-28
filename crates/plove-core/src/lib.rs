@@ -25,5 +25,6 @@ pub mod render;
 pub mod spec;
 pub mod state;
 pub mod system;
+pub mod terminal;
 pub mod theme;
 pub mod wallpaper;

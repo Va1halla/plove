@@ -16,6 +16,7 @@ use plove_core::modules::Registry;
 use plove_core::plan::module_options;
 use plove_core::spec::{BarStyle, Color, Labels, Palette, RiceSpec, Separators, Wallpaper, Widget};
 use plove_core::system::Env;
+use plove_core::terminal;
 use plove_core::theme::StyleContext;
 use plove_core::wallpaper::{self, paint};
 use std::collections::BTreeMap;
@@ -61,8 +62,17 @@ pub fn render(spec: &RiceSpec, registry: &Registry, env: &Env) -> Result<Pixmap>
         Some(id) => Some(Bar::from_spec(spec, registry, id, &look)?),
         None => None,
     };
-    if spec.components.contains_key("terminal") {
-        draw_windows(&mut canvas, &look, &fonts, bar.as_ref(), spec);
+    if let Some(id) = spec.components.get("terminal") {
+        // Своя цветовая схема терминала: окна рисуются её цветами.
+        let mut term_spec = spec.clone();
+        if let Some(module) = registry.get(id) {
+            let options = module_options(module, spec.overrides.get(id))?;
+            if let Some(palette) = terminal::from_options(&options, &spec.theme.palette)? {
+                term_spec.theme.palette = palette;
+            }
+        }
+        let term_look = Look::new(&term_spec, &compositor);
+        draw_windows(&mut canvas, &look, &term_look, &fonts, bar.as_ref(), spec);
     }
     if let Some(bar) = &bar {
         draw_bar(&mut canvas, &look, &fonts, bar, spec);
@@ -227,9 +237,11 @@ fn cover(image: &Pixmap) -> Pixmap {
 /// Два плавающих окна kitty поверх обоев, как на скриншотах с r/unixporn:
 /// слева fastfetch (активное окно), справа снизу оболочка с файлом райса.
 /// Плавающие, а не тайловые, чтобы обои было видно.
+/// `look` — рамки и отступы райса, `term` — цвета внутри терминала.
 fn draw_windows(
     canvas: &mut Pixmap,
     look: &Look,
+    term_look: &Look,
     fonts: &Fonts,
     bar: Option<&Bar>,
     spec: &RiceSpec,
@@ -260,13 +272,13 @@ fn draw_windows(
 
     let (w, h) = window_size(fonts, look, 60, 17);
     let session_area = rect(x1 - margin_x - w, y1 - margin_y - h, w, h);
-    let mut term = window(canvas, look, fonts, session_area, false);
-    session(canvas, &mut term, look, spec);
+    let mut term = window(canvas, look, term_look, fonts, session_area, false);
+    session(canvas, &mut term, term_look, spec);
 
     let (w, h) = window_size(fonts, look, 78, 24);
     let fetch_area = rect(x0 + margin_x, y0 + margin_y, w, h);
-    let mut term = window(canvas, look, fonts, fetch_area, true);
-    fastfetch(canvas, &mut term, look, spec);
+    let mut term = window(canvas, look, term_look, fonts, fetch_area, true);
+    fastfetch(canvas, &mut term, term_look, spec);
 }
 
 /// Отступ текста от краёв окна: как `window_padding_width` в kitty плюс рамка.
@@ -291,6 +303,7 @@ fn line_height(px: f32) -> f32 {
 fn window<'a>(
     canvas: &mut Pixmap,
     look: &Look,
+    term_look: &Look,
     fonts: &'a Fonts,
     area: Rect,
     active: bool,
@@ -302,7 +315,7 @@ fn window<'a>(
         look.opacity_inactive
     };
     if let Some((range, offset)) = look.shadow {
-        draw_shadow(canvas, area, look.radius, range, offset, look.bg);
+        draw_shadow(canvas, area, look.radius, range, offset, term_look.bg);
     }
     // Полупрозрачное окно в Hyprland размывает то, что под ним.
     if opacity < 1.0 && look.blur > 0 {
@@ -310,7 +323,7 @@ fn window<'a>(
     }
     canvas.fill_path(
         &shape,
-        &paint(look.bg, opacity),
+        &paint(term_look.bg, opacity),
         FillRule::Winding,
         Transform::identity(),
         None,

@@ -28,3 +28,15 @@ settings:
     range: [0, 40]
     step: 2
     default: 8
+  - id: colors
+    group: Цвета терминала
+    title: Цветовая схема
+    about: rice — цвета райса. Или любая другая схема, независимо от райса.
+    choices: [rice, tokyo-night, catppuccin-mocha, gruvbox, nord, dracula, rose-pine, everforest, kanagawa, one-dark, solarized-dark, catppuccin-latte]
+    default: rice
+  - id: background
+    group: Цвета терминала
+    title: Фон
+    about: scheme — фон схемы; darker и lighter — темнее или светлее его; rice — фон райса под цветами схемы.
+    choices: [scheme, darker, lighter, rice]
+    default: scheme

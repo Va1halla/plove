@@ -13,6 +13,7 @@ use crate::render;
 use crate::spec::{RiceSpec, Wallpaper};
 use crate::state;
 use crate::system::{self, Env};
+use crate::terminal;
 use crate::theme::{font_package, theme_context};
 use crate::wallpaper;
 
@@ -291,7 +292,14 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
     // 5. Рендерим конфиги и сравниваем с тем, что сейчас на диске.
     for module in &modules {
         let options = &module_opts[module.manifest.id.as_str()];
-        for rendered in render::render_module(module, &base, &apps, options)? {
+        // Терминалу — цвета его схемы (настройки colors и background).
+        let mut context = base.clone();
+        if let Some(palette) = terminal::from_options(options, &spec.theme.palette)? {
+            let (colors, ansi) = terminal::context(&palette);
+            context.insert("colors", &colors);
+            context.insert("ansi", &ansi);
+        }
+        for rendered in render::render_module(module, &context, &apps, options)? {
             let path = env.expand(&rendered.dest);
             if files.iter().any(|f| f.path == path) {
                 bail!("два модуля пишут в один файл {}", rendered.dest);
