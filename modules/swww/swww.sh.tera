@@ -8,20 +8,31 @@ mkdir -p "$HOME/.local/state/plove"
 exec >>"$HOME/.local/state/plove/swww.log" 2>&1
 echo "--- $(date '+%F %T') $*"
 
-pgrep -x swww-daemon >/dev/null || setsid -f swww-daemon
+# Проект swww переименовали в awww: в свежем Arch команды называются
+# awww и awww-daemon. Берём то, что установлено.
+if command -v awww >/dev/null; then
+    cli=awww
+elif command -v swww >/dev/null; then
+    cli=swww
+else
+    echo "не найдены ни awww, ни swww: поставьте пакет (plove apply)"
+    exit 1
+fi
+
+pgrep -x "$cli-daemon" >/dev/null || setsid -f "$cli-daemon"
 # На медленной машине (виртуалка без 3D) демон стартует дольше секунды.
 tries=0
-until swww query >/dev/null 2>&1; do
+until "$cli" query >/dev/null 2>&1; do
     tries=$((tries + 1))
     if [ "$tries" -ge 100 ]; then
-        echo "swww-daemon не ответил за 10 секунд"
+        echo "$cli-daemon не ответил за 10 секунд"
         exit 1
     fi
     sleep 0.1
 done
 {% if wallpaper -%}
-swww img '{{ wallpaper }}' --transition-type "${1:-none}" --transition-pos top-right \
+"$cli" img '{{ wallpaper }}' --transition-type "${1:-none}" --transition-pos top-right \
     --transition-fps 60 --transition-duration {{ options.transition_duration }}
 {%- else -%}
-swww clear {{ colors.bg.raw }}
+"$cli" clear {{ colors.bg.raw }}
 {%- endif %}

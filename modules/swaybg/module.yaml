@@ -8,7 +8,7 @@ exec: "{% if wallpaper %}swaybg -m {{ options.mode }} -i '{{ wallpaper }}'{% els
 packages: [swaybg]
 autostart: true
 # Двум программам обоев на одном экране не место.
-stops: [swww-daemon, hyprpaper]
+stops: [swww-daemon, awww-daemon, hyprpaper]
 compatible_with:
   compositor: [hyprland]
 # swaybg не умеет перечитывать картинку, поэтому перезапускаем его.
