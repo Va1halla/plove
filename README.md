@@ -138,7 +138,7 @@ overrides:
 | Терминал | kitty | Ghostty | Alacritty | kitty |
 | Лаунчер | fuzzel | rofi | fuzzel | rofi |
 | Уведомления | mako | SwayNC | mako | SwayNC |
-| Обои | swww (с анимацией) | swww | swaybg | swaybg |
+| Обои | awww (бывший swww, с анимацией) | awww | swaybg | swaybg |
 | Меню выхода | wlogout | wlogout | своё (в лаунчере) | своё |
 | Часы на рабочем столе | eww | eww | | |
 

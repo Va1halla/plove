@@ -5,7 +5,8 @@ role: wallpaper
 # Сам запуск — в скрипте swww.sh: он дожидается демона, а не спит наугад
 # секунду (в виртуалке демон бывает медленнее, и обои не ставились).
 exec: sh ~/.local/share/plove/swww.sh
-packages: [swww]
+# Проект swww переименован в awww (в Arch пакет awww, команды awww/awww-daemon).
+packages: [awww]
 compatible_with:
   compositor: [hyprland]
 autostart: true
@@ -15,7 +16,7 @@ templates:
     dest: ~/.local/share/plove/swww.sh
 reload: "sh ~/.local/share/plove/swww.sh {{ options.transition }}"
 # Фоновый процесс: plove остановит его, если модуль уберут из райса.
-process: "swww-daemon"
+process: "awww-daemon"
 settings:
   - id: transition
     group: Обои
