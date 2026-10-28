@@ -46,8 +46,8 @@ pub fn apply(plan: &Plan, env: &Env, options: &ApplyOptions) -> Result<ApplyRepo
         }
         let missing_aur = plan.missing_from(true);
         if !missing_aur.is_empty() {
-            if !system::command_exists("paru") {
-                println!("Для пакетов из AUR нужен paru, ставлю его.");
+            if !system::paru_works() {
+                println!("Для пакетов из AUR нужен paru, собираю его (несколько минут).");
                 system::install_paru()?;
             }
             system::install_aur(&missing_aur)?;

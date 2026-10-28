@@ -69,6 +69,10 @@ pub trait Probe {
     fn service_enabled(&self, name: &str) -> bool;
     fn path_exists(&self, path: &str) -> bool;
     fn online(&self) -> bool;
+    /// paru не только есть, но и запускается.
+    fn paru_works(&self) -> bool {
+        self.command_exists("paru")
+    }
 }
 
 /// Выполнить все проверки по порядку.
@@ -255,8 +259,19 @@ fn login(probe: &dyn Probe) -> Check {
 /// paru нужен для пакетов из AUR (например, wlogout). Без него райсы
 /// из официальных репозиториев работают, поэтому это лишь предупреждение.
 fn paru(probe: &dyn Probe) -> Check {
-    if probe.command_exists("paru") {
+    if probe.paru_works() {
         return Check::ok("paru (AUR)", "есть");
+    }
+    if probe.command_exists("paru") {
+        return Check {
+            fix: crate::system::paru_install_commands(),
+            ..Check::problem(
+                "paru (AUR)",
+                Level::Warn,
+                "установлен, но не запускается: скорее всего, собран под старую версию \
+                 pacman (libalpm). Исправление пересоберёт его из исходников",
+            )
+        };
     }
     Check {
         fix: crate::system::paru_install_commands(),
@@ -363,6 +378,10 @@ impl Probe for LiveProbe {
 
     fn path_exists(&self, path: &str) -> bool {
         Path::new(path).exists()
+    }
+
+    fn paru_works(&self) -> bool {
+        crate::system::paru_works()
     }
 
     fn online(&self) -> bool {

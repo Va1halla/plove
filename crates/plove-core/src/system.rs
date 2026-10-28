@@ -192,12 +192,33 @@ pub fn install_aur(packages: &[&str]) -> Result<()> {
     Ok(())
 }
 
+/// paru установлен и запускается. Готовая сборка paru-bin ломается после
+/// обновления pacman (libalpm.so.15 → .16): команда есть, но не работает.
+pub fn paru_works() -> bool {
+    Command::new("paru")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
 /// Команды установки paru: он сам живёт в AUR, поэтому собираем его
-/// из готового бинарного пакета paru-bin через makepkg.
+/// через makepkg из исходников, под ту libalpm, что стоит в системе.
+/// Готовый paru-bin не годится: он собран под старую libalpm и после
+/// обновления pacman падает с «libalpm.so.15: cannot open shared object».
+/// Сборка занимает несколько минут; cargo makepkg поставит сам (-s).
+/// Если релиз paru ещё не поддерживает новую libalpm, пробуем paru-git.
 pub fn paru_install_commands() -> Vec<Vec<String>> {
-    let build = "rm -rf /tmp/plove-paru && \
-                 git clone https://aur.archlinux.org/paru-bin.git /tmp/plove-paru && \
-                 cd /tmp/plove-paru && makepkg -si --noconfirm";
+    let build = "if pacman -Qq paru-bin >/dev/null 2>&1; then \
+                     sudo pacman -Rdd --noconfirm paru-bin; \
+                 fi; \
+                 for pkg in paru paru-git; do \
+                     rm -rf /tmp/plove-paru && \
+                     git clone https://aur.archlinux.org/$pkg.git /tmp/plove-paru && \
+                     (cd /tmp/plove-paru && makepkg -si --noconfirm) && \
+                     paru --version >/dev/null && exit 0; \
+                 done; exit 1";
     [
         vec![
             "sudo",
