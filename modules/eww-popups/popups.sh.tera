@@ -1,0 +1,161 @@
+#!/bin/sh
+# Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+# Выпадающие меню панели (eww): открыть и закрыть, данные для них, действия.
+#   popups.sh toggle <меню> <якорь> <отступ>   — открыть под модулем или закрыть
+#   popups.sh close <меню>
+#   popups.sh audio | sinks | net | wifi        — JSON для eww
+#   popups.sh calc <выражение> | copy | connect <сеть> | mixer | netsettings
+
+E="eww -c $HOME/.config/eww-popups"
+MENUS="volume network clock calculator"
+
+json_escape() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+# Открыть программу в терминале райса.
+in_terminal() {
+    {%- if run_in %}
+    setsid -f {{ run_in }} "$@" >/dev/null 2>&1
+    {%- else %}
+    setsid -f "$@" >/dev/null 2>&1
+    {%- endif %}
+}
+
+# Демон eww запускается вместе с Hyprland, но мог упасть или ещё не встать.
+ensure_daemon() {
+    $E ping >/dev/null 2>&1 && return
+    $E daemon >/dev/null 2>&1
+    i=0
+    while [ $i -lt 30 ] && ! $E ping >/dev/null 2>&1; do
+        sleep 0.1
+        i=$((i + 1))
+    done
+}
+
+close() {
+    $E close "$1" >/dev/null 2>&1
+    $E update "$1_open=false" >/dev/null 2>&1
+}
+
+case "$1" in
+toggle)
+    ensure_daemon
+    if $E active-windows 2>/dev/null | grep -q ": $2\$"; then
+        close "$2"
+        exit 0
+    fi
+    for m in $MENUS; do
+        [ "$m" = "$2" ] || close "$m"
+    done
+    $E update "$2_open=true"
+    $E open "$2" --anchor "$3" --pos "$4"
+    ;;
+close)
+    close "$2"
+    ;;
+audio)
+    sink=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null)
+    src=$(wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null)
+    pct() { printf '%s' "$1" | awk '{ v = int($2 * 100 + 0.5); print (v == "" ? 0 : v) }'; }
+    muted() { case "$1" in *MUTED*) echo true ;; *) echo false ;; esac; }
+    printf '{"vol":%s,"muted":%s,"mic":%s,"mic_muted":%s,"has_mic":%s}\n' \
+        "$(pct "$sink")" "$(muted "$sink")" "$(pct "$src")" "$(muted "$src")" \
+        "$([ -n "$src" ] && echo true || echo false)"
+    ;;
+sinks)
+    # Выходы звука из `wpctl status`: раздел Audio → Sinks.
+    wpctl status 2>/dev/null | awk '
+        /^Audio/ { audio = 1; next }
+        /^Video/ { audio = 0 }
+        audio && /Sinks:/ { sinks = 1; next }
+        sinks && /[├└]─/ { sinks = 0 }
+        sinks && /[0-9]+\./ {
+            def = ($0 ~ /\*/) ? "true" : "false"
+            line = $0
+            sub(/^[^0-9]*/, "", line)
+            id = line; sub(/\..*/, "", id)
+            name = line; sub(/^[0-9]+\. */, "", name); sub(/ *\[vol:.*/, "", name)
+            gsub(/\\/, "\\\\", name); gsub(/"/, "\\\"", name)
+            out = out sep "{\"id\":" id ",\"name\":\"" name "\",\"default\":" def "}"
+            sep = ","
+        }
+        END { print "[" out "]" }'
+    ;;
+net)
+    iface=$(ip route show default 2>/dev/null | awk '{ print $5; exit }')
+    ip=""; kind="none"; ssid=""
+    if [ -n "$iface" ]; then
+        ip=$(ip -4 -br addr show dev "$iface" 2>/dev/null | awk '{ print $3 }')
+        kind=ethernet
+        [ -d "/sys/class/net/$iface/wireless" ] && kind=wifi
+    fi
+    nm=false; wifi_on=false
+    if command -v nmcli >/dev/null 2>&1; then
+        nm=true
+        [ "$(nmcli radio wifi 2>/dev/null)" = "enabled" ] && wifi_on=true
+        ssid=$(nmcli -t -f active,ssid dev wifi 2>/dev/null | sed -n 's/^yes://p' | head -1)
+    fi
+    printf '{"iface":"%s","ip":"%s","kind":"%s","ssid":"%s","nm":%s,"wifi_on":%s}\n' \
+        "$(json_escape "$iface")" "$(json_escape "$ip")" "$kind" "$(json_escape "$ssid")" "$nm" "$wifi_on"
+    ;;
+wifi)
+    # Сети рядом (только с NetworkManager). В выводе nmcli -t двоеточие
+    # внутри имени сети экранировано как «\:».
+    command -v nmcli >/dev/null 2>&1 || { echo "[]"; exit 0; }
+    nmcli -t -f IN-USE,SIGNAL,SECURITY,SSID dev wifi list 2>/dev/null | sed 's/\\:/\x01/g' | awk -F: '
+        $4 != "" && !seen[$4]++ && n < 10 {
+            ssid = $4; gsub(/\x01/, ":", ssid)
+            gsub(/\\/, "\\\\", ssid); gsub(/"/, "\\\"", ssid)
+            out = out sep "{\"ssid\":\"" ssid "\",\"signal\":" ($2 + 0) ",\"secure\":" ($3 != "" ? "true" : "false") ",\"active\":" ($1 == "*" ? "true" : "false") "}"
+            sep = ","; n++
+        }
+        END { print "[" out "]" }'
+    ;;
+wifi-toggle)
+    if [ "$(nmcli radio wifi)" = "enabled" ]; then nmcli radio wifi off; else nmcli radio wifi on; fi
+    ;;
+connect)
+    # Знакомая сеть подключится сразу; для новой нужен пароль — nmtui.
+    nmcli dev wifi connect "$2" >/dev/null 2>&1 || in_terminal nmtui connect "$2"
+    ;;
+netsettings)
+    close network
+    if command -v nm-connection-editor >/dev/null 2>&1; then
+        setsid -f nm-connection-editor >/dev/null 2>&1
+    elif command -v nmtui >/dev/null 2>&1; then
+        in_terminal nmtui
+    else
+        in_terminal sh -c 'networkctl status; echo; read -r -p "Enter — закрыть" _'
+    fi
+    ;;
+mixer)
+    close volume
+    for app in pavucontrol pwvucontrol; do
+        command -v $app >/dev/null 2>&1 && { setsid -f $app >/dev/null 2>&1; exit 0; }
+    done
+    for app in wiremix pulsemixer alsamixer; do
+        command -v $app >/dev/null 2>&1 && { in_terminal $app; exit 0; }
+    done
+    ;;
+calc)
+    expr=$2
+    if [ -z "$expr" ]; then
+        result=""
+    elif command -v qalc >/dev/null 2>&1; then
+        result=$(qalc -t -- "$expr" 2>/dev/null | tail -1)
+    else
+        # Без qalc — только арифметика: никаких букв в awk.
+        if printf '%s' "$expr" | grep -q '[^0-9+*/%^()., -]'; then
+            result="?"
+        else
+            result=$(awk "BEGIN { print ($(printf '%s' "$expr" | tr ',' '.')) }" 2>/dev/null)
+        fi
+    fi
+    $E update "calc_result=$result"
+    ;;
+copy)
+    result=$($E get calc_result 2>/dev/null)
+    [ -n "$result" ] && printf '%s' "$result" | wl-copy
+    ;;
+esac

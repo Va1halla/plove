@@ -129,6 +129,33 @@ overrides:
   waybar: { clock_seconds: true, workspace_count: 0 }
 ```
 
+### Цвета терминала
+
+У kitty, alacritty и ghostty цвета можно отвязать от райса: `colors` — `rice` (как у райса) или другая схема (любой готовый райс, `dracula`, `rose-pine`, `everforest`, `kanagawa`, `one-dark`, `solarized-dark`, `catppuccin-latte`), `background` — фон схемы, `darker`, `lighter` или `rice` (фон райса под цветами схемы).
+
+```yaml
+overrides:
+  kitty: { colors: dracula, background: darker }
+```
+
+### Фон панели
+
+У Waybar настройка `background`: `theme` (цвет темы), `tint` (с оттенком акцента), `gradient`, `wallpaper` (обои райса), `color` и `image`. Прозрачность — из стиля `glass`.
+
+```yaml
+overrides:
+  waybar:
+    background: gradient
+    background_color: "#5e2a84"     # пусто — цвета из палитры
+    background_color2: "#1d5c63"
+    # background: image
+    # background_image: ~/Pictures/bar.png
+```
+
+### Выпадающие меню
+
+Компонент `popups: eww-popups` добавляет меню, которые открываются по щелчку на панели прямо под модулем: звук (громкость, микрофон, выбор выхода, микшер), сеть (адрес, Wi-Fi через NetworkManager), часы (календарь) и калькулятор (модуль панели `calculator`, считает через `qalc`). Меню в цветах и форме райса. Средний щелчок по звуку — выключить звук, правый — микшер. Нужен eww из AUR, его поставит paru.
+
 ## Что входит в готовые райсы
 
 Райсы отличаются не только цветами, но и набором программ:

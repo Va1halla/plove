@@ -178,13 +178,14 @@ enum Action {
 
 /// Роли, для которых мастер предлагает выбрать программу:
 /// (роль, подпись, можно ли обойтись без неё).
-const PROGRAM_ROLES: [(&str, &str, bool); 7] = [
+const PROGRAM_ROLES: [(&str, &str, bool); 8] = [
     ("terminal", "Терминал", false),
     ("launcher", "Лаунчер", false),
     ("notifications", "Уведомления", false),
     ("wallpaper", "Обои", false),
     ("power", "Меню выхода", false),
     ("widgets", "Виджеты", true),
+    ("popups", "Выпадающие меню", true),
     ("nightlight", "Ночной режим", true),
 ];
 

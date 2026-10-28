@@ -105,6 +105,7 @@ window#waybar.right .modules-right {
 #pulseaudio,
 #mpris,
 #tray,
+#custom-calculator,
 #custom-launcher,
 #custom-power {
     padding: 0 {{ style.pad }}px;

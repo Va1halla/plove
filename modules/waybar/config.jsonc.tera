@@ -4,7 +4,7 @@
 {%- elif m == "window" -%}hyprland/window
 {%- elif m == "language" -%}hyprland/language
 {%- elif m == "media" -%}mpris
-{%- elif m == "power" or m == "launcher" or m in widgets -%}custom/{{ m }}
+{%- elif m == "power" or m == "launcher" or m == "calculator" or m in widgets -%}custom/{{ m }}
 {%- else -%}{{ m }}{%- endif -%}
 {%- endmacro module_name %}
 {#- Список модулей части панели; между ними — разделители custom/sep#<часть><номер>. -#}
@@ -19,6 +19,20 @@
 {%- elif style.labels == "text" -%}{{ word }} {{ value }}
 {%- else -%}{{ glyph }} {{ word }} {{ value }}{%- endif -%}
 {%- endmacro label %}
+{#- Щелчок, открывающий выпадающее меню (модуль popups) под модулем панели.
+    Якорь — край экрана у панели и та часть панели, где стоит модуль. -#}
+{%- macro popup(menu, m, left, center, position) -%}
+{%- if m in left %}{% set part = 0 %}{% elif m in center %}{% set part = 1 %}{% else %}{% set part = 2 %}{% endif %}
+{%- if position == "left" or position == "right" -%}
+{%- set h = position %}{% set v = ["top", "center", "bottom"] | nth(n=part) %}
+{%- else -%}
+{%- set v = position %}{% set h = ["left", "center", "right"] | nth(n=part) %}
+{%- endif -%}
+{%- if h == "center" %}{% set x = 0 %}{% else %}{% set x = geometry.gaps %}{% endif -%}
+{%- if v == "center" %}{% set y = 0 %}{% else %}{% set y = geometry.gaps %}{% endif -%}
+sh ~/.local/share/plove/popups.sh toggle {{ menu }} '{% if v == "center" and h == "center" %}center{% else %}{{ v }} {{ h }}{% endif %}' {{ x }}x{{ y }}
+{%- endmacro popup %}
+{%- set popups = apps.popups | default(value="") != "" %}
 {%- set floats = style.bar != "solid" or options.floating %}
 {#- Модули, которые waybar прячет, когда показывать нечего. #}
 {%- set hideable = ["media", "battery", "backlight", "tray"] %}
@@ -99,6 +113,9 @@
     "hyprland/window": { "max-length": {{ options.window_length }}, "separate-outputs": true{% if vertical %}, "rotate": 90{% endif %} },
     "hyprland/language": { "format": "{{ self::label(compact=vertical, glyph="󰌌", word="", value="{short}") }}" },
     "clock": {
+{%- if popups %}
+      "on-click": {{ self::popup(menu="clock", m="clock", left=left, center=center, position=position) | json_encode() }},
+{%- endif %}
 {%- if options.clock_seconds %}
       "interval": 1,
 {%- endif %}
@@ -118,13 +135,20 @@
       "format-wifi": "{{ self::label(compact=vertical, glyph="󰖩", word="", value="{essid}") | trim }}",
       "format-ethernet": "{{ self::label(compact=vertical, glyph="󰈀", word="", value="eth") | trim }}",
       "format-disconnected": "{{ self::label(compact=vertical, glyph="󰖪", word="", value="offline") | trim }}",
-      "tooltip-format": "{ipaddr}"
+      "tooltip-format": "{ipaddr}"{% if popups %},
+      "on-click": {{ self::popup(menu="network", m="network", left=left, center=center, position=position) | json_encode() }}{% endif %}
     },
     "pulseaudio": {
       "format": "{{ self::label(compact=vertical, glyph="{icon}", word="vol", value="{volume}%") }}",
       "format-muted": "{{ self::label(compact=vertical, glyph="󰖁", word="vol", value="muted") }}",
       "format-icons": { "default": ["󰕿", "󰖀", "󰕾"] },
+{%- if popups %}
+      "on-click": {{ self::popup(menu="volume", m="pulseaudio", left=left, center=center, position=position) | json_encode() }},
+      "on-click-middle": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+      "on-click-right": "sh ~/.local/share/plove/popups.sh mixer"
+{%- else %}
       "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+{%- endif %}
     },
     "mpris": { "format": "{{ self::label(compact=vertical, glyph="󰝚", word="", value="{artist} — {title}") | trim }}", "max-length": 40 },
     "tray": { "spacing": {{ style.pad }} },
@@ -145,6 +169,16 @@
     "custom/launcher": {
       "format": "{% if style.labels == "text" %}apps{% else %}{% endif %}",
       "on-click": "{{ apps.launcher | default(value="") | replace(from='"', to='\\"') }}",
+      "tooltip": false
+    },
+    "custom/calculator": {
+      "format": "{{ self::label(compact=vertical, glyph="󰃬", word="calc", value="") | trim }}",
+{%- if popups %}
+      "on-click": {{ self::popup(menu="calculator", m="calculator", left=left, center=center, position=position) | json_encode() }},
+{%- else %}
+{%- set qalc = run_in ~ " qalc" %}
+      "on-click": {{ qalc | trim | json_encode() }},
+{%- endif %}
       "tooltip": false
     },
     "custom/power": {

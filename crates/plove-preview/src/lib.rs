@@ -812,6 +812,14 @@ impl BarText<'_> {
                 };
                 return (text.to_string(), None);
             }
+            "calculator" => {
+                let text = match self.labels {
+                    Labels::Glyphs => "\u{f00ec}",
+                    Labels::Text => "calc",
+                    Labels::Both => "\u{f00ec} calc",
+                };
+                return (text.to_string(), None);
+            }
             id => match self.widgets.get(id) {
                 Some(w) => {
                     let text = w.text.replace("{value}", "42");

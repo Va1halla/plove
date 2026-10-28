@@ -63,7 +63,7 @@ pub struct Widget {
 }
 
 /// Готовые виджеты панели: их имена нельзя занять своими.
-pub const BUILTIN_WIDGETS: [&str; 14] = [
+pub const BUILTIN_WIDGETS: [&str; 15] = [
     "launcher",
     "workspaces",
     "window",
@@ -77,6 +77,7 @@ pub const BUILTIN_WIDGETS: [&str; 14] = [
     "battery",
     "language",
     "tray",
+    "calculator",
     "power",
 ];
 

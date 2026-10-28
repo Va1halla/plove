@@ -1,0 +1,168 @@
+// Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+
+* {
+  all: unset;
+}
+
+window {
+  background-color: transparent;
+}
+
+.popup {
+  font-family: "{{ fonts.ui }}", "{{ fonts.mono }}";
+  font-size: {{ fonts.size }}pt;
+  color: {{ colors.fg.hex }};
+  // Почти непрозрачно даже со «стеклом»: под меню нет размытия, и обои
+  // или виджеты рабочего стола мешали бы читать.
+  background-color: rgba({{ colors.bg.rgb }}, {{ 0.3 + style.bg_alpha * 0.7 }});
+  border: {% if style.border > 1 %}{{ style.border }}{% else %}1{% endif %}px solid {{ colors.surface.hex }};
+  border-radius: {{ style.radius_box }}px;
+  padding: {{ style.pad + 6 }}px;
+  margin: 2px;
+}
+
+.head .title {
+  font-weight: bold;
+  color: {{ colors.accent.hex }};
+}
+
+.close {
+  color: {{ colors.muted.hex }};
+  padding: 0 4px;
+}
+
+.close:hover {
+  color: {{ colors.fg.hex }};
+}
+
+.section {
+  color: {{ colors.muted.hex }};
+  font-size: {{ fonts.size - 1 }}pt;
+  margin-top: 4px;
+}
+
+.dim {
+  color: {{ colors.muted.hex }};
+}
+
+.strong {
+  font-weight: bold;
+}
+
+.icon,
+.big-icon {
+  font-family: "{{ fonts.mono }}";
+  color: {{ colors.accent.hex }};
+  min-width: 22px;
+}
+
+.big-icon {
+  font-size: {{ fonts.size + 12 }}pt;
+}
+
+.value {
+  min-width: 40px;
+  color: {{ colors.muted.hex }};
+}
+
+// Ползунки: дорожка, заполненная часть, бегунок.
+.slider trough {
+  min-height: 6px;
+  border-radius: 999px;
+  background-color: {{ colors.surface.hex }};
+}
+
+.slider highlight {
+  border-radius: 999px;
+  background-color: {{ colors.accent.hex }};
+}
+
+.slider slider {
+  min-width: 14px;
+  min-height: 14px;
+  margin: -4px;
+  border-radius: 999px;
+  background-color: {{ colors.fg.hex }};
+}
+
+.item {
+  padding: 6px {{ style.pad }}px;
+  border-radius: {{ style.radius_chip_px }}px;
+}
+
+.item:hover,
+.link:hover,
+.calc-result:hover {
+  background-color: {{ colors.surface.hex }};
+}
+
+.item.active {
+  color: {{ colors.accent.hex }};
+  font-weight: bold;
+}
+
+.link {
+  padding: 6px {{ style.pad }}px;
+  border-radius: {{ style.radius_chip_px }}px;
+  border: 1px solid {{ colors.surface.hex }};
+  color: {{ colors.accent.hex }};
+}
+
+.toggle {
+  padding: 2px 12px;
+  border-radius: 999px;
+  background-color: {{ colors.surface.hex }};
+  color: {{ colors.muted.hex }};
+}
+
+.toggle.on {
+  background-color: {{ colors.accent.hex }};
+  color: {{ colors.bg.hex }};
+}
+
+.big-time {
+  font-size: {{ fonts.size + 18 }}pt;
+  font-weight: bold;
+  color: {{ colors.accent.hex }};
+}
+
+.calendar {
+  padding: 4px;
+}
+
+.calendar:selected {
+  color: {{ colors.bg.hex }};
+  background-color: {{ colors.accent.hex }};
+  border-radius: {{ style.radius_chip_px }}px;
+}
+
+.calendar.header {
+  color: {{ colors.accent.hex }};
+  font-weight: bold;
+}
+
+.calendar.button {
+  color: {{ colors.muted.hex }};
+}
+
+.calendar:indeterminate {
+  color: {{ colors.surface.hex }};
+}
+
+.calc-input {
+  font-family: "{{ fonts.mono }}";
+  font-size: {{ fonts.size + 3 }}pt;
+  padding: 8px {{ style.pad }}px;
+  border-radius: {{ style.radius_chip_px }}px;
+  background-color: {{ colors.surface.hex }};
+  caret-color: {{ colors.accent.hex }};
+}
+
+.calc-result {
+  font-family: "{{ fonts.mono }}";
+  font-size: {{ fonts.size + 6 }}pt;
+  font-weight: bold;
+  color: {{ colors.accent.hex }};
+  padding: 4px {{ style.pad }}px;
+  border-radius: {{ style.radius_chip_px }}px;
+}

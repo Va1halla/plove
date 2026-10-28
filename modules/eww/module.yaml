@@ -15,7 +15,8 @@ templates:
 autostart: true
 # `eww open` сам запускает фоновый процесс eww, если его ещё нет.
 reload: "pgrep -x eww >/dev/null && eww reload || eww open desktop"
-process: "eww"
+# Именно этот eww: у выпадающих меню (eww-popups) свой процесс eww.
+process: "eww open desktop"
 settings:
   - id: cards
     group: Рабочий стол
