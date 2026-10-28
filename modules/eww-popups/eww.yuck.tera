@@ -95,7 +95,10 @@
   :stacking "overlay"
   :focusable true
   {{ self::frame(id="calculator", title="Калькулятор") }}
-      (input :class "calc-input" :onchange "{{ pop }} calc {}")
+      ; :timeout — eww по умолчанию обрывает команду через 200 мс, а qalc
+      ; (особенно с курсами валют) думает дольше.
+      (input :class "calc-input" :timeout "3s" :onchange "{{ pop }} calc {}")
       (button :class "calc-result" :onclick "{{ pop }} copy"
         (label :xalign 1 :limit-width 32 :text {calc_result == "" ? " " : "= ${calc_result}"}))
-      (label :class "dim" :xalign 0 :wrap true :text "Щелчок по ответу — скопировать. Например: 2^10, sqrt(2), 5 USD to EUR"))))
+      (label :class "dim" :xalign 0 :text "Щелчок по ответу — скопировать.")
+      (label :class "dim" :xalign 0 :text "Например: 2^10, sqrt(2), 5 USD to EUR"))))

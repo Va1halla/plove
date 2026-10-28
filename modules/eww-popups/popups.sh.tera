@@ -140,6 +140,13 @@ mixer)
     ;;
 calc)
     expr=$2
+    # eww запускает calc на каждую букву, и ответы приходят вперемешку:
+    # на «2^10+1» мог остаться ответ для «2^10». Запоминаем последнее
+    # выражение и показываем ответ, только если оно не сменилось.
+    last="${XDG_RUNTIME_DIR:-/tmp}/plove-calc"
+    printf '%s' "$expr" > "$last"
+    sleep 0.1
+    [ "$(cat "$last")" = "$expr" ] || exit 0
     if [ -z "$expr" ]; then
         result=""
     elif command -v qalc >/dev/null 2>&1; then
@@ -152,7 +159,7 @@ calc)
             result=$(awk "BEGIN { print ($(printf '%s' "$expr" | tr ',' '.')) }" 2>/dev/null)
         fi
     fi
-    $E update "calc_result=$result"
+    [ "$(cat "$last")" = "$expr" ] && $E update "calc_result=$result"
     ;;
 copy)
     result=$($E get calc_result 2>/dev/null)
