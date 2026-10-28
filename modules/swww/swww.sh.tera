@@ -1,0 +1,27 @@
+#!/bin/sh
+# Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+# Ставит обои через swww: запускает демона, если его нет, ждёт, пока он
+# будет готов, и только потом показывает картинку. Первый аргумент —
+# анимация (по умолчанию без неё, как при входе в систему).
+# Ошибки пишутся в ~/.local/state/plove/swww.log.
+mkdir -p "$HOME/.local/state/plove"
+exec >>"$HOME/.local/state/plove/swww.log" 2>&1
+echo "--- $(date '+%F %T') $*"
+
+pgrep -x swww-daemon >/dev/null || setsid -f swww-daemon
+# На медленной машине (виртуалка без 3D) демон стартует дольше секунды.
+tries=0
+until swww query >/dev/null 2>&1; do
+    tries=$((tries + 1))
+    if [ "$tries" -ge 100 ]; then
+        echo "swww-daemon не ответил за 10 секунд"
+        exit 1
+    fi
+    sleep 0.1
+done
+{% if wallpaper -%}
+swww img '{{ wallpaper }}' --transition-type "${1:-none}" --transition-pos top-right \
+    --transition-fps 60 --transition-duration {{ options.transition_duration }}
+{%- else -%}
+swww clear {{ colors.bg.raw }}
+{%- endif %}

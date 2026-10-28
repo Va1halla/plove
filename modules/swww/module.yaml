@@ -2,15 +2,18 @@
 # обои меняются плавной волной, а не мгновенно. Альтернатива swaybg.
 id: swww
 role: wallpaper
-exec: "{% if wallpaper %}swww-daemon & sleep 1; swww img '{{ wallpaper }}' --transition-type none{% else %}swww-daemon & sleep 1; swww clear {{ colors.bg.raw }}{% endif %}"
+# Сам запуск — в скрипте swww.sh: он дожидается демона, а не спит наугад
+# секунду (в виртуалке демон бывает медленнее, и обои не ставились).
+exec: sh ~/.local/share/plove/swww.sh
 packages: [swww]
 compatible_with:
   compositor: [hyprland]
 autostart: true
 stops: [swaybg, hyprpaper]
-reload: >-
-  pgrep -x swww-daemon >/dev/null || { setsid -f swww-daemon >/dev/null 2>&1; sleep 1; };
-  {% if wallpaper %}swww img '{{ wallpaper }}' --transition-type {{ options.transition }} --transition-pos top-right --transition-fps 60 --transition-duration {{ options.transition_duration }}{% else %}swww clear {{ colors.bg.raw }}{% endif %}
+templates:
+  - src: swww.sh.tera
+    dest: ~/.local/share/plove/swww.sh
+reload: "sh ~/.local/share/plove/swww.sh {{ options.transition }}"
 # Фоновый процесс: plove остановит его, если модуль уберут из райса.
 process: "swww-daemon"
 settings:
