@@ -209,10 +209,11 @@ pub fn paru_works() -> bool {
 /// обновления pacman падает с «libalpm.so.15: cannot open shared object».
 /// Сборка занимает несколько минут; cargo makepkg поставит сам (-s).
 /// Если релиз paru ещё не поддерживает новую libalpm, пробуем paru-git.
+/// Вместе с paru-bin убираем и paru-bin-debug: его файлы мешают
+/// поставить отладочный пакет нового paru.
 pub fn paru_install_commands() -> Vec<Vec<String>> {
-    let build = "if pacman -Qq paru-bin >/dev/null 2>&1; then \
-                     sudo pacman -Rdd --noconfirm paru-bin; \
-                 fi; \
+    let build = "old=$(pacman -Qq paru-bin paru-bin-debug 2>/dev/null); \
+                 if [ -n \"$old\" ]; then sudo pacman -Rdd --noconfirm $old; fi; \
                  for pkg in paru paru-git; do \
                      rm -rf /tmp/plove-paru && \
                      git clone https://aur.archlinux.org/$pkg.git /tmp/plove-paru && \
