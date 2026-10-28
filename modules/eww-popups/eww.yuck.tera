@@ -4,7 +4,7 @@
 ; чтобы данные опрашивались, только пока меню открыто.
 {%- set pop = "sh ~/.local/share/plove/popups.sh" %}
 {%- macro frame(id, title) -%}
-(eventbox{% if options.close_on_leave and id != "calculator" %} :onhoverlost "sh ~/.local/share/plove/popups.sh close {{ id }}"{% endif %}
+(eventbox{% if options.close_on_leave %} :onhoverlost "sh ~/.local/share/plove/popups.sh close {{ id }}"{% endif %}
     (box :class "popup {{ id }}" :orientation "v" :space-evenly false :spacing 10 :width {{ options.width }}
       (box :class "head" :space-evenly false
         (label :class "title" :hexpand true :xalign 0 :text "{{ title }}")
@@ -14,8 +14,6 @@
 (defvar volume_open false)
 (defvar network_open false)
 (defvar clock_open false)
-(defvar calculator_open false)
-(defvar calc_result "")
 
 (defpoll audio :interval "1s" :run-while volume_open
   :initial '{"vol":0,"muted":false,"mic":0,"mic_muted":false,"has_mic":false}'
@@ -89,16 +87,3 @@
       (label :class "dim" :text clock_date)
       (calendar :class "calendar"))))
 
-(defwindow calculator
-  :monitor 0
-  :geometry (geometry :anchor "top right")
-  :stacking "overlay"
-  :focusable true
-  {{ self::frame(id="calculator", title="Калькулятор") }}
-      ; :timeout — eww по умолчанию обрывает команду через 200 мс, а qalc
-      ; (особенно с курсами валют) думает дольше.
-      (input :class "calc-input" :timeout "3s" :onchange "{{ pop }} calc {}")
-      (button :class "calc-result" :onclick "{{ pop }} copy"
-        (label :xalign 1 :limit-width 32 :text {calc_result == "" ? " " : "= ${calc_result}"}))
-      (label :class "dim" :xalign 0 :text "Щелчок по ответу — скопировать.")
-      (label :class "dim" :xalign 0 :text "Например: 2^10, sqrt(2), 5 USD to EUR"))))

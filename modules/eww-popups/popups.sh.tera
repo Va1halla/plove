@@ -4,10 +4,10 @@
 #   popups.sh toggle <меню> <якорь> <отступ>   — открыть под модулем или закрыть
 #   popups.sh close <меню>
 #   popups.sh audio | sinks | net | wifi        — JSON для eww
-#   popups.sh calc <выражение> | copy | connect <сеть> | mixer | netsettings
+#   popups.sh connect <сеть> | mixer | netsettings | wifi-toggle
 
 E="eww -c $HOME/.config/eww-popups"
-MENUS="volume network clock calculator"
+MENUS="volume network clock"
 
 json_escape() {
     printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
@@ -137,32 +137,5 @@ mixer)
     for app in wiremix pulsemixer alsamixer; do
         command -v $app >/dev/null 2>&1 && { in_terminal $app; exit 0; }
     done
-    ;;
-calc)
-    expr=$2
-    # eww запускает calc на каждую букву, и ответы приходят вперемешку:
-    # на «2^10+1» мог остаться ответ для «2^10». Запоминаем последнее
-    # выражение и показываем ответ, только если оно не сменилось.
-    last="${XDG_RUNTIME_DIR:-/tmp}/plove-calc"
-    printf '%s' "$expr" > "$last"
-    sleep 0.1
-    [ "$(cat "$last")" = "$expr" ] || exit 0
-    if [ -z "$expr" ]; then
-        result=""
-    elif command -v qalc >/dev/null 2>&1; then
-        result=$(qalc -t -- "$expr" 2>/dev/null | tail -1)
-    else
-        # Без qalc — только арифметика: никаких букв в awk.
-        if printf '%s' "$expr" | grep -q '[^0-9+*/%^()., -]'; then
-            result="?"
-        else
-            result=$(awk "BEGIN { print ($(printf '%s' "$expr" | tr ',' '.')) }" 2>/dev/null)
-        fi
-    fi
-    [ "$(cat "$last")" = "$expr" ] && $E update "calc_result=$result"
-    ;;
-copy)
-    result=$($E get calc_result 2>/dev/null)
-    [ -n "$result" ] && printf '%s' "$result" | wl-copy
     ;;
 esac

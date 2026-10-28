@@ -177,12 +177,7 @@ sh ~/.local/share/plove/popups.sh toggle {{ menu }} '{% if v == "center" and h =
     },
     "custom/calculator": {
       "format": "{{ self::label(compact=vertical, glyph="󰃬", word="calc", value="") | trim }}",
-{%- if popups %}
-      "on-click": {{ self::popup(menu="calculator", m="calculator", left=left, center=center, position=position) | json_encode() }},
-{%- else %}
-{%- set qalc = run_in ~ " qalc" %}
-      "on-click": {{ qalc | trim | json_encode() }},
-{%- endif %}
+      "on-click": "sh ~/.local/share/plove/calc.sh",
       "tooltip": false
     },
     "custom/power": {

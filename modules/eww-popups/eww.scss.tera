@@ -91,8 +91,7 @@ window {
 }
 
 .item:hover,
-.link:hover,
-.calc-result:hover {
+.link:hover {
   background-color: {{ colors.surface.hex }};
 }
 
@@ -149,20 +148,3 @@ window {
   color: {{ colors.surface.hex }};
 }
 
-.calc-input {
-  font-family: "{{ fonts.mono }}";
-  font-size: {{ fonts.size + 3 }}pt;
-  padding: 8px {{ style.pad }}px;
-  border-radius: {{ style.radius_chip_px }}px;
-  background-color: {{ colors.surface.hex }};
-  caret-color: {{ colors.accent.hex }};
-}
-
-.calc-result {
-  font-family: "{{ fonts.mono }}";
-  font-size: {{ fonts.size + 6 }}pt;
-  font-weight: bold;
-  color: {{ colors.accent.hex }};
-  padding: 4px {{ style.pad }}px;
-  border-radius: {{ style.radius_chip_px }}px;
-}
