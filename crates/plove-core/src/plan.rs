@@ -487,12 +487,16 @@ fn previous_modules(env: &Env) -> Vec<String> {
 fn stop_command(name: &str) -> String {
     // Linux хранит имя процесса только до 15 символов, поэтому длинные
     // имена и имена с аргументами ищем по всей командной строке.
-    let flag = if name.len() > 15 || name.contains(' ') {
-        "-f"
+    if name.len() > 15 || name.contains(' ') {
+        // Команда запускается через `sh -c`, и в командной строке самого sh
+        // тоже есть это имя: pkill -f убивал бы свой sh, и перезагрузка
+        // считалась несработавшей. «[p]olkit» находит «polkit», но не себя.
+        let mut chars = name.chars();
+        let first = chars.next().unwrap_or_default();
+        format!("pkill -f '[{first}]{}'; true", chars.as_str())
     } else {
-        "-x"
-    };
-    format!("pkill {flag} '{name}'; true")
+        format!("pkill -x '{name}'; true")
+    }
 }
 
 /// Сочетание клавиш из строки `bind`: «$mod SHIFT, E, exec, …» → «$MOD+SHIFT+E».

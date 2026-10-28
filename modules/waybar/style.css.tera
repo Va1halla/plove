@@ -40,6 +40,17 @@ window#waybar {
 }
 {%- endif %}
 
+/* Вертикальная панель: отступы сверху и снизу, а не по бокам, иначе
+   крайние модули прилипают к краю панели. */
+window#waybar.left .modules-left,
+window#waybar.left .modules-center,
+window#waybar.left .modules-right,
+window#waybar.right .modules-left,
+window#waybar.right .modules-center,
+window#waybar.right .modules-right {
+    padding: {{ style.pad_small }}px 0;
+}
+
 #workspaces button {
     padding: 0 {{ style.pad }}px;
     margin: {{ (style.pad_small / 2) | round(method="floor") }}px 1px;

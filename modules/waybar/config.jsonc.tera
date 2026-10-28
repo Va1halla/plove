@@ -69,6 +69,8 @@
 {%- if side == "l" %}{% set list = left %}{% set glyph = style.sep_left %}
 {%- elif side == "c" %}{% set list = center %}{% set glyph = style.sep_center %}
 {%- else %}{% set list = right %}{% set glyph = style.sep_right %}{% endif %}
+{#- Стрелки, наклоны и линии смотрят вбок; на вертикальной панели — черта поперёк. #}
+{%- if vertical and style.separators != "dots" %}{% set glyph = "─" %}{% endif %}
 {%- if style.separators != "none" %}{% for m in list %}{% if not loop.last %}
 {#- Разделитель перед list[n]. Если рядом модули, которые waybar прячет,
     разделитель показывается, только когда с обеих сторон что-то видно. -#}
@@ -94,7 +96,7 @@
       "persistent-workspaces": { "*": {{ options.workspace_count }} }
 {%- endif %}
     },
-    "hyprland/window": { "max-length": {{ options.window_length }}, "separate-outputs": true },
+    "hyprland/window": { "max-length": {{ options.window_length }}, "separate-outputs": true{% if vertical %}, "rotate": 90{% endif %} },
     "hyprland/language": { "format": "{{ self::label(compact=vertical, glyph="󰌌", word="", value="{short}") }}" },
     "clock": {
 {%- if options.clock_seconds %}
