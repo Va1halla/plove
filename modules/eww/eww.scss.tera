@@ -35,6 +35,8 @@ window {
 .date {
   font-size: {{ (options.clock_size / 5) | round }}px;
   margin-top: -8px;
+  /* Дата цвета текста: на светлых обоях без тени её не видно. */
+  text-shadow: 0 1px 6px rgba({{ colors.bg.rgb }}, 0.9), 0 0 2px rgba({{ colors.bg.rgb }}, 0.6);
 }
 
 .ring {

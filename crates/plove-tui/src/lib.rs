@@ -25,9 +25,10 @@ use plove_core::check::{self, Check, Level, LiveProbe, Probe};
 use std::collections::BTreeMap;
 
 use plove_core::modules::{show_value, Registry, Setting, SettingKind};
+use plove_core::palette;
 use plove_core::plan::{self, FileStatus, Plan};
 use plove_core::presets;
-use plove_core::spec::{Color as SpecColor, RiceSpec};
+use plove_core::spec::{Color as SpecColor, RiceSpec, Wallpaper};
 use plove_core::system::Env;
 use plove_preview::Pixmap;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
@@ -234,6 +235,48 @@ struct Settings {
     /// Индексы вариантов в STYLE_TOKENS.
     style: [usize; 7],
     programs: Vec<Program>,
+    /// Подбор цветов из обоев, если обои райса — картинка.
+    colors: Option<ColorPick>,
+}
+
+/// Как подбирать цвета из картинки: строки «Акцент», «Фон», «Терминал»
+/// в конце экрана. Палитра пересчитывается, только если их тронули:
+/// иначе поправленные руками цвета своего райса не потеряются.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ColorPick {
+    /// Уменьшенная картинка: пересчёт по ней мгновенный.
+    pixels: Vec<SpecColor>,
+    /// Индексы в palette::ACCENTS, BACKGROUNDS, TERMINALS.
+    choice: [usize; 3],
+    touched: bool,
+}
+
+impl ColorPick {
+    const ROWS: usize = 3;
+
+    /// Для райса с обоями из файла; иначе (или если файла нет) — None.
+    fn for_spec(spec: &RiceSpec) -> Option<ColorPick> {
+        let Some(Wallpaper::File(path)) = &spec.theme.wallpaper else {
+            return None;
+        };
+        let path = match path.strip_prefix("~/") {
+            Some(rest) => std::path::PathBuf::from(std::env::var_os("HOME")?).join(rest),
+            None => std::path::PathBuf::from(path),
+        };
+        Some(ColorPick {
+            pixels: palette::pixels(&path).ok()?,
+            choice: [0; 3],
+            touched: false,
+        })
+    }
+
+    fn options(&self) -> palette::Options {
+        palette::Options {
+            accent: palette::Accent::from_index(self.choice[0]),
+            background: palette::Background::from_index(self.choice[1]),
+            terminal: palette::Terminal::from_index(self.choice[2]),
+        }
+    }
 }
 
 impl Settings {
@@ -285,11 +328,12 @@ impl Settings {
             position: POSITIONS.iter().position(|p| *p == position).unwrap_or(0),
             style: indexes,
             programs,
+            colors: ColorPick::for_spec(spec),
         }
     }
 
     fn len(&self) -> usize {
-        Self::SWITCHES + self.programs.len()
+        Self::SWITCHES + self.programs.len() + self.colors.as_ref().map_or(0, |_| ColorPick::ROWS)
     }
 
     /// Записать настройки в райс.
@@ -312,6 +356,9 @@ impl Settings {
                 spec.components.insert(program.role.to_string(), id.clone());
             }
         }
+        if let Some(colors) = self.colors.as_ref().filter(|c| c.touched) {
+            spec.theme.palette = palette::from_pixels_with(&colors.pixels, colors.options());
+        }
     }
 
     /// Поменять значение строки: → вперёд по списку, ← назад.
@@ -331,9 +378,22 @@ impl Settings {
                 let i = r - 2;
                 self.style[i] = cycle(self.style[i], STYLE_TOKENS[i].2.len());
             }
-            _ => {
+            r if r < Self::SWITCHES + self.programs.len() => {
                 let program = &mut self.programs[row - Self::SWITCHES];
                 program.current = cycle(program.current, program.choices.len());
+            }
+            r => {
+                let Some(colors) = &mut self.colors else {
+                    return;
+                };
+                let i = r - Self::SWITCHES - self.programs.len();
+                let n = [
+                    palette::ACCENTS.len(),
+                    palette::BACKGROUNDS.len(),
+                    palette::TERMINALS.len(),
+                ][i];
+                colors.choice[i] = cycle(colors.choice[i], n);
+                colors.touched = true;
             }
         }
     }
@@ -356,6 +416,12 @@ impl Settings {
             let id = &program.choices[program.current];
             let value = if id.is_empty() { "нет" } else { id.as_str() };
             rows.push((program.label, value.to_string()));
+        }
+        if let Some(colors) = &self.colors {
+            let [a, b, t] = colors.choice;
+            rows.push(("Акцент", palette::ACCENTS[a].1.to_string()));
+            rows.push(("Фон", palette::BACKGROUNDS[b].1.to_string()));
+            rows.push(("Цвета терминала", palette::TERMINALS[t].1.to_string()));
         }
         rows
     }
@@ -517,6 +583,7 @@ impl App {
                 position: 0,
                 style: [0; 7],
                 programs: Vec::new(),
+                colors: None,
             },
             setting_row: 0,
             tune: Vec::new(),
@@ -1075,7 +1142,7 @@ impl App {
             };
             lines.push(Line::from(vec![
                 Span::raw(if selected { " › " } else { "   " }),
-                Span::styled(format!("{name:<14}"), style),
+                Span::styled(format!("{name:<15}"), style),
                 Span::raw("  ◀ "),
                 Span::styled(value.clone(), Style::new().cyan()),
                 Span::raw(" ▶"),
@@ -1372,6 +1439,37 @@ mod tests {
         settings.apply_to(&mut spec);
         assert_eq!(spec.components["launcher"], "rofi");
         assert!(!spec.components.contains_key("widgets"));
+    }
+
+    /// Райс из картинки: строки подбора цветов пересчитывают палитру,
+    /// а пока их не трогали, палитра остаётся как есть.
+    #[test]
+    fn colors_from_picture_can_be_tuned() {
+        let registry = Registry::builtin().unwrap();
+        let mut spec = presets::get("nord").unwrap().unwrap();
+        let mut settings = Settings::from_spec(&spec, &registry);
+        assert!(settings.colors.is_none());
+        let pixels = [
+            vec![SpecColor::parse("#3fa9c9").unwrap(); 800],
+            vec![SpecColor::parse("#123c48").unwrap(); 100],
+            vec![SpecColor::parse("#9c3b2c").unwrap(); 20],
+        ]
+        .concat();
+        settings.colors = Some(ColorPick {
+            pixels,
+            choice: [0; 3],
+            touched: false,
+        });
+        let before = spec.theme.palette.accent;
+        settings.apply_to(&mut spec);
+        assert_eq!(spec.theme.palette.accent, before);
+
+        let accent_row = settings.len() - ColorPick::ROWS;
+        settings.change(accent_row, true);
+        assert_eq!(settings.rows()[accent_row].1, "контрастный");
+        settings.apply_to(&mut spec);
+        let red = spec.theme.palette.accent;
+        assert!(red.r > red.b, "{}", red.hex());
     }
 
     /// Числа двигаются шагом и не выходят за границы, списки идут по кругу.
