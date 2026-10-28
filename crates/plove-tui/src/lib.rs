@@ -44,7 +44,12 @@ use serde_yaml::Value;
 /// Чем закончился мастер.
 pub enum Outcome {
     /// Пользователь подтвердил план: применить этот райс.
-    Apply(Box<RiceSpec>),
+    /// `from_picture` — райс собран в мастере из своей картинки, его
+    /// стоит сохранить в файл, чтобы потом поменять (`plove edit`).
+    Apply {
+        spec: Box<RiceSpec>,
+        from_picture: bool,
+    },
     Quit,
 }
 
@@ -93,7 +98,12 @@ fn event_loop(
         match app.handle(key.code, registry, env) {
             Action::None => {}
             Action::Quit => return Ok(Outcome::Quit),
-            Action::Apply(spec) => return Ok(Outcome::Apply(spec)),
+            Action::Apply(spec) => {
+                return Ok(Outcome::Apply {
+                    spec,
+                    from_picture: app.picked,
+                })
+            }
             Action::Fix => {
                 // Исправления спрашивают пароль sudo, поэтому временно
                 // выходим из TUI в обычный терминал.
@@ -390,6 +400,72 @@ struct TuneModule {
     values: Vec<Value>,
 }
 
+/// Окно выбора своей картинки: путь вручную или из найденных.
+struct ImagePick {
+    input: String,
+    found: Vec<std::path::PathBuf>,
+    selected: usize,
+    error: Option<String>,
+}
+
+impl ImagePick {
+    fn new(env: &Env) -> ImagePick {
+        ImagePick {
+            input: String::new(),
+            found: find_images(env),
+            selected: 0,
+            error: None,
+        }
+    }
+
+    /// Что выбрано: путь из строки ввода, а если она пуста — из списка.
+    fn path(&self, env: &Env) -> Option<std::path::PathBuf> {
+        let typed = self.input.trim();
+        if typed.is_empty() {
+            self.found.get(self.selected).cloned()
+        } else {
+            Some(env.expand(typed))
+        }
+    }
+}
+
+/// Картинки в обычных местах: Pictures, Downloads, wallpapers (до 3 уровней).
+fn find_images(env: &Env) -> Vec<std::path::PathBuf> {
+    fn walk(dir: &std::path::Path, depth: usize, out: &mut Vec<std::path::PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() && depth > 0 {
+                walk(&path, depth - 1, out);
+            } else if path.extension().is_some_and(|e| {
+                matches!(
+                    e.to_string_lossy().to_lowercase().as_str(),
+                    "png" | "jpg" | "jpeg" | "webp"
+                )
+            }) {
+                out.push(path);
+            }
+        }
+    }
+    let mut found = Vec::new();
+    for dir in [
+        "~/Pictures",
+        "~/Изображения",
+        "~/Downloads",
+        "~/Загрузки",
+        "~/wallpapers",
+        "~/Wallpapers",
+    ] {
+        walk(&env.expand(dir), 3, &mut found);
+    }
+    found.sort();
+    found.dedup();
+    found.truncate(300);
+    found
+}
+
 struct App {
     step: Step,
     checks: Vec<Check>,
@@ -419,6 +495,10 @@ struct App {
     image: Option<StatefulProtocol>,
     /// Первый в списке — райс из файла пользователя.
     own: bool,
+    /// Выбор своей картинки: открыт ли и что в нём.
+    pick: Option<ImagePick>,
+    /// Первый в списке райс собран из своей картинки.
+    picked: bool,
     /// Песочница (`--root`): система не меняется, так что проблемы
     /// из проверки не мешают пройти дальше.
     sandbox: bool,
@@ -450,12 +530,58 @@ impl App {
             picker: None,
             image: None,
             own: false,
+            pick: None,
+            picked: false,
             sandbox: false,
         })
     }
 
     fn selected_rice(&self) -> &RiceSpec {
-        &self.presets[self.rice.selected().unwrap_or(0)]
+        let i = self.rice.selected().unwrap_or(0);
+        &self.presets[i.min(self.presets.len() - 1)]
+    }
+
+    /// В списке райсов выбран последний пункт — «Своя картинка».
+    fn on_picture_item(&self) -> bool {
+        self.rice.selected() == Some(self.presets.len())
+    }
+
+    /// Окно выбора картинки: набрать путь или выбрать из найденных.
+    fn handle_pick(&mut self, key: KeyCode, registry: &Registry, env: &Env) {
+        let Some(pick) = &mut self.pick else {
+            return;
+        };
+        match key {
+            KeyCode::Esc => self.pick = None,
+            KeyCode::Up => pick.selected = pick.selected.saturating_sub(1),
+            KeyCode::Down => {
+                pick.selected = (pick.selected + 1).min(pick.found.len().saturating_sub(1))
+            }
+            KeyCode::Backspace => {
+                pick.input.pop();
+            }
+            KeyCode::Char(c) => pick.input.push(c),
+            KeyCode::Enter => {
+                let Some(path) = pick.path(env) else {
+                    pick.error = Some("Наберите путь к картинке.".into());
+                    return;
+                };
+                match presets::from_image(&path) {
+                    Ok(spec) => {
+                        self.pick = None;
+                        self.presets.insert(0, spec);
+                        self.picked = true;
+                        self.own = false;
+                        self.rice.select(Some(0));
+                        self.settings = Settings::from_spec(self.selected_rice(), registry);
+                        self.setting_row = 0;
+                        self.step = Step::Settings;
+                    }
+                    Err(e) => pick.error = Some(format!("{e:#}")),
+                }
+            }
+            _ => {}
+        }
     }
 
     /// Выбранный райс с применёнными настройками.
@@ -511,19 +637,36 @@ impl App {
 
     /// Обновить превью под то, что сейчас на экране.
     fn refresh_preview(&mut self, registry: &Registry, env: &Env) {
-        let spec = match self.step {
-            Step::Rice => self.selected_rice().clone(),
-            Step::Settings | Step::Tune => self.final_spec(),
-            _ => return,
-        };
-        let key = serde_yaml::to_string(&spec).unwrap_or_default();
-        if self.preview.as_ref().is_some_and(|(k, _)| *k == key) {
-            return;
+        // Пока выбирают картинку, показываем её саму: райса из неё ещё нет.
+        if let Some(pick) = &self.pick {
+            let path = pick.path(env);
+            let key = format!("картинка {path:?}");
+            if self.preview.as_ref().is_some_and(|(k, _)| *k == key) {
+                return;
+            }
+            self.preview = path
+                .and_then(|p| plove_preview::wallpaper_only(&p).ok())
+                .map(|image| (key, image));
+        } else {
+            let spec = match self.step {
+                Step::Rice if self.on_picture_item() => {
+                    self.preview = None;
+                    self.image = None;
+                    return;
+                }
+                Step::Rice => self.selected_rice().clone(),
+                Step::Settings | Step::Tune => self.final_spec(),
+                _ => return,
+            };
+            let key = serde_yaml::to_string(&spec).unwrap_or_default();
+            if self.preview.as_ref().is_some_and(|(k, _)| *k == key) {
+                return;
+            }
+            // Не вышло (например, нет файла обоев) — просто без картинки.
+            self.preview = plove_preview::render(&spec, registry, env)
+                .ok()
+                .map(|image| (key, image));
         }
-        // Не вышло (например, нет файла обоев) — просто без картинки.
-        self.preview = plove_preview::render(&spec, registry, env)
-            .ok()
-            .map(|image| (key, image));
         self.image = match (&self.picker, &self.preview) {
             (Some(picker), Some((_, pixmap))) => {
                 // Превью непрозрачное, поэтому премультиплицированные
@@ -558,6 +701,10 @@ impl App {
     }
 
     fn handle_key(&mut self, key: KeyCode, registry: &Registry, env: &Env) -> Action {
+        if self.pick.is_some() {
+            self.handle_pick(key, registry, env);
+            return Action::None;
+        }
         if key == KeyCode::Char('q') {
             return Action::Quit;
         }
@@ -577,9 +724,13 @@ impl App {
                 KeyCode::Up | KeyCode::Char('k') => self.rice.select_previous(),
                 KeyCode::Down | KeyCode::Char('j') => {
                     // select_next не знает длину списка, поэтому ограничиваем сами.
-                    let last = self.presets.len() - 1;
+                    // Последний пункт — «Своя картинка».
+                    let last = self.presets.len();
                     let next = self.rice.selected().map_or(0, |i| (i + 1).min(last));
                     self.rice.select(Some(next));
+                }
+                KeyCode::Enter | KeyCode::Right if self.on_picture_item() => {
+                    self.pick = Some(ImagePick::new(env));
                 }
                 KeyCode::Enter | KeyCode::Right => {
                     self.settings = Settings::from_spec(self.selected_rice(), registry);
@@ -645,7 +796,7 @@ impl App {
             },
             Step::Plan => match key {
                 KeyCode::Enter if self.plan.is_some() => {
-                    return Action::Apply(Box::new(self.final_spec()))
+                    return Action::Apply(Box::new(self.final_spec()));
                 }
                 _ if back => self.step = Step::Tune,
                 _ => {}
@@ -705,6 +856,9 @@ impl App {
                 " есть проблемы, которые нужно исправить вручную · f исправить автоматически · q выйти"
             }
             Step::Checks => " Enter дальше · f исправить автоматически · q выйти",
+            Step::Rice if self.pick.is_some() => {
+                " ↑↓ выбрать картинку · Enter собрать райс · Esc отмена"
+            }
             Step::Rice => " ↑↓ выбрать · Enter дальше · Esc назад · q выйти",
             Step::Settings => " ↑↓ выбрать · ←→ или Пробел изменить · Enter дальше · Esc назад",
             Step::Tune if self.tune_inside => {
@@ -749,8 +903,10 @@ impl App {
             .enumerate()
             .map(|(i, spec)| match i {
                 0 if self.own => ListItem::new(format!(" {} (ваш)", spec.name)).cyan(),
+                0 if self.picked => ListItem::new(format!(" {} (своя)", spec.name)).cyan(),
                 _ => ListItem::new(format!(" {}", spec.name)),
             })
+            .chain(std::iter::once(ListItem::new(" + Своя картинка").green()))
             .collect();
         let list = List::new(items)
             .block(Block::bordered().title(" Райсы "))
@@ -758,6 +914,10 @@ impl App {
             .highlight_symbol("›");
         frame.render_stateful_widget(list, list_area, &mut self.rice);
 
+        if self.pick.is_some() || self.on_picture_item() {
+            self.draw_pick(frame, info_area);
+            return;
+        }
         let spec = self.selected_rice();
         let p = &spec.theme.palette;
         let g = &spec.theme.geometry;
@@ -802,6 +962,59 @@ impl App {
             Layout::vertical([Constraint::Length(lines.len() as u16), Constraint::Min(0)])
                 .areas(inner);
         frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), text_area);
+        self.draw_preview(frame, picture_area);
+    }
+
+    /// Свой райс из картинки: подсказка, а если окно выбора открыто —
+    /// строка ввода, найденные картинки и сама выбранная картинка.
+    fn draw_pick(&mut self, frame: &mut Frame, area: Rect) {
+        let block = Block::bordered().title(" Своя картинка ");
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+        let Some(pick) = &self.pick else {
+            let text = vec![
+                Line::raw(""),
+                Line::raw(" Райс вокруг ваших обоев.").bold(),
+                Line::raw(""),
+                Line::raw(" plove возьмёт цвета из картинки: фон, текст, акцент и 16 цветов"),
+                Line::raw(" терминала. Стиль, программы и тонкие настройки — на следующих шагах."),
+                Line::raw(" Готовые райсы при этом не используются."),
+                Line::raw(""),
+                Line::raw(" Enter — выбрать картинку (PNG, JPEG, WebP).").cyan(),
+            ];
+            frame.render_widget(Paragraph::new(text).wrap(Wrap { trim: false }), inner);
+            return;
+        };
+        let [text_area, picture_area] =
+            Layout::vertical([Constraint::Percentage(50), Constraint::Min(6)]).areas(inner);
+        let mut lines = vec![
+            Line::from(vec![
+                Span::raw(" Путь: "),
+                Span::styled(format!("{}▏", pick.input), Style::new().bold()),
+            ]),
+            Line::raw(" Наберите путь (можно с ~) или выберите ↑↓ из найденных.").dark_gray(),
+        ];
+        if let Some(error) = &pick.error {
+            lines.push(Line::raw(format!(" {error}")).red());
+        }
+        lines.push(Line::raw(""));
+        if pick.found.is_empty() {
+            lines.push(
+                Line::raw(" В ~/Pictures, ~/Downloads и ~/wallpapers картинок нет.").dark_gray(),
+            );
+        }
+        let shown = text_area.height.saturating_sub(lines.len() as u16) as usize;
+        let start = pick.selected.saturating_sub(shown.saturating_sub(1));
+        for (i, path) in pick.found.iter().enumerate().skip(start).take(shown) {
+            let typed = !pick.input.trim().is_empty();
+            let name = env_display(path);
+            lines.push(if i == pick.selected && !typed {
+                Line::styled(format!(" › {name}"), Style::new().reversed().bold())
+            } else {
+                Line::raw(format!("   {name}"))
+            });
+        }
+        frame.render_widget(Paragraph::new(lines), text_area);
         self.draw_preview(frame, picture_area);
     }
 
@@ -1261,5 +1474,54 @@ mod tests {
         app.handle(KeyCode::Down, &registry, &env);
         app.handle(KeyCode::Right, &registry, &env);
         assert_ne!(app.preview.as_ref().unwrap().0, before);
+    }
+
+    /// Свой райс из картинки: найти её в ~/Pictures, собрать райс и
+    /// пройти мастер до конца.
+    #[test]
+    fn rice_from_own_picture() {
+        let home = std::env::temp_dir().join("plove-tui-picture");
+        let _ = std::fs::remove_dir_all(&home);
+        std::fs::create_dir_all(home.join("Pictures")).unwrap();
+        let palette = presets::get("gruvbox").unwrap().unwrap().theme.palette;
+        let png = plove_core::wallpaper::generate_png(plove_core::spec::Pattern::Waves, &palette)
+            .unwrap();
+        std::fs::write(home.join("Pictures/sunset.png"), png).unwrap();
+        let env = Env::sandbox(home.clone());
+        let registry = Registry::builtin().unwrap();
+        let mut app = App::new(&Healthy).unwrap();
+        app.show_preview = true;
+        let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+
+        app.handle(KeyCode::Enter, &registry, &env);
+        // Вниз до последнего пункта — «Своя картинка».
+        for _ in 0..app.presets.len() {
+            app.handle(KeyCode::Down, &registry, &env);
+        }
+        assert!(app.on_picture_item());
+        app.handle(KeyCode::Enter, &registry, &env);
+        let pick = app.pick.as_ref().unwrap();
+        assert_eq!(pick.found, vec![home.join("Pictures/sunset.png")]);
+        // Пока выбирают, в превью сама картинка.
+        assert!(app.preview.is_some());
+        terminal.draw(|f| app.draw(f)).unwrap();
+        // q в окне выбора — просто буква пути, а не выход.
+        assert!(matches!(
+            app.handle(KeyCode::Char('q'), &registry, &env),
+            Action::None
+        ));
+        app.handle(KeyCode::Backspace, &registry, &env);
+
+        app.handle(KeyCode::Enter, &registry, &env);
+        assert_eq!(app.step, Step::Settings);
+        assert!(app.picked);
+        let spec = app.final_spec();
+        assert_eq!(spec.name, "sunset");
+        assert_eq!(spec.components["wallpaper"], "swaybg");
+        for key in [KeyCode::Enter, KeyCode::Enter] {
+            terminal.draw(|f| app.draw(f)).unwrap();
+            app.handle(key, &registry, &env);
+        }
+        assert!(app.plan.is_some(), "{:?}", app.error);
     }
 }

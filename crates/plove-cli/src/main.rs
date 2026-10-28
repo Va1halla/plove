@@ -12,10 +12,9 @@ use clap::{Parser, Subcommand};
 use plove_core::apply::{self, ApplyOptions};
 use plove_core::check::{self, Check, Level, LiveProbe};
 use plove_core::modules::Registry;
-use plove_core::palette;
 use plove_core::plan::{self, FileStatus, Plan};
 use plove_core::presets;
-use plove_core::spec::{Color, RiceSpec, Wallpaper};
+use plove_core::spec::{Color, RiceSpec};
 use plove_core::state;
 use plove_core::system::Env;
 
@@ -86,9 +85,10 @@ enum Command {
     New {
         /// Обои: PNG, JPEG или WebP
         image: PathBuf,
-        /// Встроенный райс, из которого берутся шрифты, отступы и панель
-        #[arg(long, default_value = "tokyo-night")]
-        base: String,
+        /// Взять шрифты, стиль и программы из готового райса. Без него —
+        /// нейтральная основа, стиль потом выбирается в мастере (plove edit)
+        #[arg(long)]
+        base: Option<String>,
         /// Куда сохранить райс (по умолчанию <имя картинки>.yaml)
         #[arg(short, long, value_name = "ФАЙЛ")]
         output: Option<PathBuf>,
@@ -254,7 +254,7 @@ fn run(cli: Cli) -> Result<()> {
             image,
             base,
             output,
-        } => new_from_wallpaper(&image, &base, output)?,
+        } => new_from_wallpaper(&image, base.as_deref(), output)?,
         Command::Doctor { fix } => doctor(fix)?,
         Command::Widget { rice, id } => {
             let spec = load_rice(&rice)?;
@@ -441,33 +441,17 @@ fn print_check(c: &Check) {
 /// Райс по имени встроенного или по пути к файлу.
 /// Если файл с таким именем есть, он важнее встроенного райса.
 /// `plove new`: взять готовый райс и перекрасить его в цвета картинки.
-fn new_from_wallpaper(image: &Path, base: &str, output: Option<PathBuf>) -> Result<()> {
-    let image = image
-        .canonicalize()
-        .with_context(|| format!("картинка {} не найдена", image.display()))?;
-    let palette = palette::from_image(&image)?;
-    let name = image
-        .file_stem()
-        .map(|stem| stem.to_string_lossy().to_lowercase().replace(' ', "-"))
-        .unwrap_or_else(|| "my-rice".into());
-
-    let mut spec = load_rice(base)?;
-    spec.description = Some(format!(
-        "Цвета из обоев {}, остальное из {}",
-        image.display(),
-        spec.name
-    ));
-    spec.name = name;
-    spec.theme.palette = palette;
-    // В райсе путь лучше хранить через «~/»: так файл можно перенести
-    // на другую машину с другим именем пользователя.
-    let home = PathBuf::from(std::env::var_os("HOME").unwrap_or_default());
-    let wallpaper = match image.strip_prefix(&home) {
-        Ok(rest) if !home.as_os_str().is_empty() => format!("~/{}", rest.display()),
-        _ => image.display().to_string(),
-    };
-    spec.theme.wallpaper = Some(Wallpaper::File(wallpaper));
-    spec.validate()?;
+fn new_from_wallpaper(image: &Path, base: Option<&str>, output: Option<PathBuf>) -> Result<()> {
+    let mut spec = presets::from_image(image)?;
+    if let Some(base) = base {
+        let mut from = load_rice(base)?;
+        from.description = Some(format!("Цвета из обоев, остальное из {}", from.name));
+        from.name = spec.name;
+        from.theme.palette = spec.theme.palette;
+        from.theme.wallpaper = spec.theme.wallpaper;
+        from.validate()?;
+        spec = from;
+    }
 
     let output = output.unwrap_or_else(|| PathBuf::from(format!("{}.yaml", spec.name)));
     let header = format!(
@@ -485,6 +469,10 @@ fn new_from_wallpaper(image: &Path, base: &str, output: Option<PathBuf>) -> Resu
     let ansi: String = p.ansi.iter().map(|&c| swatch(c)).collect();
     println!("  терминал {ansi}");
     println!("\nРайс сохранён в {}. Дальше:", output.display());
+    println!(
+        "  plove edit {}      # стиль, программы и настройки в мастере",
+        output.display()
+    );
     println!("  plove preview {}   # посмотреть", output.display());
     println!("  plove apply {}     # применить", output.display());
     Ok(())
@@ -501,11 +489,21 @@ fn wizard(registry: &Registry, env: &Env, file: Option<&Path>) -> Result<()> {
         Some(file) if file.exists() => Some(RiceSpec::load(file)?),
         _ => None,
     };
-    let plove_tui::Outcome::Apply(spec) = plove_tui::run(registry, env, own)? else {
+    let plove_tui::Outcome::Apply { spec, from_picture } = plove_tui::run(registry, env, own)?
+    else {
         return Ok(());
     };
     if let Some(file) = file {
         save_rice(&spec, file)?;
+    } else if from_picture {
+        // Райс из своей картинки есть только в мастере: сохраняем его,
+        // чтобы потом поменять (`plove edit`) или применить снова.
+        let file = env.expand(&format!("~/.config/plove/rices/{}.yaml", spec.name));
+        if let Some(dir) = file.parent() {
+            std::fs::create_dir_all(dir)
+                .with_context(|| format!("не удалось создать {}", dir.display()))?;
+        }
+        save_rice(&spec, &file)?;
     }
     let plan = plan::build(*spec, registry, env)?;
     print_plan(&plan, env);

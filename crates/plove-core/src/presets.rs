@@ -41,3 +41,76 @@ pub fn get(name: &str) -> Result<Option<RiceSpec>> {
     // into_iter().find(..) — это LINQ FirstOrDefault.
     Ok(all()?.into_iter().find(|spec| spec.name == name))
 }
+
+/// Основа для райса со своими обоями: ни один из готовых райсов, а
+/// нейтральный набор программ из официальных репозиториев. Цвета и
+/// картинку подставляет [`from_wallpaper`], стиль выбирается в мастере.
+const BLANK: &str = r##"
+version: 1
+name: blank
+theme:
+  palette: { bg: "#000000", fg: "#ffffff", accent: "#ffffff" }
+  fonts: { ui: "Inter", mono: "JetBrainsMono Nerd Font", size: 11 }
+  geometry: { gaps: 10, border: 2, radius: 10, opacity: 0.93 }
+components:
+  compositor: hyprland
+  bar: waybar
+  terminal: kitty
+  wallpaper: swaybg
+  launcher: fuzzel
+  notifications: mako
+  power: power-menu
+  lock: hyprlock
+  idle: hypridle
+  screenshot: grim
+  clipboard: cliphist
+  polkit: hyprpolkitagent
+  gtk: gtk
+  qt: qt
+  files: thunar
+  shell: zsh
+  fetch: fastfetch
+  monitor: btop
+  editor: neovim
+overrides:
+  hyprland: { kb_layout: "us,ru" }
+"##;
+
+/// Райс вокруг своей картинки: палитра из неё, остальное из [`BLANK`].
+/// `wallpaper` — путь к картинке, лучше через `~/`, чтобы райс переносился.
+pub fn from_wallpaper(
+    name: &str,
+    wallpaper: &str,
+    palette: crate::spec::Palette,
+) -> Result<RiceSpec> {
+    let mut spec = RiceSpec::from_yaml(BLANK).context("ошибка в основе райса")?;
+    spec.name = name.to_string();
+    spec.description = Some(format!("Свой райс: цвета из {wallpaper}"));
+    spec.theme.palette = palette;
+    spec.theme.wallpaper = Some(crate::spec::Wallpaper::File(wallpaper.to_string()));
+    spec.validate()?;
+    Ok(spec)
+}
+
+/// Райс из картинки целиком: цвета, имя по имени файла, путь через `~/`.
+pub fn from_image(image: &std::path::Path) -> Result<RiceSpec> {
+    let image = image
+        .canonicalize()
+        .with_context(|| format!("картинка {} не найдена", image.display()))?;
+    let palette = crate::palette::from_image(&image)?;
+    let name = image
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().to_lowercase().replace(' ', "-"))
+        .unwrap_or_else(|| "my-rice".into());
+    from_wallpaper(&name, &home_relative(&image), palette)
+}
+
+/// Путь через «~/», если он внутри домашней папки: так райс можно
+/// перенести на машину с другим именем пользователя.
+pub fn home_relative(path: &std::path::Path) -> String {
+    let home = std::path::PathBuf::from(std::env::var_os("HOME").unwrap_or_default());
+    match path.strip_prefix(&home) {
+        Ok(rest) if !home.as_os_str().is_empty() => format!("~/{}", rest.display()),
+        _ => path.display().to_string(),
+    }
+}

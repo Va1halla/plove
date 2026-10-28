@@ -201,6 +201,11 @@ fn background(spec: &RiceSpec, env: &Env) -> Result<Pixmap> {
     }
 }
 
+/// Сама картинка обоев в размере превью — пока райса из неё ещё нет.
+pub fn wallpaper_only(path: &std::path::Path) -> Result<Pixmap> {
+    Ok(cover(&wallpaper::load(path)?))
+}
+
 /// Растянуть картинку на весь экран с обрезкой краёв, как `swaybg -m fill`.
 fn cover(image: &Pixmap) -> Pixmap {
     let mut canvas = Pixmap::new(WIDTH, HEIGHT).expect("размер превью ненулевой");

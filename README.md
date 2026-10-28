@@ -40,12 +40,17 @@ cargo build --release
 
 ### Свой райс из обоев
 
+Готовые райсы не обязательны. В мастере (`plove`) на шаге «Райс» есть пункт **+ Своя картинка**: выберите картинку из `~/Pictures`, `~/Downloads`, `~/wallpapers` или наберите путь. plove возьмёт из неё цвета, а стиль, программы и тонкие настройки вы выберете на следующих шагах. Основа — нейтральный набор программ из официальных репозиториев, ни один готовый райс не используется. После применения райс сохраняется в `~/.config/plove/rices/<имя>.yaml`.
+
+То же из командной строки:
+
 ```sh
-# Подобрать цвета по картинке (PNG, JPEG, WebP) и сохранить райс в my-wall.yaml.
-# Шрифты, отступы и панель берутся из готового райса (--base, по умолчанию tokyo-night):
-./target/release/plove new ~/Pictures/my-wall.jpg --base nord
-./target/release/plove preview my-wall.yaml
+# Цвета из картинки (PNG, JPEG, WebP), остальное — нейтральная основа:
+./target/release/plove new ~/Pictures/my-wall.jpg
+./target/release/plove edit my-wall.yaml      # стиль и программы в мастере
 ./target/release/plove apply my-wall.yaml
+# Или взять шрифты, стиль и программы из готового райса:
+./target/release/plove new ~/Pictures/my-wall.jpg --base nord
 ```
 
 Тема всегда получается тёмной. Цвета подбираются автоматически, а файл райса можно поправить руками.
