@@ -115,6 +115,8 @@ sh ~/.local/share/plove/popups.sh toggle {{ menu }} '{% if v == "center" and h =
     "clock": {
 {%- if popups %}
       "on-click": {{ self::popup(menu="clock", m="clock", left=left, center=center, position=position) | json_encode() }},
+      {#- Подсказка-календарь легла бы поверх выпадающего меню. #}
+      "tooltip": false,
 {%- endif %}
 {%- if options.clock_seconds %}
       "interval": 1,
@@ -136,6 +138,7 @@ sh ~/.local/share/plove/popups.sh toggle {{ menu }} '{% if v == "center" and h =
       "format-ethernet": "{{ self::label(compact=vertical, glyph="󰈀", word="", value="eth") | trim }}",
       "format-disconnected": "{{ self::label(compact=vertical, glyph="󰖪", word="", value="offline") | trim }}",
       "tooltip-format": "{ipaddr}"{% if popups %},
+      "tooltip": false,
       "on-click": {{ self::popup(menu="network", m="network", left=left, center=center, position=position) | json_encode() }}{% endif %}
     },
     "pulseaudio": {
@@ -145,7 +148,8 @@ sh ~/.local/share/plove/popups.sh toggle {{ menu }} '{% if v == "center" and h =
 {%- if popups %}
       "on-click": {{ self::popup(menu="volume", m="pulseaudio", left=left, center=center, position=position) | json_encode() }},
       "on-click-middle": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
-      "on-click-right": "sh ~/.local/share/plove/popups.sh mixer"
+      "on-click-right": "sh ~/.local/share/plove/popups.sh mixer",
+      "tooltip": false
 {%- else %}
       "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
 {%- endif %}
