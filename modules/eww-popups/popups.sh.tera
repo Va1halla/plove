@@ -7,6 +7,8 @@
 #   popups.sh connect <сеть> | mixer | netsettings | wifi-toggle
 
 E="eww -c $HOME/.config/eww-popups"
+# Метки «мышь заходила в меню» и номер последнего открытия.
+RUN="${XDG_RUNTIME_DIR:-/tmp}/plove-popups"
 MENUS="volume network clock"
 
 json_escape() {
@@ -50,6 +52,22 @@ toggle)
     done
     $E update "$2_open=true"
     $E open "$2" --anchor "$3" --pos "$4"
+{%- if options.close_on_leave %}
+    # Меню закрывается, когда мышь из него ушла. Если же в него так и не
+    # зашли, оно висело бы до повторного щелчка: закрываем через 5 секунд.
+    # Номер открытия — чтобы старый таймер не закрыл меню, открытое заново.
+    mkdir -p "$RUN"
+    rm -f "$RUN/$2.hovered"
+    echo $$ > "$RUN/$2.opened"
+    (
+        sleep 5
+        [ -e "$RUN/$2.hovered" ] || [ "$(cat "$RUN/$2.opened" 2>/dev/null)" != "$$" ] || close "$2"
+    ) >/dev/null 2>&1 &
+{%- endif %}
+    ;;
+hovered)
+    mkdir -p "$RUN"
+    touch "$RUN/$2.hovered"
     ;;
 close)
     close "$2"

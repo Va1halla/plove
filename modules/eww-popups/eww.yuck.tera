@@ -4,7 +4,7 @@
 ; чтобы данные опрашивались, только пока меню открыто.
 {%- set pop = "sh ~/.local/share/plove/popups.sh" %}
 {%- macro frame(id, title) -%}
-(eventbox{% if options.close_on_leave %} :onhoverlost "sh ~/.local/share/plove/popups.sh close {{ id }}"{% endif %}
+(eventbox{% if options.close_on_leave %} :onhover "sh ~/.local/share/plove/popups.sh hovered {{ id }}" :onhoverlost "sh ~/.local/share/plove/popups.sh close {{ id }}"{% endif %}
     (box :class "popup {{ id }}" :orientation "v" :space-evenly false :spacing 10 :width {{ options.width }}
       (box :class "head" :space-evenly false
         (label :class "title" :hexpand true :xalign 0 :text "{{ title }}")
