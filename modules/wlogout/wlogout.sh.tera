@@ -1,0 +1,33 @@
+#!/bin/sh
+# Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+# Запуск wlogout с отступами под размер экрана. Отступы у wlogout в
+# пикселях, и постоянные числа не подходят всем экранам: на маленьком
+# кнопки сплющивались, на большом расползались.
+
+# Кнопок четыре: в три столбца wlogout дорисовал бы пустые кнопки.
+columns={{ options.columns }}
+[ "$columns" -eq 3 ] && columns=4
+rows=$(( (4 + columns - 1) / columns ))
+
+# Размер активного монитора в логических точках (с учётом масштаба).
+size=$(hyprctl monitors 2>/dev/null | awk '
+    /^Monitor/ { mode = ""; scale = 1; focused = 0 }
+    /@/ && mode == "" { split($1, m, "[x@]"); w = m[1]; h = m[2]; mode = 1 }
+    /scale:/ { scale = $2 }
+    /focused: yes/ { printf "%d %d\n", w / scale, h / scale; exit }')
+width=${size% *}
+height=${size#* }
+[ -n "$width" ] && [ "$width" -gt 0 ] 2>/dev/null || { width=1920; height=1080; }
+
+# Кнопка 200 точек, но не больше, чем влезает (столбик на низком экране).
+button=200
+fit=$(( (height - 40) / rows - 24 ))
+[ $fit -lt $button ] && button=$fit
+fit=$(( (width - 40) / columns - 24 ))
+[ $fit -lt $button ] && button=$fit
+x=$(( (width - columns * (button + 24)) / 2 ))
+y=$(( (height - rows * (button + 24)) / 2 ))
+[ $x -lt 20 ] && x=20
+[ $y -lt 20 ] && y=20
+
+exec wlogout -b "$columns" -L $x -R $x -T $y -B $y "$@"
