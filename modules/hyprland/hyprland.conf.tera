@@ -74,16 +74,10 @@ decoration {
 }
 
 # Размытие под панелью, лаунчером, уведомлениями и меню выхода.
-layerrule = blur, waybar
-layerrule = blur, launcher
-layerrule = blur, rofi
-layerrule = blur, swaync-control-center
-layerrule = blur, swaync-notification-window
-layerrule = blur, notifications
-layerrule = blur, logout_dialog
-layerrule = ignorezero, waybar
-layerrule = ignorezero, rofi
-layerrule = ignorezero, launcher
+# Синтаксис Hyprland 0.53+: «эффект значение, match:namespace регулярка».
+# ignore_alpha 0 — не размывать полностью прозрачные места (края панели-островов).
+layerrule = blur on, ignore_alpha 0, match:namespace ^(waybar|rofi|launcher)$
+layerrule = blur on, match:namespace ^(swaync-control-center|swaync-notification-window|notifications|logout_dialog)$
 
 animations {
 {%- if options.animations == "none" %}
