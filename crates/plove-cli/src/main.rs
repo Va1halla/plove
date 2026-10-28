@@ -12,6 +12,7 @@ use clap::{Parser, Subcommand};
 use plove_core::apply::{self, ApplyOptions};
 use plove_core::check::{self, Check, Level, LiveProbe};
 use plove_core::modules::Registry;
+use plove_core::palette::{self, AccentChoice};
 use plove_core::plan::{self, FileStatus, Plan};
 use plove_core::presets;
 use plove_core::spec::{Color, RiceSpec};
@@ -89,6 +90,10 @@ enum Command {
         /// нейтральная основа, стиль потом выбирается в мастере (plove edit)
         #[arg(long)]
         base: Option<String>,
+        /// Акцент: keep (по обоям), contrast (противоположный оттенок, для
+        /// обоев почти одного цвета), red, green, yellow, blue, magenta, cyan
+        #[arg(long, default_value = "keep")]
+        accent: String,
         /// Куда сохранить райс (по умолчанию <имя картинки>.yaml)
         #[arg(short, long, value_name = "ФАЙЛ")]
         output: Option<PathBuf>,
@@ -253,8 +258,14 @@ fn run(cli: Cli) -> Result<()> {
         Command::New {
             image,
             base,
+            accent,
             output,
-        } => new_from_wallpaper(&image, base.as_deref(), output)?,
+        } => {
+            let Some(accent) = AccentChoice::parse(&accent) else {
+                bail!("--accent: keep, contrast, red, green, yellow, blue, magenta или cyan");
+            };
+            new_from_wallpaper(&image, base.as_deref(), accent, output)?
+        }
         Command::Doctor { fix } => doctor(fix)?,
         Command::Widget { rice, id } => {
             let spec = load_rice(&rice)?;
@@ -445,8 +456,14 @@ fn print_check(c: &Check) {
 /// Райс по имени встроенного или по пути к файлу.
 /// Если файл с таким именем есть, он важнее встроенного райса.
 /// `plove new`: взять готовый райс и перекрасить его в цвета картинки.
-fn new_from_wallpaper(image: &Path, base: Option<&str>, output: Option<PathBuf>) -> Result<()> {
+fn new_from_wallpaper(
+    image: &Path,
+    base: Option<&str>,
+    accent: AccentChoice,
+    output: Option<PathBuf>,
+) -> Result<()> {
     let mut spec = presets::from_image(image)?;
+    spec.theme.palette.accent = palette::accent(&spec.theme.palette, accent);
     if let Some(base) = base {
         let mut from = load_rice(base)?;
         from.description = Some(format!("Цвета из обоев, остальное из {}", from.name));

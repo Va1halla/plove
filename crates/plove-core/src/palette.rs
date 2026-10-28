@@ -113,6 +113,85 @@ pub fn from_pixels(pixels: &[Color]) -> Palette {
     }
 }
 
+/// Каким сделать акцент вместо подобранного автоматически.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AccentChoice {
+    /// Как в райсе (для райса из картинки — подобранный по обоям).
+    Keep,
+    /// Противоположный оттенок на цветовом круге: заметен на обоях,
+    /// где почти всё одного цвета.
+    Contrast,
+    /// Один из цветов терминала: 0 красный, 1 зелёный, 2 жёлтый,
+    /// 3 синий, 4 пурпурный, 5 голубой.
+    Ansi(usize),
+}
+
+impl AccentChoice {
+    /// Все варианты по порядку и их названия для экрана.
+    pub const ALL: [(AccentChoice, &'static str); 8] = [
+        (AccentChoice::Keep, "как в райсе"),
+        (AccentChoice::Contrast, "контрастный"),
+        (AccentChoice::Ansi(0), "красный"),
+        (AccentChoice::Ansi(1), "зелёный"),
+        (AccentChoice::Ansi(2), "жёлтый"),
+        (AccentChoice::Ansi(3), "синий"),
+        (AccentChoice::Ansi(4), "пурпурный"),
+        (AccentChoice::Ansi(5), "голубой"),
+    ];
+
+    /// Вариант по слову из командной строки: keep, contrast, red…
+    pub fn parse(word: &str) -> Option<AccentChoice> {
+        let names = [
+            "keep", "contrast", "red", "green", "yellow", "blue", "magenta", "cyan",
+        ];
+        names
+            .iter()
+            .position(|n| *n == word)
+            .map(|i| AccentChoice::ALL[i].0)
+    }
+}
+
+/// Акцент палитры по выбору. Результат всегда читается на фоне.
+pub fn accent(palette: &Palette, choice: AccentChoice) -> Color {
+    let bg = palette.bg;
+    match choice {
+        AccentChoice::Keep => palette.accent,
+        AccentChoice::Contrast => {
+            let hsl = Hsl::from(palette.accent);
+            // У серого акцента оттенка нет: берём тёплый оранжевый.
+            let h = if hsl.s < 0.15 { 30.0 } else { hsl.h + 180.0 };
+            readable(
+                Hsl {
+                    h,
+                    s: hsl.s.clamp(0.55, 0.85),
+                    l: hsl.l.clamp(0.6, 0.72),
+                },
+                bg,
+                4.5,
+            )
+        }
+        AccentChoice::Ansi(i) => {
+            let i = i.min(5);
+            // Яркие цвета терминала (color9–14) уже подходят к фону.
+            match palette.ansi.get(9 + i) {
+                Some(&c) => readable(Hsl::from(c), bg, 4.5),
+                None => {
+                    let hues = [0.0, 120.0, 50.0, 220.0, 300.0, 185.0];
+                    readable(
+                        Hsl {
+                            h: hues[i],
+                            s: 0.65,
+                            l: 0.68,
+                        },
+                        bg,
+                        4.5,
+                    )
+                }
+            }
+        }
+    }
+}
+
 /// 16 цветов терминала: color0–7 обычные, color8–15 яркие.
 fn terminal_colors(clusters: &[Cluster], bg: Color, fg: Color, accent_s: f64) -> Vec<Color> {
     // Стандартные оттенки в порядке ANSI: красный, зелёный, жёлтый,
@@ -364,6 +443,21 @@ mod tests {
         let b = from_pixels(&sunset());
         assert_eq!(a.accent, b.accent);
         assert_eq!(a.ansi, b.ansi);
+    }
+
+    #[test]
+    fn contrast_accent_is_opposite() {
+        // Обои почти целиком голубые: акцент тоже голубой.
+        let pixels = [repeat("#4fb3d9", 900), repeat("#f0f0f0", 100)].concat();
+        let palette = from_pixels(&pixels);
+        let auto = Hsl::from(palette.accent);
+        let other = accent(&palette, AccentChoice::Contrast);
+        assert!(hue_distance(Hsl::from(other).h, auto.h) > 150.0);
+        assert!(contrast(other, palette.bg) >= 4.5);
+        let red = accent(&palette, AccentChoice::Ansi(0));
+        assert!(hue_distance(Hsl::from(red).h, 0.0) < 30.0, "{}", red.hex());
+        assert_eq!(accent(&palette, AccentChoice::Keep), palette.accent);
+        assert_eq!(AccentChoice::parse("cyan"), Some(AccentChoice::Ansi(5)));
     }
 
     #[test]

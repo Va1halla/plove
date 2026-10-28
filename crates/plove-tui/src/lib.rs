@@ -25,6 +25,7 @@ use plove_core::check::{self, Check, Level, LiveProbe, Probe};
 use std::collections::BTreeMap;
 
 use plove_core::modules::{show_value, Registry, Setting, SettingKind};
+use plove_core::palette::{self, AccentChoice};
 use plove_core::plan::{self, FileStatus, Plan};
 use plove_core::presets;
 use plove_core::spec::{Color as SpecColor, RiceSpec};
@@ -230,14 +231,16 @@ struct Settings {
     russian: bool,
     /// Индекс в POSITIONS.
     position: usize,
+    /// Индекс в `AccentChoice::ALL`: акцент как в райсе или другой.
+    accent: usize,
     /// Индексы вариантов в STYLE_TOKENS.
     style: [usize; 7],
     programs: Vec<Program>,
 }
 
 impl Settings {
-    /// Строки до списка программ: раскладка, панель и токены стиля.
-    const SWITCHES: usize = 2 + STYLE_TOKENS.len();
+    /// Строки до списка программ: раскладка, панель, акцент и токены стиля.
+    const SWITCHES: usize = 3 + STYLE_TOKENS.len();
 
     /// Прочитать текущие значения из райса. Из реестра берём, какие
     /// программы вообще есть для каждой роли.
@@ -282,6 +285,7 @@ impl Settings {
                 .and_then(Value::as_str)
                 .is_some_and(|l| l.contains("ru")),
             position: POSITIONS.iter().position(|p| *p == position).unwrap_or(0),
+            accent: 0,
             style: indexes,
             programs,
         }
@@ -296,6 +300,8 @@ impl Settings {
         let layout = if self.russian { "us,ru" } else { "us" };
         set(spec, "hyprland", "kb_layout", layout.into());
         set(spec, "waybar", "position", POSITIONS[self.position].into());
+        let (choice, _) = AccentChoice::ALL[self.accent];
+        spec.theme.palette.accent = palette::accent(&spec.theme.palette, choice);
         let mut style = serde_yaml::Mapping::new();
         for (i, (key, _, variants)) in STYLE_TOKENS.iter().enumerate() {
             style.insert((*key).into(), variants[self.style[i]].into());
@@ -326,8 +332,9 @@ impl Settings {
         match row {
             0 => self.russian = !self.russian,
             1 => self.position = cycle(self.position, POSITIONS.len()),
+            2 => self.accent = cycle(self.accent, AccentChoice::ALL.len()),
             r if r < Self::SWITCHES => {
-                let i = r - 2;
+                let i = r - 3;
                 self.style[i] = cycle(self.style[i], STYLE_TOKENS[i].2.len());
             }
             _ => {
@@ -347,6 +354,7 @@ impl Settings {
         let mut rows = vec![
             ("Раскладка", layout.to_string()),
             ("Панель", position.to_string()),
+            ("Акцент", AccentChoice::ALL[self.accent].1.to_string()),
         ];
         for (i, (_, label, variants)) in STYLE_TOKENS.iter().enumerate() {
             rows.push((*label, variants[self.style[i]].to_string()));
@@ -514,6 +522,7 @@ impl App {
             settings: Settings {
                 russian: false,
                 position: 0,
+                accent: 0,
                 style: [0; 7],
                 programs: Vec::new(),
             },
@@ -1371,6 +1380,25 @@ mod tests {
         settings.apply_to(&mut spec);
         assert_eq!(spec.components["launcher"], "rofi");
         assert!(!spec.components.contains_key("widgets"));
+    }
+
+    /// Строка «Акцент»: первым — как в райсе, дальше контрастный и цвета терминала.
+    #[test]
+    fn accent_can_be_changed() {
+        let registry = Registry::builtin().unwrap();
+        let spec = presets::get("tokyo-night").unwrap().unwrap();
+        let mut settings = Settings::from_spec(&spec, &registry);
+        assert_eq!(settings.rows()[2].0, "Акцент");
+        let mut same = spec.clone();
+        settings.apply_to(&mut same);
+        assert_eq!(same.theme.palette.accent, spec.theme.palette.accent);
+        settings.change(2, true);
+        let mut other = spec.clone();
+        settings.apply_to(&mut other);
+        assert_ne!(other.theme.palette.accent, spec.theme.palette.accent);
+        settings.change(2, false);
+        settings.change(2, false);
+        assert_eq!(settings.rows()[2].1, "голубой");
     }
 
     /// Числа двигаются шагом и не выходят за границы, списки идут по кругу.
