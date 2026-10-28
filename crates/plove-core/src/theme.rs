@@ -56,6 +56,10 @@ pub struct ThemeContext {
     pub colors: BTreeMap<&'static str, ColorForms>,
     pub ansi: Vec<ColorForms>,
     pub fonts: Fonts,
+    /// Шрифт для значков рядом с текстом: вариант Nerd Font «Propo».
+    /// В обычном Nerd Font значок шире своей клетки и налезает на пробел
+    /// («󰅐12:44» вместо «󰅐 12:44»), а у Propo ширина честная.
+    pub icon_font: String,
     pub geometry: GeometryContext,
     pub style: StyleContext,
 }
@@ -165,6 +169,7 @@ pub fn theme_context(spec: &RiceSpec) -> ThemeContext {
         // `.iter().map(..).collect()` — это LINQ `.Select(..).ToList()`.
         ansi: palette.ansi.iter().map(|&c| c.into()).collect(),
         fonts: spec.theme.fonts.clone(),
+        icon_font: icon_font(&spec.theme.fonts.mono),
         geometry: GeometryContext {
             gaps: geometry.gaps,
             gaps_in: geometry.gaps / 2,
@@ -174,6 +179,16 @@ pub fn theme_context(spec: &RiceSpec) -> ThemeContext {
             opacity_inactive: round2((geometry.opacity - 0.05).max(0.0)),
         },
         style: StyleContext::new(spec.theme.style, geometry),
+    }
+}
+
+/// `JetBrainsMono Nerd Font` → `JetBrainsMono Nerd Font Propo`. Пакеты
+/// ttf-*-nerd ставят Propo вместе с основным шрифтом. Другие шрифты как есть.
+fn icon_font(mono: &str) -> String {
+    if mono.ends_with("Nerd Font") {
+        format!("{mono} Propo")
+    } else {
+        mono.to_string()
     }
 }
 

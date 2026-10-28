@@ -9,7 +9,7 @@ window {
 }
 
 .popup {
-  font-family: "{{ fonts.ui }}", "{{ fonts.mono }}";
+  font-family: "{{ fonts.ui }}", "{{ icon_font }}", "{{ fonts.mono }}";
   font-size: {{ fonts.size }}pt;
   color: {{ colors.fg.hex }};
   // Почти непрозрачно даже со «стеклом»: под меню нет размытия, и обои

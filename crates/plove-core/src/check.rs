@@ -73,6 +73,21 @@ pub trait Probe {
     fn paru_works(&self) -> bool {
         self.command_exists("paru")
     }
+    /// Папка сессии (`$XDG_RUNTIME_DIR`): насколько занята и сколько весят
+    /// логи Hyprland в ней. `None` — сессии нет (например, вход по ssh).
+    fn runtime_dir(&self) -> Option<RuntimeDir> {
+        None
+    }
+}
+
+/// Занятость папки сессии.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuntimeDir {
+    pub path: String,
+    /// Сколько процентов занято.
+    pub used_percent: u64,
+    /// Логи Hyprland: путь и размер в байтах.
+    pub hyprland_logs: Vec<(String, u64)>,
 }
 
 /// Выполнить все проверки по порядку.
@@ -87,6 +102,7 @@ pub fn run_all(probe: &dyn Probe) -> Vec<Check> {
         login(probe),
         paru(probe),
         other_desktop(probe),
+        runtime_dir(probe),
     ]
 }
 
@@ -311,6 +327,46 @@ fn other_desktop(probe: &dyn Probe) -> Check {
     }
 }
 
+/// Папка сессии в памяти (/run/user/…) маленькая. В виртуалке VMware
+/// Hyprland пишет ошибку рендера на каждый кадр, и за полчаса его лог
+/// занимает её целиком. После этого программы не могут создать общую
+/// память для картинки окна и падают (rofi — с SIGBUS).
+fn runtime_dir(probe: &dyn Probe) -> Check {
+    const TITLE: &str = "Папка сессии";
+    let Some(dir) = probe.runtime_dir() else {
+        return Check::ok(TITLE, "сессии нет, не проверялось");
+    };
+    let logs: u64 = dir.hyprland_logs.iter().map(|(_, size)| size).sum();
+    if dir.used_percent < 80 {
+        return Check::ok(
+            TITLE,
+            format!("{} занята на {}%", dir.path, dir.used_percent),
+        );
+    }
+    let mut detail = format!(
+        "{} занята на {}%: программы, которым не хватит места, падают (rofi — с SIGBUS)",
+        dir.path, dir.used_percent
+    );
+    let mut fix = Vec::new();
+    if logs >= 50 * 1024 * 1024 {
+        detail += &format!(
+            ". Почти всё — лог Hyprland, {} МБ; его можно очистить, Hyprland продолжит писать в пустой файл",
+            logs / 1024 / 1024
+        );
+        // Очистить, а не удалить: Hyprland держит файл открытым, и место
+        // от удалённого файла не освободилось бы до выхода из сессии.
+        fix = dir
+            .hyprland_logs
+            .iter()
+            .map(|(path, _)| cmd(&["truncate", "-s", "0", path]))
+            .collect();
+    }
+    Check {
+        fix,
+        ..Check::problem(TITLE, Level::Warn, detail)
+    }
+}
+
 fn cmd(parts: &[&str]) -> Vec<String> {
     parts.iter().map(|s| s.to_string()).collect()
 }
@@ -382,6 +438,32 @@ impl Probe for LiveProbe {
 
     fn paru_works(&self) -> bool {
         crate::system::paru_works()
+    }
+
+    fn runtime_dir(&self) -> Option<RuntimeDir> {
+        let path = std::env::var("XDG_RUNTIME_DIR").ok()?;
+        let used_percent = output("df", &["--output=pcent", &path])
+            .lines()
+            .last()?
+            .trim()
+            .trim_end_matches('%')
+            .parse()
+            .ok()?;
+        let hyprland_logs = std::fs::read_dir(Path::new(&path).join("hypr"))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|entry| entry.path().join("hyprland.log"))
+            .filter_map(|log| {
+                let size = log.metadata().ok()?.len();
+                Some((log.display().to_string(), size))
+            })
+            .collect();
+        Some(RuntimeDir {
+            path,
+            used_percent,
+            hyprland_logs,
+        })
     }
 
     fn online(&self) -> bool {
@@ -482,6 +564,57 @@ mod tests {
         assert_eq!(login.level, Level::Warn);
         assert_eq!(login.fix.len(), 3);
         assert!(login.fix[1][3].contains("start-hyprland"));
+    }
+
+    /// Тоже из VM: лог Hyprland занял всю папку сессии, rofi падал.
+    #[test]
+    fn full_runtime_dir_gets_log_truncated() {
+        struct Full;
+        impl Probe for Full {
+            fn is_root(&self) -> bool {
+                false
+            }
+            fn user(&self) -> String {
+                "val".into()
+            }
+            fn groups(&self) -> Vec<String> {
+                vec![]
+            }
+            fn command_exists(&self, _: &str) -> bool {
+                true
+            }
+            fn service_active(&self, _: &str) -> bool {
+                true
+            }
+            fn service_enabled(&self, _: &str) -> bool {
+                true
+            }
+            fn path_exists(&self, _: &str) -> bool {
+                true
+            }
+            fn online(&self) -> bool {
+                true
+            }
+            fn runtime_dir(&self) -> Option<RuntimeDir> {
+                Some(RuntimeDir {
+                    path: "/run/user/1000".into(),
+                    used_percent: 100,
+                    hyprland_logs: vec![("/run/user/1000/hypr/x/hyprland.log".into(), 800 << 20)],
+                })
+            }
+        }
+        let check = runtime_dir(&Full);
+        assert_eq!(check.level, Level::Warn);
+        assert!(check.detail.contains("800 МБ"), "{}", check.detail);
+        assert_eq!(
+            check.fix,
+            vec![cmd(&[
+                "truncate",
+                "-s",
+                "0",
+                "/run/user/1000/hypr/x/hyprland.log"
+            ])]
+        );
     }
 
     /// Ровно та ситуация, что была в VM: seatd установлен, но выключен,

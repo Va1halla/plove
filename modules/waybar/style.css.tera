@@ -28,8 +28,8 @@
 {%- endmacro panel_background %}
 
 * {
-    /* Моноширинный Nerd Font — запасной: из него берутся значки. */
-    font-family: "{{ fonts.ui }}", "{{ fonts.mono }}";
+    /* Значки берутся из Nerd Font: сначала Propo с честной шириной значков. */
+    font-family: "{{ fonts.ui }}", "{{ icon_font }}", "{{ fonts.mono }}";
     font-size: {{ fonts.size }}pt;
     border: none;
     min-height: 0;
