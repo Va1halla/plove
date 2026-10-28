@@ -1,0 +1,38 @@
+# Модуль eww-popups: выпадающие меню панели — звук, сеть, календарь и
+# калькулятор. Открываются по щелчку на модуле Waybar прямо под ним.
+# Отдельная папка настроек и свой процесс eww: виджеты рабочего стола
+# (модуль eww) живут сами по себе.
+id: eww-popups
+role: popups
+exec: eww -c ~/.config/eww-popups daemon
+# Собирается из AUR; paru поставит его и если пакет появится в репозитории.
+aur: [eww]
+# qalc для калькулятора, wl-copy — скопировать ответ.
+packages: [libqalculate, wl-clipboard]
+compatible_with:
+  compositor: [hyprland]
+  bar: [waybar]
+templates:
+  - src: eww.yuck.tera
+    dest: ~/.config/eww-popups/eww.yuck
+  - src: eww.scss.tera
+    dest: ~/.config/eww-popups/eww.scss
+  - src: popups.sh.tera
+    dest: ~/.local/share/plove/popups.sh
+autostart: true
+reload: "eww -c ~/.config/eww-popups reload 2>/dev/null || eww -c ~/.config/eww-popups daemon"
+# Фоновый процесс: plove остановит его, если модуль уберут из райса.
+# Только этот eww, а не виджеты рабочего стола.
+process: "eww -c .*eww-popups"
+settings:
+  - id: close_on_leave
+    group: Выпадающие меню
+    title: Закрывать, когда мышь ушла
+    about: Иначе меню закрывается повторным щелчком на панели или крестиком.
+    default: true
+  - id: width
+    group: Выпадающие меню
+    title: Ширина меню, px
+    range: [240, 520]
+    step: 20
+    default: 340

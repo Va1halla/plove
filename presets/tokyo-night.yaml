@@ -22,6 +22,7 @@ components:
   notifications: mako
   power: wlogout
   widgets: eww
+  popups: eww-popups
   lock: hyprlock
   idle: hypridle
   screenshot: grim
@@ -45,4 +46,4 @@ overrides:
   waybar:
     modules_left: [launcher, workspaces, window]
     modules_center: [clock]
-    modules_right: [media, pulseaudio, network, battery, tray, power]
+    modules_right: [media, pulseaudio, network, battery, calculator, tray, power]

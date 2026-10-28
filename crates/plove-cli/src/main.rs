@@ -12,10 +12,10 @@ use clap::{Parser, Subcommand};
 use plove_core::apply::{self, ApplyOptions};
 use plove_core::check::{self, Check, Level, LiveProbe};
 use plove_core::modules::Registry;
-use plove_core::palette::{self, AccentChoice};
+use plove_core::palette;
 use plove_core::plan::{self, FileStatus, Plan};
 use plove_core::presets;
-use plove_core::spec::{Color, RiceSpec};
+use plove_core::spec::{Color, RiceSpec, Wallpaper};
 use plove_core::state;
 use plove_core::system::Env;
 
@@ -90,13 +90,18 @@ enum Command {
         /// нейтральная основа, стиль потом выбирается в мастере (plove edit)
         #[arg(long)]
         base: Option<String>,
-        /// Акцент: keep (по обоям), contrast (противоположный оттенок, для
-        /// обоев почти одного цвета), red, green, yellow, blue, magenta, cyan
-        #[arg(long, default_value = "keep")]
-        accent: String,
         /// Куда сохранить райс (по умолчанию <имя картинки>.yaml)
         #[arg(short, long, value_name = "ФАЙЛ")]
         output: Option<PathBuf>,
+        #[command(flatten)]
+        colors: ColorArgs,
+    },
+    /// Заново подобрать цвета райса по его обоям, не трогая остальное
+    Recolor {
+        /// Файл райса .yaml с обоями-картинкой
+        rice: PathBuf,
+        #[command(flatten)]
+        colors: ColorArgs,
     },
     /// Проверить, готова ли система к райсу
     Doctor {
@@ -258,14 +263,10 @@ fn run(cli: Cli) -> Result<()> {
         Command::New {
             image,
             base,
-            accent,
             output,
-        } => {
-            let Some(accent) = AccentChoice::parse(&accent) else {
-                bail!("--accent: keep, contrast, red, green, yellow, blue, magenta или cyan");
-            };
-            new_from_wallpaper(&image, base.as_deref(), accent, output)?
-        }
+            colors,
+        } => new_from_wallpaper(&image, base.as_deref(), output, colors.options()?)?,
+        Command::Recolor { rice, colors } => recolor(&rice, &Env::real()?, colors.options()?)?,
         Command::Doctor { fix } => doctor(fix)?,
         Command::Widget { rice, id } => {
             let spec = load_rice(&rice)?;
@@ -459,11 +460,10 @@ fn print_check(c: &Check) {
 fn new_from_wallpaper(
     image: &Path,
     base: Option<&str>,
-    accent: AccentChoice,
     output: Option<PathBuf>,
+    options: palette::Options,
 ) -> Result<()> {
-    let mut spec = presets::from_image(image)?;
-    spec.theme.palette.accent = palette::accent(&spec.theme.palette, accent);
+    let mut spec = presets::from_image_with(image, options)?;
     if let Some(base) = base {
         let mut from = load_rice(base)?;
         from.description = Some(format!("Цвета из обоев, остальное из {}", from.name));
@@ -482,13 +482,8 @@ fn new_from_wallpaper(
     std::fs::write(&output, header + &spec.to_yaml()?)
         .with_context(|| format!("не удалось записать {}", output.display()))?;
 
-    let p = &spec.theme.palette;
     println!("Палитра из {}:", image.display());
-    println!("  фон     {} {}", swatch(p.bg), p.bg.hex());
-    println!("  текст   {} {}", swatch(p.fg), p.fg.hex());
-    println!("  акцент  {} {}", swatch(p.accent), p.accent.hex());
-    let ansi: String = p.ansi.iter().map(|&c| swatch(c)).collect();
-    println!("  терминал {ansi}");
+    print_palette(&spec.theme.palette);
     println!("\nРайс сохранён в {}. Дальше:", output.display());
     println!(
         "  plove edit {}      # стиль, программы и настройки в мастере",
@@ -532,6 +527,58 @@ fn wizard(registry: &Registry, env: &Env, file: Option<&Path>) -> Result<()> {
         return Ok(());
     }
     apply_and_report(&plan, env, false, false)
+}
+
+/// Как подбирать цвета из обоев: `plove new` и `plove recolor`.
+#[derive(clap::Args)]
+struct ColorArgs {
+    /// Акцент: auto (самый яркий цвет), contrast (другой оттенок, чем у
+    /// большей части картинки), dominant (основной цвет) или #rrggbb
+    #[arg(long, default_value = "auto")]
+    accent: String,
+    /// Фон: tinted (с оттенком обоев), neutral (почти серый), deep (темнее)
+    #[arg(long, default_value = "tinted")]
+    background: String,
+    /// Цвета терминала: soft (приглушённые) или vivid (яркие)
+    #[arg(long, default_value = "soft")]
+    terminal: String,
+}
+
+impl ColorArgs {
+    fn options(&self) -> Result<palette::Options> {
+        Ok(palette::Options {
+            accent: palette::Accent::parse(&self.accent)?,
+            background: palette::Background::parse(&self.background)?,
+            terminal: palette::Terminal::parse(&self.terminal)?,
+        })
+    }
+}
+
+fn print_palette(p: &plove_core::spec::Palette) {
+    println!("  фон     {} {}", swatch(p.bg), p.bg.hex());
+    println!("  текст   {} {}", swatch(p.fg), p.fg.hex());
+    println!("  акцент  {} {}", swatch(p.accent), p.accent.hex());
+    let ansi: String = p.ansi.iter().map(|&c| swatch(c)).collect();
+    println!("  терминал {ansi}");
+}
+
+/// `plove recolor`: новые цвета из обоев райса, всё остальное как было.
+fn recolor(file: &Path, env: &Env, options: palette::Options) -> Result<()> {
+    let mut spec = RiceSpec::load(file)?;
+    let Some(Wallpaper::File(wallpaper)) = &spec.theme.wallpaper else {
+        bail!(
+            "у райса {} обои не из файла: цвета брать не из чего",
+            file.display()
+        );
+    };
+    let image = env.expand(wallpaper);
+    spec.theme.palette = palette::from_pixels_with(&palette::pixels(&image)?, options);
+    spec.validate()?;
+    println!("Палитра из {}:", image.display());
+    print_palette(&spec.theme.palette);
+    save_rice(&spec, file)?;
+    println!("Применить: plove apply {}", file.display());
+    Ok(())
 }
 
 /// Записать райс в файл. Старый файл остаётся рядом как `.bak`:

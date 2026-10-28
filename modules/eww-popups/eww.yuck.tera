@@ -1,0 +1,101 @@
+; Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+; Выпадающие меню панели. Открывает их ~/.local/share/plove/popups.sh:
+; он же ставит место под модулем (--anchor, --pos) и переменные *_open,
+; чтобы данные опрашивались, только пока меню открыто.
+{%- set pop = "sh ~/.local/share/plove/popups.sh" %}
+{%- macro frame(id, title) -%}
+(eventbox{% if options.close_on_leave and id != "calculator" %} :onhoverlost "sh ~/.local/share/plove/popups.sh close {{ id }}"{% endif %}
+    (box :class "popup {{ id }}" :orientation "v" :space-evenly false :spacing 10 :width {{ options.width }}
+      (box :class "head" :space-evenly false
+        (label :class "title" :hexpand true :xalign 0 :text "{{ title }}")
+        (button :class "close" :onclick "sh ~/.local/share/plove/popups.sh close {{ id }}" "󰅖"))
+{%- endmacro frame %}
+
+(defvar volume_open false)
+(defvar network_open false)
+(defvar clock_open false)
+(defvar calculator_open false)
+(defvar calc_result "")
+
+(defpoll audio :interval "1s" :run-while volume_open
+  :initial '{"vol":0,"muted":false,"mic":0,"mic_muted":false,"has_mic":false}'
+  "{{ pop }} audio")
+(defpoll sinks :interval "3s" :run-while volume_open :initial "[]" "{{ pop }} sinks")
+(defpoll net :interval "3s" :run-while network_open
+  :initial '{"iface":"","ip":"","kind":"none","ssid":"","nm":false,"wifi_on":false}'
+  "{{ pop }} net")
+(defpoll wifi :interval "10s" :run-while network_open :initial "[]" "{{ pop }} wifi")
+(defpoll clock_time :interval "1s" :run-while clock_open "date '+%H:%M:%S'")
+(defpoll clock_date :interval "60s" :run-while clock_open "date '+%A, %-d %B %Y'")
+
+(defwindow volume
+  :monitor 0
+  :geometry (geometry :anchor "top right")
+  :stacking "overlay"
+  :focusable false
+  {{ self::frame(id="volume", title="Звук") }}
+      (box :class "row" :space-evenly false :spacing 10
+        (button :class "icon" :onclick "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+          {audio.muted ? "󰖁" : "󰕾"})
+        (scale :class "slider" :hexpand true :min 0 :max 101 :value {audio.vol}
+          :onchange "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ {}%")
+        (label :class "value" :text "${audio.vol}%"))
+      (box :class "row" :space-evenly false :spacing 10 :visible {audio.has_mic}
+        (button :class "icon" :onclick "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
+          {audio.mic_muted ? "󰍭" : "󰍬"})
+        (scale :class "slider" :hexpand true :min 0 :max 101 :value {audio.mic}
+          :onchange "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SOURCE@ {}%")
+        (label :class "value" :text "${audio.mic}%"))
+      (label :class "section" :xalign 0 :text "Выход")
+      (box :orientation "v" :space-evenly false
+        (for sink in sinks
+          (button :class {sink.default ? "item active" : "item"} :onclick "wpctl set-default ${sink.id}"
+            (label :xalign 0 :limit-width 42 :text {sink.name}))))
+      (button :class "link" :onclick "{{ pop }} mixer" "Микшер"))))
+
+(defwindow network
+  :monitor 0
+  :geometry (geometry :anchor "top right")
+  :stacking "overlay"
+  :focusable false
+  {{ self::frame(id="network", title="Сеть") }}
+      (box :class "status" :space-evenly false :spacing 12
+        (label :class "big-icon" :text {net.kind == "wifi" ? "󰖩" : net.kind == "ethernet" ? "󰈀" : "󰖪"})
+        (box :orientation "v" :space-evenly false :hexpand true
+          (label :class "strong" :xalign 0 :limit-width 32
+            :text {net.kind == "none" ? "Нет подключения" : net.ssid != "" ? net.ssid : net.iface})
+          (label :class "dim" :xalign 0 :text {net.ip != "" ? net.ip : net.kind == "none" ? "" : "без адреса"})))
+      (box :class "row" :space-evenly false :visible {net.nm}
+        (label :hexpand true :xalign 0 :text "Wi-Fi")
+        (button :class {net.wifi_on ? "toggle on" : "toggle"} :onclick "{{ pop }} wifi-toggle"
+          {net.wifi_on ? "вкл" : "выкл"}))
+      (box :orientation "v" :space-evenly false :visible {net.nm && net.wifi_on}
+        (label :class "section" :xalign 0 :text "Сети рядом")
+        (for w in wifi
+          (button :class {w.active ? "item active" : "item"} :onclick "{{ pop }} connect '${w.ssid}'"
+            (box :space-evenly false :spacing 8
+              (label :text {w.signal > 66 ? "󰤨" : w.signal > 33 ? "󰤥" : "󰤟"})
+              (label :hexpand true :xalign 0 :limit-width 30 :text {w.ssid})
+              (label :class "dim" :text {w.secure ? "󰌾" : ""})))))
+      (button :class "link" :onclick "{{ pop }} netsettings" "Настройки сети"))))
+
+(defwindow clock
+  :monitor 0
+  :geometry (geometry :anchor "top center")
+  :stacking "overlay"
+  :focusable false
+  {{ self::frame(id="clock", title="Календарь") }}
+      (label :class "big-time" :text clock_time)
+      (label :class "dim" :text clock_date)
+      (calendar :class "calendar"))))
+
+(defwindow calculator
+  :monitor 0
+  :geometry (geometry :anchor "top right")
+  :stacking "overlay"
+  :focusable true
+  {{ self::frame(id="calculator", title="Калькулятор") }}
+      (input :class "calc-input" :onchange "{{ pop }} calc {}")
+      (button :class "calc-result" :onclick "{{ pop }} copy"
+        (label :xalign 1 :limit-width 32 :text {calc_result == "" ? " " : "= ${calc_result}"}))
+      (label :class "dim" :xalign 0 :wrap true :text "Щелчок по ответу — скопировать. Например: 2^10, sqrt(2), 5 USD to EUR"))))

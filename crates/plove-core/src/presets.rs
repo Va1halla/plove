@@ -94,10 +94,18 @@ pub fn from_wallpaper(
 
 /// Райс из картинки целиком: цвета, имя по имени файла, путь через `~/`.
 pub fn from_image(image: &std::path::Path) -> Result<RiceSpec> {
+    from_image_with(image, crate::palette::Options::default())
+}
+
+/// То же, но цвета подбираются с подсказками (контрастный акцент и т. п.).
+pub fn from_image_with(
+    image: &std::path::Path,
+    options: crate::palette::Options,
+) -> Result<RiceSpec> {
     let image = image
         .canonicalize()
         .with_context(|| format!("картинка {} не найдена", image.display()))?;
-    let palette = crate::palette::from_image(&image)?;
+    let palette = crate::palette::from_pixels_with(&crate::palette::pixels(&image)?, options);
     let name = image
         .file_stem()
         .map(|stem| stem.to_string_lossy().to_lowercase().replace(' ', "-"))

@@ -13,34 +13,168 @@
 //!
 //! Тема всегда тёмная: светлые темы plove пока не поддерживает.
 //! Результат детерминированный: одна картинка всегда даёт одну палитру.
+//!
+//! Подбор можно направить [`Options`]: взять акцент контрастным к картинке
+//! (на обоях из оттенков одного цвета иначе всё сливается), сделать фон
+//! нейтральным или глубже, а цвета терминала ярче.
 
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 
 use crate::spec::{Color, Palette};
 
 /// Сколько групп цветов ищем в картинке.
 const CLUSTERS: usize = 8;
 
+/// Как подбирать цвета. По умолчанию — как раньше.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Options {
+    pub accent: Accent,
+    pub background: Background,
+    pub terminal: Terminal,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Accent {
+    /// Самый яркий из заметных цветов картинки.
+    #[default]
+    Auto,
+    /// Другой оттенок, чем у большей части картинки: детали вроде цветов
+    /// на голубых досках, а если их нет — дополнительный цвет.
+    Contrast,
+    /// Основной цвет картинки.
+    Dominant,
+    /// Свой цвет, как есть.
+    Exact(Color),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Background {
+    /// Тёмный с оттенком обоев.
+    #[default]
+    Tinted,
+    /// Почти серый.
+    Neutral,
+    /// Темнее, почти чёрный.
+    Deep,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Terminal {
+    /// Приглушённые, под насыщенность акцента.
+    #[default]
+    Soft,
+    /// Яркие.
+    Vivid,
+}
+
+/// Варианты для мастера и подсказок: имя в командной строке и подпись.
+pub const ACCENTS: [(&str, &str); 3] = [
+    ("auto", "самый яркий"),
+    ("contrast", "контрастный"),
+    ("dominant", "основной цвет"),
+];
+pub const BACKGROUNDS: [(&str, &str); 3] = [
+    ("tinted", "с оттенком"),
+    ("neutral", "нейтральный"),
+    ("deep", "глубокий"),
+];
+pub const TERMINALS: [(&str, &str); 2] = [("soft", "мягкие"), ("vivid", "яркие")];
+
+impl Accent {
+    /// `auto`, `contrast`, `dominant` или цвет `#rrggbb`.
+    pub fn parse(text: &str) -> Result<Accent> {
+        Ok(match text {
+            // keep — старое имя из первой версии `--accent`.
+            "auto" | "keep" => Accent::Auto,
+            "contrast" => Accent::Contrast,
+            "dominant" => Accent::Dominant,
+            hex if hex.starts_with('#') => Accent::Exact(Color::parse(hex)?),
+            other => bail!("акцент «{other}»: можно auto, contrast, dominant или #rrggbb"),
+        })
+    }
+
+    /// Номер в [`ACCENTS`] (у своего цвета номера нет).
+    pub fn index(self) -> Option<usize> {
+        match self {
+            Accent::Auto => Some(0),
+            Accent::Contrast => Some(1),
+            Accent::Dominant => Some(2),
+            Accent::Exact(_) => None,
+        }
+    }
+
+    pub fn from_index(i: usize) -> Accent {
+        [Accent::Auto, Accent::Contrast, Accent::Dominant][i % 3]
+    }
+}
+
+impl Background {
+    pub fn parse(text: &str) -> Result<Background> {
+        Ok(match text {
+            "tinted" => Background::Tinted,
+            "neutral" => Background::Neutral,
+            "deep" => Background::Deep,
+            other => bail!("фон «{other}»: можно tinted, neutral, deep"),
+        })
+    }
+
+    pub fn index(self) -> usize {
+        self as usize
+    }
+
+    pub fn from_index(i: usize) -> Background {
+        [Background::Tinted, Background::Neutral, Background::Deep][i % 3]
+    }
+}
+
+impl Terminal {
+    pub fn parse(text: &str) -> Result<Terminal> {
+        Ok(match text {
+            "soft" => Terminal::Soft,
+            "vivid" => Terminal::Vivid,
+            other => bail!("цвета терминала «{other}»: можно soft, vivid"),
+        })
+    }
+
+    pub fn index(self) -> usize {
+        self as usize
+    }
+
+    pub fn from_index(i: usize) -> Terminal {
+        [Terminal::Soft, Terminal::Vivid][i % 2]
+    }
+}
+
 /// Палитра из файла картинки (PNG, JPEG или WebP).
 pub fn from_image(path: &Path) -> Result<Palette> {
+    Ok(from_pixels(&pixels(path)?))
+}
+
+/// Точки уменьшенной картинки: их хватает, чтобы подобрать цвета, и их
+/// можно держать в памяти, чтобы быстро пересчитывать палитру (мастер).
+pub fn pixels(path: &Path) -> Result<Vec<Color>> {
     let image = image::open(path)
         .with_context(|| format!("не удалось открыть картинку {}", path.display()))?;
     let small = image.thumbnail(96, 96).to_rgb8();
-    let pixels: Vec<Color> = small
+    Ok(small
         .pixels()
         .map(|p| Color {
             r: p[0],
             g: p[1],
             b: p[2],
         })
-        .collect();
-    Ok(from_pixels(&pixels))
+        .collect())
 }
 
 /// Палитра из набора точек. Отдельная функция, чтобы тестировать без файлов.
 pub fn from_pixels(pixels: &[Color]) -> Palette {
+    from_pixels_with(pixels, Options::default())
+}
+
+/// Палитра из набора точек с подсказками, как подбирать цвета.
+pub fn from_pixels_with(pixels: &[Color], options: Options) -> Palette {
     let clusters = kmeans(pixels, CLUSTERS);
     // Группы меньше 2% картинки — это мелкие детали, на роль фона
     // или текста они не годятся.
@@ -57,10 +191,22 @@ pub fn from_pixels(pixels: &[Color]) -> Palette {
         .min_by(|a, b| luminance(a.color).total_cmp(&luminance(b.color)))
         .map_or(Color { r: 0, g: 0, b: 0 }, |c| c.color);
     let dark = Hsl::from(darkest);
-    let bg = Hsl {
-        s: dark.s.min(0.35),
-        l: dark.l.clamp(0.06, 0.12),
-        ..dark
+    let bg = match options.background {
+        Background::Tinted => Hsl {
+            s: dark.s.min(0.35),
+            l: dark.l.clamp(0.06, 0.12),
+            ..dark
+        },
+        Background::Neutral => Hsl {
+            s: dark.s.min(0.04),
+            l: dark.l.clamp(0.07, 0.11),
+            ..dark
+        },
+        Background::Deep => Hsl {
+            s: dark.s.min(0.3),
+            l: 0.045,
+            ..dark
+        },
     }
     .into();
 
@@ -84,27 +230,50 @@ pub fn from_pixels(pixels: &[Color]) -> Palette {
     }
     .into();
 
-    // Акцент: насыщенная группа, и чем она больше, тем лучше.
-    // Корень из доли, чтобы крупная серая группа не перебила яркую мелкую.
-    let accent_source = clusters
+    // Цветные группы: из них берутся акцент и основной цвет картинки.
+    let colorful: Vec<(&Cluster, Hsl)> = clusters
         .iter()
         .map(|c| (c, Hsl::from(c.color)))
         .filter(|(_, hsl)| hsl.s >= 0.2 && hsl.l > 0.15)
-        .max_by(|(a, ha), (b, hb)| (ha.s * a.share.sqrt()).total_cmp(&(hb.s * b.share.sqrt())))
-        .map(|(_, hsl)| hsl);
-    // В чёрно-белой картинке акцента нет: берём оттенок фона и делаем его ярче.
-    let accent_hsl = accent_source.unwrap_or(Hsl { s: 0.5, ..dark });
-    let accent = readable(
-        Hsl {
-            s: accent_hsl.s.clamp(0.45, 0.85),
-            l: accent_hsl.l.clamp(0.6, 0.75),
-            ..accent_hsl
-        },
-        bg,
-        4.5,
-    );
+        .collect();
+    // Основной цвет: самая большая цветная группа.
+    let dominant = colorful
+        .iter()
+        .max_by(|(a, _), (b, _)| a.share.total_cmp(&b.share))
+        .map(|(_, hsl)| *hsl);
+    let accent_source = match options.accent {
+        // Насыщенная группа, и чем она больше, тем лучше. Корень из доли,
+        // чтобы крупная серая группа не перебила яркую мелкую.
+        Accent::Auto => colorful
+            .iter()
+            .max_by(|(a, ha), (b, hb)| (ha.s * a.share.sqrt()).total_cmp(&(hb.s * b.share.sqrt())))
+            .map(|(_, hsl)| *hsl),
+        Accent::Dominant => dominant,
+        Accent::Contrast => dominant.map(|d| contrast_hue(pixels, d)),
+        Accent::Exact(_) => None,
+    };
+    let accent = match options.accent {
+        Accent::Exact(color) => color,
+        _ => {
+            // В чёрно-белой картинке акцента нет: берём оттенок фона и делаем его ярче.
+            let accent_hsl = accent_source.unwrap_or(Hsl { s: 0.5, ..dark });
+            readable(
+                Hsl {
+                    s: accent_hsl.s.clamp(0.45, 0.85),
+                    l: accent_hsl.l.clamp(0.6, 0.75),
+                    ..accent_hsl
+                },
+                bg,
+                4.5,
+            )
+        }
+    };
 
-    let ansi = terminal_colors(&clusters, bg, fg, Hsl::from(accent).s);
+    let terminal_s = match options.terminal {
+        Terminal::Soft => (Hsl::from(accent).s * 0.85).clamp(0.4, 0.75),
+        Terminal::Vivid => 0.75,
+    };
+    let ansi = terminal_colors(&clusters, bg, fg, terminal_s);
     Palette {
         bg,
         fg,
@@ -113,91 +282,12 @@ pub fn from_pixels(pixels: &[Color]) -> Palette {
     }
 }
 
-/// Каким сделать акцент вместо подобранного автоматически.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AccentChoice {
-    /// Как в райсе (для райса из картинки — подобранный по обоям).
-    Keep,
-    /// Противоположный оттенок на цветовом круге: заметен на обоях,
-    /// где почти всё одного цвета.
-    Contrast,
-    /// Один из цветов терминала: 0 красный, 1 зелёный, 2 жёлтый,
-    /// 3 синий, 4 пурпурный, 5 голубой.
-    Ansi(usize),
-}
-
-impl AccentChoice {
-    /// Все варианты по порядку и их названия для экрана.
-    pub const ALL: [(AccentChoice, &'static str); 8] = [
-        (AccentChoice::Keep, "как в райсе"),
-        (AccentChoice::Contrast, "контрастный"),
-        (AccentChoice::Ansi(0), "красный"),
-        (AccentChoice::Ansi(1), "зелёный"),
-        (AccentChoice::Ansi(2), "жёлтый"),
-        (AccentChoice::Ansi(3), "синий"),
-        (AccentChoice::Ansi(4), "пурпурный"),
-        (AccentChoice::Ansi(5), "голубой"),
-    ];
-
-    /// Вариант по слову из командной строки: keep, contrast, red…
-    pub fn parse(word: &str) -> Option<AccentChoice> {
-        let names = [
-            "keep", "contrast", "red", "green", "yellow", "blue", "magenta", "cyan",
-        ];
-        names
-            .iter()
-            .position(|n| *n == word)
-            .map(|i| AccentChoice::ALL[i].0)
-    }
-}
-
-/// Акцент палитры по выбору. Результат всегда читается на фоне.
-pub fn accent(palette: &Palette, choice: AccentChoice) -> Color {
-    let bg = palette.bg;
-    match choice {
-        AccentChoice::Keep => palette.accent,
-        AccentChoice::Contrast => {
-            let hsl = Hsl::from(palette.accent);
-            // У серого акцента оттенка нет: берём тёплый оранжевый.
-            let h = if hsl.s < 0.15 { 30.0 } else { hsl.h + 180.0 };
-            readable(
-                Hsl {
-                    h,
-                    s: hsl.s.clamp(0.55, 0.85),
-                    l: hsl.l.clamp(0.6, 0.72),
-                },
-                bg,
-                4.5,
-            )
-        }
-        AccentChoice::Ansi(i) => {
-            let i = i.min(5);
-            // Яркие цвета терминала (color9–14) уже подходят к фону.
-            match palette.ansi.get(9 + i) {
-                Some(&c) => readable(Hsl::from(c), bg, 4.5),
-                None => {
-                    let hues = [0.0, 120.0, 50.0, 220.0, 300.0, 185.0];
-                    readable(
-                        Hsl {
-                            h: hues[i],
-                            s: 0.65,
-                            l: 0.68,
-                        },
-                        bg,
-                        4.5,
-                    )
-                }
-            }
-        }
-    }
-}
-
 /// 16 цветов терминала: color0–7 обычные, color8–15 яркие.
-fn terminal_colors(clusters: &[Cluster], bg: Color, fg: Color, accent_s: f64) -> Vec<Color> {
+/// `s` — насыщенность цветов.
+fn terminal_colors(clusters: &[Cluster], bg: Color, fg: Color, s: f64) -> Vec<Color> {
     // Стандартные оттенки в порядке ANSI: красный, зелёный, жёлтый,
     // синий, пурпурный, голубой (в градусах на цветовом круге).
     let hues = [0.0, 120.0, 50.0, 220.0, 300.0, 185.0];
-    let s = (accent_s * 0.85).clamp(0.4, 0.75);
     let tones: Vec<f64> = hues
         .iter()
         .map(|&target| {
@@ -226,6 +316,43 @@ fn terminal_colors(clusters: &[Cluster], bg: Color, fg: Color, accent_s: f64) ->
         ansi.push(if bright { fg } else { fg.mix(bg, 0.15) });
     }
     ansi
+}
+
+/// Цвет, далёкий по оттенку от основного `dominant`. Ищем по всем точкам,
+/// а не по группам: мелкие детали (бутоны на голубых досках) в отдельную
+/// группу k-средних не попадают. Нет такого — дополнительный цвет.
+fn contrast_hue(pixels: &[Color], dominant: Hsl) -> Hsl {
+    // 24 корзины по 15°: вес (сумма насыщенности), суммы s и l и
+    // направление оттенка (среднее по кругу, чтобы 350° и 10° дали 0°).
+    let mut bins = [(0.0f64, 0usize, 0.0f64, 0.0f64, 0.0f64, 0.0f64); 24];
+    for &c in pixels {
+        let hsl = Hsl::from(c);
+        if hsl.s < 0.3 || !(0.2..=0.85).contains(&hsl.l) || hue_distance(hsl.h, dominant.h) < 60.0 {
+            continue;
+        }
+        let bin = &mut bins[(hsl.h / 15.0) as usize % 24];
+        let rad = hsl.h.to_radians();
+        bin.0 += hsl.s;
+        bin.1 += 1;
+        bin.2 += hsl.s;
+        bin.3 += hsl.l;
+        bin.4 += rad.cos();
+        bin.5 += rad.sin();
+    }
+    // Хотя бы 0,3% картинки, иначе это шум.
+    let enough = (pixels.len() as f64 * 0.003).max(3.0) as usize;
+    bins.iter()
+        .filter(|b| b.1 >= enough)
+        .max_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|&(_, n, s, l, cos, sin)| Hsl {
+            h: sin.atan2(cos).to_degrees().rem_euclid(360.0),
+            s: s / n as f64,
+            l: l / n as f64,
+        })
+        .unwrap_or(Hsl {
+            h: (dominant.h + 180.0).rem_euclid(360.0),
+            ..dominant
+        })
 }
 
 /// Осветлять цвет, пока контраст с фоном не станет не меньше `min`.
@@ -445,19 +572,68 @@ mod tests {
         assert_eq!(a.ansi, b.ansi);
     }
 
+    /// Голубые доски почти на всю картинку, белые цветы и немного красных бутонов.
+    fn boards() -> Vec<Color> {
+        [
+            repeat("#3fa9c9", 600),
+            repeat("#2f8fae", 250),
+            repeat("#123c48", 60),
+            repeat("#f2f0ee", 80),
+            repeat("#9c3b2c", 10),
+        ]
+        .concat()
+    }
+
     #[test]
-    fn contrast_accent_is_opposite() {
-        // Обои почти целиком голубые: акцент тоже голубой.
-        let pixels = [repeat("#4fb3d9", 900), repeat("#f0f0f0", 100)].concat();
-        let palette = from_pixels(&pixels);
-        let auto = Hsl::from(palette.accent);
-        let other = accent(&palette, AccentChoice::Contrast);
-        assert!(hue_distance(Hsl::from(other).h, auto.h) > 150.0);
-        assert!(contrast(other, palette.bg) >= 4.5);
-        let red = accent(&palette, AccentChoice::Ansi(0));
-        assert!(hue_distance(Hsl::from(red).h, 0.0) < 30.0, "{}", red.hex());
-        assert_eq!(accent(&palette, AccentChoice::Keep), palette.accent);
-        assert_eq!(AccentChoice::parse("cyan"), Some(AccentChoice::Ansi(5)));
+    fn contrast_accent_finds_the_buds() {
+        let auto = Hsl::from(from_pixels(&boards()).accent);
+        assert!(hue_distance(auto.h, 194.0) < 15.0, "auto: {}", auto.h);
+        let options = Options {
+            accent: Accent::Contrast,
+            ..Options::default()
+        };
+        let palette = from_pixels_with(&boards(), options);
+        let accent = Hsl::from(palette.accent);
+        assert!(
+            hue_distance(accent.h, 8.0) < 15.0,
+            "{}",
+            palette.accent.hex()
+        );
+        assert!(contrast(palette.accent, palette.bg) >= 4.5);
+    }
+
+    #[test]
+    fn contrast_accent_without_details_is_complementary() {
+        let pixels = [repeat("#3fa9c9", 900), repeat("#123c48", 100)].concat();
+        let options = Options {
+            accent: Accent::Contrast,
+            ..Options::default()
+        };
+        let accent = Hsl::from(from_pixels_with(&pixels, options).accent);
+        assert!(hue_distance(accent.h, 14.0) < 15.0, "{}", accent.h);
+    }
+
+    #[test]
+    fn background_and_exact_accent() {
+        let neutral = from_pixels_with(
+            &boards(),
+            Options {
+                background: Background::Neutral,
+                accent: Accent::parse("#ff00aa").unwrap(),
+                ..Options::default()
+            },
+        );
+        assert!(Hsl::from(neutral.bg).s <= 0.1, "{}", neutral.bg.hex());
+        assert_eq!(neutral.accent.hex(), "#ff00aa");
+        let deep = from_pixels_with(
+            &boards(),
+            Options {
+                background: Background::Deep,
+                ..Options::default()
+            },
+        );
+        assert!(luminance(deep.bg) < luminance(from_pixels(&boards()).bg));
+        assert!(Accent::parse("blue").is_err());
     }
 
     #[test]

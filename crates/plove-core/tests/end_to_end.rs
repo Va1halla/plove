@@ -38,7 +38,7 @@ fn apply_is_idempotent_and_rollback_restores() {
     // Первое применение: все конфиги новые, kitty и ~/.zshrc меняются.
     let first = plan::build(example_spec(), &registry, &env).unwrap();
     assert!(first.warnings.iter().all(|w| !w.contains("занята")));
-    assert_eq!(first.changed_files().len(), 31);
+    assert_eq!(first.changed_files().len(), 34);
     let report = apply(&first, &env, &options).unwrap();
     assert_eq!(report.generation, Some(1));
 
@@ -136,7 +136,9 @@ fn removed_daemon_is_stopped() {
     let mut spec = example_spec();
     spec.components.remove("widgets");
     let second = plan::build(spec, &registry, &env).unwrap();
-    assert!(second.reloads.contains(&"pkill -x 'eww'; true".to_string()));
+    assert!(second
+        .reloads
+        .contains(&"pkill -f '[e]ww open desktop'; true".to_string()));
     // Оставшиеся программы не трогаем.
     assert!(!second.reloads.iter().any(|r| r.contains("'waybar'")));
 }
