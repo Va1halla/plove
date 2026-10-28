@@ -11,3 +11,5 @@ plove-preview = { path = "../plove-preview" }
 anyhow.workspace = true
 serde_yaml.workspace = true
 ratatui.workspace = true
+ratatui-image.workspace = true
+image.workspace = true

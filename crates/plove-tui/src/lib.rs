@@ -36,6 +36,9 @@ use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, List, ListItem, ListState, Paragraph, Wrap};
 use ratatui::{DefaultTerminal, Frame};
+use ratatui_image::picker::{Picker, ProtocolType};
+use ratatui_image::protocol::StatefulProtocol;
+use ratatui_image::{Resize, StatefulImage};
 use serde_yaml::Value;
 
 /// Чем закончился мастер.
@@ -58,6 +61,14 @@ pub fn run(registry: &Registry, env: &Env, own: Option<RiceSpec>) -> Result<Outc
     app.sandbox = env.sandbox;
     app.show_preview = std::env::var("TERM").map_or(true, |term| term != "linux");
     let mut terminal = ratatui::init();
+    if app.show_preview {
+        // Спросить терминал, умеет ли он показывать картинки (kitty, ghostty,
+        // WezTerm, foot…) и какой у него размер клетки в пикселях.
+        // Не умеет — остаются наши полублоки.
+        app.picker = Picker::from_query_stdio()
+            .ok()
+            .filter(|p| p.protocol_type() != ProtocolType::Halfblocks);
+    }
     let result = event_loop(&mut terminal, &mut app, registry, env);
     // Вернуть терминал в обычный режим, даже если была ошибка.
     ratatui::restore();
@@ -402,6 +413,10 @@ struct App {
     /// Последнее превью и райс, по которому оно нарисовано (в YAML):
     /// перерисовываем, только когда райс поменялся.
     preview: Option<(String, Pixmap)>,
+    /// Терминал умеет настоящие картинки: через что их показывать
+    /// и картинка, уже подготовленная для него.
+    picker: Option<Picker>,
+    image: Option<StatefulProtocol>,
     /// Первый в списке — райс из файла пользователя.
     own: bool,
     /// Песочница (`--root`): система не меняется, так что проблемы
@@ -432,6 +447,8 @@ impl App {
             error: None,
             show_preview: false,
             preview: None,
+            picker: None,
+            image: None,
             own: false,
             sandbox: false,
         })
@@ -507,6 +524,15 @@ impl App {
         self.preview = plove_preview::render(&spec, registry, env)
             .ok()
             .map(|image| (key, image));
+        self.image = match (&self.picker, &self.preview) {
+            (Some(picker), Some((_, pixmap))) => {
+                // Превью непрозрачное, поэтому премультиплицированные
+                // пиксели tiny-skia можно отдать как обычный RGBA.
+                image::RgbaImage::from_raw(pixmap.width(), pixmap.height(), pixmap.data().to_vec())
+                    .map(|rgba| picker.new_resize_protocol(rgba.into()))
+            }
+            _ => None,
+        };
     }
 
     fn build_plan(&mut self, registry: &Registry, env: &Env) {
@@ -762,7 +788,7 @@ impl App {
             Line::raw(""),
         ];
         if self.show_preview {
-            lines.push(Line::raw(" Ниже — набросок; в полном размере: plove preview").dark_gray());
+            lines.push(Line::raw(" В полном размере: plove preview").dark_gray());
         } else {
             // В TTY цвета приблизительные: консоль Linux знает только 16 цветов.
             lines.push(Line::raw(format!(" Картинка: plove preview {}", spec.name)).dark_gray());
@@ -779,20 +805,37 @@ impl App {
         self.draw_preview(frame, picture_area);
     }
 
-    /// Картинка-превью полублоками: в одной клетке терминала две точки,
-    /// верхняя — цветом символа «▀», нижняя — цветом фона клетки.
-    fn draw_preview(&self, frame: &mut Frame, area: Rect) {
+    /// Картинка-превью по центру `area`, с пропорциями экрана 16:9.
+    ///
+    /// Если терминал умеет картинки — настоящая картинка. Иначе полублоки:
+    /// в одной клетке две точки, верхняя — цветом символа «▀», нижняя —
+    /// цветом фона клетки.
+    fn draw_preview(&mut self, frame: &mut Frame, area: Rect) {
         let Some((_, image)) = &self.preview else {
             return;
         };
-        // Вписываем 16:9: точек по вертикали вдвое больше, чем строк.
-        let width = area.width.min(area.height * 32 / 9);
-        let rows = width * 9 / 32;
+        // Клетка терминала обычно вдвое выше своей ширины; точный размер
+        // знает только терминал, который умеет картинки.
+        let (cell_w, cell_h) = self.picker.as_ref().map_or((1, 2), |p| p.font_size());
+        let (cell_w, cell_h) = (u32::from(cell_w.max(1)), u32::from(cell_h.max(1)));
+        let fit_w = u32::from(area.width).min(u32::from(area.height) * cell_h * 16 / (9 * cell_w));
+        let width = fit_w as u16;
+        let rows = (fit_w * cell_w * 9 / (16 * cell_h)) as u16;
         if width < 16 || rows < 4 {
             return;
         }
         let x0 = area.x + (area.width - width) / 2;
         let y0 = area.y + (area.height - rows) / 2;
+        if let Some(state) = &mut self.image {
+            let target = Rect::new(x0, y0, width, rows);
+            frame.render_stateful_widget(
+                StatefulImage::default()
+                    .resize(Resize::Scale(Some(image::imageops::FilterType::Triangle))),
+                target,
+                state,
+            );
+            return;
+        }
         let pixels = plove_preview::thumbnail(image, width.into(), (rows * 2).into());
         let buffer = frame.buffer_mut();
         for row in 0..rows {
@@ -807,7 +850,7 @@ impl App {
         }
     }
 
-    fn draw_settings(&self, frame: &mut Frame, area: Rect) {
+    fn draw_settings(&mut self, frame: &mut Frame, area: Rect) {
         let mut lines = vec![Line::raw("")];
         for (i, (name, value)) in self.settings.rows().iter().enumerate() {
             let selected = i == self.setting_row;
