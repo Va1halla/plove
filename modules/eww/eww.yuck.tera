@@ -50,11 +50,13 @@
 {%- set gap14 = c.scale * 14 %}{% set gap14 = gap14 | round %}
 {%- set gap16 = c.scale * 16 %}{% set gap16 = gap16 | round %}
 {%- set gap18 = c.scale * 18 %}{% set gap18 = gap18 | round %}
+{#- Слой bottom, а не bg: на bg живут и обои, и перезапущенный swaybg
+    ложится поверх карточек. bottom — над обоями, но под окнами. #}
 
 (defwindow {{ c.window }}
   :monitor 0
   :geometry (geometry :x "{{ c.x }}%" :y "{{ c.y }}%" :width "{{ c.w }}px" :height "{{ c.h }}px" :anchor "top left")
-  :stacking "bg"
+  :stacking "bottom"
   :exclusive false
 {%- if c.kind == "clock" %}
   (box :class "desktop card desk k_clock c{{ i }}" :orientation "v" :space-evenly false :valign "center"
@@ -165,7 +167,7 @@
 (defwindow desktop
   :monitor 0
   :geometry (geometry :x "{{ x }}" :y "{{ y }}" :width "{{ width }}px" :height "{{ height }}px" :anchor "{{ anchor }}")
-  :stacking "bg"
+  :stacking "bottom"
   :exclusive false
   (box :class "desktop" :orientation "v" :space-evenly false :spacing 18
 {%- for card in cards %}
