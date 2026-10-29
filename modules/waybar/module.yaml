@@ -14,7 +14,9 @@ templates:
     dest: ~/.local/share/plove/waybar-sep.sh
   - src: calc.sh.tera
     dest: ~/.local/share/plove/calc.sh
-reload: pkill -SIGUSR2 waybar
+# SIGUSR2 перечитывает конфиг. Если waybar не запущен (например, панель
+# только что переключили с Quickshell обратно), запускаем его.
+reload: "pkill -SIGUSR2 -x waybar || setsid -f {{ exec }} >/dev/null 2>&1"
 autostart: true
 # Фоновый процесс: plove остановит его, если модуль уберут из райса.
 process: "waybar"
