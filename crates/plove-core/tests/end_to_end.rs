@@ -4,6 +4,7 @@
 use std::fs;
 
 use plove_core::apply::{apply, ApplyOptions};
+use plove_core::desk;
 use plove_core::modules::Registry;
 use plove_core::plan::{self, FileStatus};
 use plove_core::presets;
@@ -333,4 +334,83 @@ fn desk_cards_become_eww_windows() {
     assert!(scss.contains(".c1 .temp { font-size: 45px; }"), "{scss}");
     let hypr = file("hypr/hyprland.conf");
     assert!(hypr.contains("exec-once = eww open-many desktop desktop1"));
+}
+
+/// Каждый вид карточки даёт целое окно eww: скобки сходятся. Лишняя
+/// или потерянная скобка ломает весь eww.yuck, и на столе пусто.
+#[test]
+fn every_desk_card_closes_its_window() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let mut spec = example_spec();
+    spec.widgets.insert(
+        "vpn".into(),
+        serde_yaml::from_str("{command: \"echo on\", text: \"VPN {value}\"}").unwrap(),
+    );
+    let catalog = desk::catalog_json();
+    let kinds: Vec<&str> = catalog
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|k| k["id"].as_str().unwrap())
+        .collect();
+    for kind in kinds {
+        let with = match kind {
+            "weather" => "{city: Meppel}",
+            "widget" => "{id: vpn}",
+            _ => "{}",
+        };
+        spec.desktop =
+            serde_yaml::from_str(&format!("[{{kind: {kind}, at: [5, 5], with: {with}}}]")).unwrap();
+        spec.validate().unwrap();
+        let plan = plan::build(spec.clone(), &registry, &env).unwrap();
+        let file = plan
+            .files
+            .iter()
+            .find(|f| f.path.ends_with("eww/eww.yuck"))
+            .unwrap();
+        let yuck = String::from_utf8(file.content.clone()).unwrap();
+        assert_eq!(yuck_depth(&yuck), Ok(0), "карточка {kind}:\n{yuck}");
+        // Кириллица в /* */ доживает до CSS, grass ставит перед ним
+        // @charset, а GTK такого правила не знает и не грузит стили.
+        let file = plan
+            .files
+            .iter()
+            .find(|f| f.path.ends_with("eww/eww.scss"))
+            .unwrap();
+        let scss = String::from_utf8(file.content.clone()).unwrap();
+        for comment in scss.split("/*").skip(1) {
+            let comment = comment.split("*/").next().unwrap();
+            assert!(comment.is_ascii(), "не ASCII в /* */ в eww.scss: {comment}");
+        }
+    }
+}
+
+/// Глубина скобок в конце файла yuck, без строк и комментариев.
+/// `Err` — закрывающая скобка без открывающей.
+fn yuck_depth(text: &str) -> Result<i32, usize> {
+    let (mut depth, mut string, mut escaped, mut comment) = (0, false, false, false);
+    for (i, ch) in text.char_indices() {
+        if comment {
+            comment = ch != '\n';
+        } else if string {
+            match ch {
+                _ if escaped => escaped = false,
+                '\\' => escaped = true,
+                '"' => string = false,
+                _ => {}
+            }
+        } else {
+            match ch {
+                ';' => comment = true,
+                '"' => string = true,
+                '(' => depth += 1,
+                ')' if depth == 0 => return Err(i),
+                ')' => depth -= 1,
+                _ => {}
+            }
+        }
+    }
+    Ok(depth)
 }

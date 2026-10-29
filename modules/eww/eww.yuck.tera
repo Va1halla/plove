@@ -103,7 +103,7 @@
     (label :class "weather-icon" :text {d{{ i }}_weather.icon})
     (box :orientation "v" :space-evenly false :valign "center"
       (label :class "temp" :xalign 0 :text {d{{ i }}_weather.temp})
-      (label :class "desc" :xalign 0 :limit-width 24 :text {d{{ i }}_weather.desc})))
+      (label :class "desc" :xalign 0 :limit-width 24 :text {d{{ i }}_weather.desc}))))
 {%- elif c.kind == "countdown" %}
   (box :class "desktop card desk k_countdown c{{ i }}" :orientation "v" :space-evenly false :valign "center"
     (label :class "days" :text d{{ i }}_days)
