@@ -4,13 +4,17 @@
 //! картинку рабочего стола без карточек и состояние райса. Карточки
 //! двигаются мышью прямо на странице; «Сохранить» записывает раскладку
 //! в файл райса (раздел `desktop`), «Применить» ещё и запускает
-//! `plove apply`. Сервер однопоточный и без библиотек: запросов мало,
-//! и все они от одного человека.
+//! `plove apply`. Сервер без библиотек: запросов мало, и все они от одного
+//! человека. Запрос читается в своём потоке: браузер заранее открывает
+//! соединения «про запас» и ничего в них не шлёт, и одно такое соединение
+//! не должно задерживать остальные. Отвечает на запросы один поток по очереди.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::mpsc;
+use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use plove_core::desk::{self, DeskCard};
@@ -70,9 +74,22 @@ pub fn run(rice: &str, registry: &Registry, env: &Env, port: u16, open: bool) ->
             .stderr(std::process::Stdio::null())
             .spawn();
     }
-    for stream in listener.incoming() {
-        let Ok(mut stream) = stream else { continue };
-        if let Err(e) = studio.serve(&mut stream) {
+    let (requests, incoming) = mpsc::channel();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { continue };
+            let requests = requests.clone();
+            std::thread::spawn(move || {
+                // Соединение «про запас» так и закроется, ничего не прислав.
+                let _ = stream.set_read_timeout(Some(Duration::from_secs(60)));
+                if let Ok(request) = read_request(&mut stream) {
+                    let _ = requests.send((stream, request));
+                }
+            });
+        }
+    });
+    for (mut stream, request) in incoming {
+        if let Err(e) = studio.serve(&mut stream, request) {
             let _ = respond_json(&mut stream, 500, &json!({ "error": format!("{e:#}") }));
         }
     }
@@ -220,8 +237,7 @@ fn screen_size(env: &Env) -> (u32, u32) {
 }
 
 impl Studio<'_> {
-    fn serve(&mut self, stream: &mut TcpStream) -> Result<()> {
-        let request = read_request(stream)?;
+    fn serve(&mut self, stream: &mut TcpStream, request: Request) -> Result<()> {
         let (method, path, body) = (request.method, request.path, request.body);
         // Любой сайт в браузере может отправить запрос на 127.0.0.1.
         // Своего заголовка без разрешения CORS чужая страница не добавит,
