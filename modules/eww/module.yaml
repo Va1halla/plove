@@ -2,7 +2,8 @@
 # системы поверх обоев. eww умеет и панели, но здесь только «украшение».
 id: eww
 role: widgets
-exec: eww open desktop
+# Карточки из plove studio — отдельные окна desktop, desktop1, desktop2…
+exec: "{% if desk | length > 0 %}eww open-many{% for c in desk %} {{ c.window }}{% endfor %}{% else %}eww open desktop{% endif %}"
 # Собирается из AUR; paru поставит его и если пакет появится в репозитории.
 aur: [eww]
 compatible_with:
@@ -12,16 +13,22 @@ templates:
     dest: ~/.config/eww/eww.yuck
   - src: eww.scss.tera
     dest: ~/.config/eww/eww.scss
+  - src: desk-weather.sh.tera
+    dest: ~/.local/share/plove/desk-weather.sh
+  - src: desk-cover.sh.tera
+    dest: ~/.local/share/plove/desk-cover.sh
 autostart: true
 # `eww open` сам запускает фоновый процесс eww, если его ещё нет.
-reload: "pgrep -x eww >/dev/null && eww reload || eww open desktop"
+# Набор окон мог поменяться, поэтому закрываем все и открываем заново.
+reload: "{% if desk | length > 0 %}eww close-all >/dev/null 2>&1; eww open-many{% for c in desk %} {{ c.window }}{% endfor %}{% else %}pgrep -x eww >/dev/null && eww reload || eww open desktop{% endif %}"
 # Именно этот eww: у выпадающих меню (eww-popups) свой процесс eww.
-process: "eww open desktop"
+# Шаблон для pkill -f: и «eww open desktop», и «eww open-many desktop …».
+process: "eww open.* desktop"
 settings:
   - id: cards
     group: Рабочий стол
     title: Карточки
-    about: "Что лежит на рабочем столе, сверху вниз: clock (часы и дата), system (процессор, память, диск), media (музыка с кнопками) или свои виджеты из widgets."
+    about: "Если в райсе есть desktop (раскладка из plove studio), эти три настройки не действуют. Что лежит на рабочем столе, сверху вниз: clock (часы и дата), system (процессор, память, диск), media (музыка с кнопками) или свои виджеты из widgets."
     items: [clock, system, media]
     default: [clock, system]
   - id: anchor

@@ -1,0 +1,22 @@
+#!/bin/sh
+# Сгенерировано plove: обложка трека для карточки «Плеер».
+# На каждую смену трека печатает путь к файлу картинки или пустую строку.
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/plove/covers"
+mkdir -p "$cache"
+# playerctld сам висит на шине как плеер: его пропускаем.
+playerctl --ignore-player=playerctld --follow metadata --format '{{ "{{" }} mpris:artUrl {{ "}}" }}' 2>/dev/null |
+    while read -r url; do
+        case "$url" in
+            file://*)
+                # Пробелы и кириллица в пути закодированы как %20 и т. п.
+                path=$(printf '%s' "${url#file://}" | sed 's/+/ /g; s/%\([0-9A-Fa-f][0-9A-Fa-f]\)/\\x\1/g')
+                printf '%b\n' "$path"
+                ;;
+            http*)
+                file="$cache/$(printf '%s' "$url" | md5sum | cut -c1-16)"
+                [ -s "$file" ] || curl -sfL --max-time 10 -o "$file" "$url"
+                printf '%s\n' "$file"
+                ;;
+            *) echo "" ;;
+        esac
+    done

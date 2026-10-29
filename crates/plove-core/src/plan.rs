@@ -201,6 +201,8 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         })
         .collect::<Result<_>>()?;
     base.insert("widgets", &widgets);
+    // Карточки рабочего стола из `plove studio`.
+    base.insert("desk", &crate::desk::context(&spec));
     // Домашняя папка: для программ, которые не понимают ~ в путях.
     base.insert("home", &env.home.display().to_string());
     // Режим «выбрать из списка» у лаунчера. Нужен до команд запуска:

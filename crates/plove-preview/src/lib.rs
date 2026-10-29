@@ -52,7 +52,9 @@ pub fn render(spec: &RiceSpec, registry: &Registry, env: &Env) -> Result<Pixmap>
     let mut canvas = background(spec, env)?;
     // Виджеты eww лежат на обоях под окнами (stacking "bg").
     if let Some(id) = spec.components.get("widgets") {
-        if let Some(module) = registry.get(id) {
+        if !spec.desktop.is_empty() {
+            draw_desk(&mut canvas, &look, &fonts, spec);
+        } else if let Some(module) = registry.get(id) {
             let options = module_options(module, spec.overrides.get(id))?;
             draw_desktop(&mut canvas, &look, &fonts, &options, spec);
         }
@@ -1078,6 +1080,322 @@ fn draw_desktop(
             }
         }
         top += h + spacing;
+    }
+}
+
+/// Карточки из plove studio: каждая в своей точке экрана, как окна eww.
+/// Превью считает экран равным 1920×1080.
+fn draw_desk(canvas: &mut Pixmap, look: &Look, fonts: &Fonts, spec: &RiceSpec) {
+    let glass = look.style.raw.glass != plove_core::spec::Glass::None;
+    for card in plove_core::desk::context(spec) {
+        let num = |key: &str| card[key].as_f64().unwrap_or(0.0) as f32;
+        let (x, y) = (
+            num("x") / 100.0 * WIDTH as f32,
+            num("y") / 100.0 * HEIGHT as f32,
+        );
+        let (w, h, s) = (num("w"), num("h"), num("scale"));
+        let kind = card["kind"].as_str().unwrap_or("");
+        let opts = &card["opts"];
+        if kind != "clock" && glass {
+            canvas.fill_path(
+                &rounded_rect(rect(x, y, w, h), look.style.radius_box as f32 * s),
+                &paint(look.bg, (look.style.bg_alpha as f32 - 0.25).max(0.15)),
+                FillRule::Winding,
+                Transform::identity(),
+                None,
+            );
+        }
+        let pad = look.style.pad as f32 * 2.0 * s;
+        // Строка текста: слева с отступом или по центру карточки.
+        let line = |canvas: &mut Pixmap,
+                    text: &str,
+                    px: f32,
+                    baseline: f32,
+                    color: Color,
+                    bold: bool,
+                    center: bool| {
+            let font = if bold { &fonts.bold } else { &fonts.regular };
+            let width = fonts.char_width(px) * text.chars().count() as f32;
+            let left = if center {
+                x + (w - width) / 2.0
+            } else {
+                x + pad
+            };
+            fonts.text(canvas, font, text, px, left, baseline, color);
+        };
+        match kind {
+            "clock" => {
+                let time = if opts["seconds"] == true {
+                    "21:37:05"
+                } else {
+                    "21:37"
+                };
+                let px = 96.0 * s;
+                let top = if opts["date"] == true {
+                    y + (h - px * 1.4) / 2.0
+                } else {
+                    y + (h - px) / 2.0
+                };
+                line(canvas, time, px, top + px * 0.9, look.accent, true, true);
+                if opts["date"] == true {
+                    line(
+                        canvas,
+                        "Среда, 28 октября",
+                        20.0 * s,
+                        top + px * 1.3,
+                        look.fg,
+                        false,
+                        true,
+                    );
+                }
+            }
+            "worldclock" => {
+                let zones = card["zones"].as_array().cloned().unwrap_or_default();
+                let step = 40.0 * s;
+                let mut base = y + (h - step * zones.len() as f32) / 2.0 + step * 0.7;
+                for (i, zone) in zones.iter().enumerate() {
+                    let city = zone
+                        .as_str()
+                        .unwrap_or("")
+                        .rsplit('/')
+                        .next()
+                        .unwrap_or("")
+                        .replace('_', " ");
+                    line(canvas, &city, 17.0 * s, base, look.muted, false, false);
+                    let time = format!("{:02}:37", (21 + i * 7) % 24);
+                    let px = 22.0 * s;
+                    let tw = fonts.char_width(px) * 5.0;
+                    fonts.text(
+                        canvas,
+                        &fonts.bold,
+                        &time,
+                        px,
+                        x + w - pad - tw,
+                        base,
+                        look.accent,
+                    );
+                    base += step;
+                }
+            }
+            "calendar" => {
+                let px = 14.0 * s;
+                line(
+                    canvas,
+                    "Октябрь 2026",
+                    px * 1.1,
+                    y + pad + px,
+                    look.accent,
+                    true,
+                    true,
+                );
+                let cell = (w - 2.0 * pad) / 7.0;
+                for (i, day) in ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+                    .iter()
+                    .enumerate()
+                {
+                    fonts.text(
+                        canvas,
+                        &fonts.regular,
+                        day,
+                        px,
+                        x + pad + cell * i as f32 + cell * 0.2,
+                        y + pad + px * 3.0,
+                        look.muted,
+                    );
+                }
+                // Октябрь 2026 начинается с четверга.
+                for d in 1..=31u32 {
+                    let slot = d + 2;
+                    let (col, row) = ((slot % 7) as f32, (slot / 7) as f32);
+                    let cx = x + pad + cell * col + cell * 0.2;
+                    let cy = y + pad + px * 5.0 + row * px * 2.0;
+                    let color = if d == 28 { look.accent } else { look.fg };
+                    fonts.text(
+                        canvas,
+                        if d == 28 { &fonts.bold } else { &fonts.regular },
+                        &d.to_string(),
+                        px,
+                        cx,
+                        cy,
+                        color,
+                    );
+                }
+            }
+            "system" => {
+                let ring = 64.0 * s;
+                let gap = (w - 3.0 * ring) / 4.0;
+                for (i, (label, value)) in [("cpu", 0.12), ("ram", 0.41), ("disk", 0.63)]
+                    .into_iter()
+                    .enumerate()
+                {
+                    let cx = x + gap + i as f32 * (ring + gap) + ring / 2.0;
+                    let cy = y + (h - ring - 20.0 * s) / 2.0 + ring / 2.0;
+                    draw_ring(canvas, cx, cy, ring / 2.0 - 3.0, value, look);
+                    let number = format!("{}", (value * 100.0) as u32);
+                    let px = 15.0 * s;
+                    let nw = fonts.char_width(px) * number.len() as f32;
+                    fonts.text(
+                        canvas,
+                        &fonts.regular,
+                        &number,
+                        px,
+                        cx - nw / 2.0,
+                        cy + px / 3.0,
+                        look.fg,
+                    );
+                    let lw = fonts.char_width(13.0 * s) * label.len() as f32;
+                    fonts.text(
+                        canvas,
+                        &fonts.regular,
+                        label,
+                        13.0 * s,
+                        cx - lw / 2.0,
+                        cy + ring / 2.0 + 18.0 * s,
+                        look.muted,
+                    );
+                }
+            }
+            "player" => {
+                let cover = 110.0 * s;
+                let top = y + (h - cover) / 2.0;
+                canvas.fill_path(
+                    &rounded_rect(
+                        rect(x + pad, top, cover, cover),
+                        look.style.radius_chip as f32,
+                    ),
+                    &paint(look.accent, 0.35),
+                    FillRule::Winding,
+                    Transform::identity(),
+                    None,
+                );
+                let left = x + pad + cover + 14.0 * s;
+                fonts.text(
+                    canvas,
+                    &fonts.bold,
+                    "Aruarian Dance",
+                    18.0 * s,
+                    left,
+                    top + 30.0 * s,
+                    look.fg,
+                );
+                fonts.text(
+                    canvas,
+                    &fonts.regular,
+                    "Nujabes",
+                    14.0 * s,
+                    left,
+                    top + 54.0 * s,
+                    look.muted,
+                );
+                fonts.text(
+                    canvas,
+                    &fonts.regular,
+                    "\u{f04ae}   \u{f040e}   \u{f04ad}",
+                    22.0 * s,
+                    left,
+                    top + 96.0 * s,
+                    look.fg,
+                );
+            }
+            "weather" => {
+                let px = 48.0 * s;
+                let base = y + h / 2.0 + px / 3.0;
+                fonts.text(
+                    canvas,
+                    &fonts.regular,
+                    "\u{f0590}",
+                    px,
+                    x + pad,
+                    base,
+                    look.accent,
+                );
+                let left = x + pad + px * 1.4;
+                fonts.text(
+                    canvas,
+                    &fonts.bold,
+                    "+7°C",
+                    30.0 * s,
+                    left,
+                    y + h / 2.0,
+                    look.accent,
+                );
+                fonts.text(
+                    canvas,
+                    &fonts.regular,
+                    "Облачно",
+                    14.0 * s,
+                    left,
+                    y + h / 2.0 + 22.0 * s,
+                    look.muted,
+                );
+            }
+            "countdown" => {
+                line(
+                    canvas,
+                    "53",
+                    46.0 * s,
+                    y + h / 2.0 + 6.0 * s,
+                    look.accent,
+                    true,
+                    true,
+                );
+                let title = format!("дн. до: {}", opts["title"].as_str().unwrap_or(""));
+                line(
+                    canvas,
+                    &title,
+                    14.0 * s,
+                    y + h / 2.0 + 30.0 * s,
+                    look.muted,
+                    false,
+                    true,
+                );
+            }
+            "note" => {
+                let text = opts["text"].as_str().unwrap_or("");
+                let px = 17.0 * s;
+                // Перенос по словам, как у метки с :wrap в eww.
+                let per_line = ((w - 2.0 * pad) / fonts.char_width(px)).max(4.0) as usize;
+                let mut lines: Vec<String> = vec![String::new()];
+                for word in text.split_whitespace() {
+                    let last = lines.last_mut().unwrap();
+                    if !last.is_empty()
+                        && last.chars().count() + 1 + word.chars().count() > per_line
+                    {
+                        lines.push(word.to_string());
+                    } else {
+                        if !last.is_empty() {
+                            last.push(' ');
+                        }
+                        last.push_str(word);
+                    }
+                }
+                let mut base = y + (h - lines.len() as f32 * px * 1.4) / 2.0 + px;
+                for text in &lines {
+                    line(canvas, text, px, base, look.fg, false, false);
+                    base += px * 1.4;
+                }
+            }
+            "widget" => {
+                let id = opts["id"].as_str().unwrap_or("");
+                if let Some(widget) = spec.widgets.get(id) {
+                    let mut text = widget.text.replace("{value}", "42");
+                    if !widget.icon.is_empty() {
+                        text = format!("{} {text}", widget.icon);
+                    }
+                    let color = widget.resolve_color(&spec.theme.palette).unwrap_or(look.fg);
+                    line(
+                        canvas,
+                        &text,
+                        18.0 * s,
+                        y + h / 2.0 + 6.0 * s,
+                        color,
+                        false,
+                        true,
+                    );
+                }
+            }
+            _ => {}
+        }
     }
 }
 

@@ -17,6 +17,7 @@
 // `import x` в Python или отдельный namespace в C#.
 pub mod apply;
 pub mod check;
+pub mod desk;
 pub mod modules;
 pub mod palette;
 pub mod plan;

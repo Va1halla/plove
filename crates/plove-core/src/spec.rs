@@ -37,6 +37,11 @@ pub struct RiceSpec {
     /// рабочий стол по id, как готовые (`modules_right: [vpn, clock]`).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub widgets: BTreeMap<String, Widget>,
+    /// Карточки на рабочем столе, расставленные в `plove studio`:
+    /// часы, погода, плеер… Если список пустой, виджеты стола берутся
+    /// из настроек модуля eww (cards, anchor).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub desktop: Vec<crate::desk::DeskCard>,
 }
 
 /// Свой виджет: что показывает команда, раз в сколько секунд, как выглядит.
@@ -420,6 +425,7 @@ impl RiceSpec {
                 .resolve_color(&self.theme.palette)
                 .with_context(|| format!("виджет «{id}»"))?;
         }
+        crate::desk::validate(self)?;
         Ok(())
     }
 }

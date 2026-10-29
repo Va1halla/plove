@@ -38,7 +38,7 @@ fn apply_is_idempotent_and_rollback_restores() {
     // Первое применение: все конфиги новые, kitty и ~/.zshrc меняются.
     let first = plan::build(example_spec(), &registry, &env).unwrap();
     assert!(first.warnings.iter().all(|w| !w.contains("занята")));
-    assert_eq!(first.changed_files().len(), 36);
+    assert_eq!(first.changed_files().len(), 38);
     let report = apply(&first, &env, &options).unwrap();
     assert_eq!(report.generation, Some(1));
 
@@ -138,7 +138,7 @@ fn removed_daemon_is_stopped() {
     let second = plan::build(spec, &registry, &env).unwrap();
     assert!(second
         .reloads
-        .contains(&"pkill -f '[e]ww open desktop'; true".to_string()));
+        .contains(&"pkill -f '[e]ww open.* desktop'; true".to_string()));
     // Оставшиеся программы не трогаем.
     assert!(!second.reloads.iter().any(|r| r.contains("'waybar'")));
 }
@@ -304,4 +304,33 @@ fn removed_module_config_is_deleted() {
 
     state::rollback(&env).unwrap();
     assert!(yazi.exists());
+}
+
+/// Раскладка из plove studio: каждая карточка — своё окно eww,
+/// и все окна открываются при входе.
+#[test]
+fn desk_cards_become_eww_windows() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let mut spec = example_spec();
+    spec.desktop = serde_yaml::from_str(
+        "[{kind: clock, at: [5, 8]}, {kind: weather, at: [70, 6], scale: 1.5, with: {city: Москва}}]",
+    )
+    .unwrap();
+    spec.validate().unwrap();
+    let plan = plan::build(spec, &registry, &env).unwrap();
+    let file = |name: &str| {
+        let f = plan.files.iter().find(|f| f.path.ends_with(name)).unwrap();
+        String::from_utf8(f.content.clone()).unwrap()
+    };
+    let yuck = file("eww/eww.yuck");
+    assert!(yuck.contains("(defwindow desktop\n"), "{yuck}");
+    assert!(yuck.contains("(defwindow desktop1\n"));
+    assert!(yuck.contains(":x \"70%\" :y \"6%\" :width \"480px\" :height \"165px\""));
+    assert!(yuck.contains("desk-weather.sh 'Москва'"));
+    let scss = file("eww/eww.scss");
+    assert!(scss.contains(".c1 .temp { font-size: 45px; }"), "{scss}");
+    let hypr = file("hypr/hyprland.conf");
+    assert!(hypr.contains("exec-once = eww open-many desktop desktop1"));
 }

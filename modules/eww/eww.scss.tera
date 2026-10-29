@@ -1,4 +1,5 @@
 // Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+{%- macro px(n, s) %}{% set v = n * s %}{{ v | round }}px{% endmacro px %}
 
 * {
   all: unset;
@@ -71,3 +72,86 @@ window {
   font-size: 16px;
 }
 {%- endfor %}
+{%- if desk | length > 0 %}
+
+// Карточки из plove studio. Размеры шрифтов умножены на scale карточки.
+.k_clock {
+  background-color: transparent;
+}
+
+.zone,
+.desc,
+.artist,
+.ring-label {
+  color: {{ colors.muted.hex }};
+}
+
+.zone-time,
+.temp,
+.days,
+.weather-icon {
+  color: {{ colors.accent.hex }};
+  font-weight: bold;
+}
+
+.cover {
+  background-size: cover;
+  background-position: center;
+  border-radius: {{ style.radius_chip }}px;
+}
+
+.cal {
+  padding: 4px;
+}
+
+.cal:selected {
+  color: {{ colors.bg.hex }};
+  background-color: {{ colors.accent.hex }};
+  border-radius: {{ style.radius_chip }}px;
+}
+
+.cal.header,
+.cal.button {
+  color: {{ colors.accent.hex }};
+}
+
+.cal:indeterminate {
+  color: {{ colors.muted.hex }};
+}
+{%- for c in desk %}
+{%- set s = c.scale %}
+
+.c{{ c.index }} {
+  padding: {{ self::px(n=style.pad, s=s) }} {{ self::px(n=style.pad * 2, s=s) }};
+  font-size: {{ self::px(n=15, s=s) }};
+}
+{%- if c.kind == "clock" %}
+.c{{ c.index }} .time { font-size: {{ self::px(n=96, s=s) }}; }
+.c{{ c.index }} .date { font-size: {{ self::px(n=20, s=s) }}; margin-top: {{ self::px(n=-6, s=s) }}; }
+{%- elif c.kind == "worldclock" %}
+.c{{ c.index }} .zone { font-size: {{ self::px(n=17, s=s) }}; }
+.c{{ c.index }} .zone-time { font-size: {{ self::px(n=22, s=s) }}; font-family: "{{ fonts.mono }}"; }
+{%- elif c.kind == "calendar" %}
+.c{{ c.index }} .cal { font-size: {{ self::px(n=14, s=s) }}; }
+{%- elif c.kind == "system" %}
+.c{{ c.index }} .ring { min-width: {{ self::px(n=64, s=s) }}; min-height: {{ self::px(n=64, s=s) }}; }
+.c{{ c.index }} .ring-text { font-size: {{ self::px(n=15, s=s) }}; }
+.c{{ c.index }} .ring-label { font-size: {{ self::px(n=13, s=s) }}; }
+{%- elif c.kind == "player" %}
+.c{{ c.index }} .song { font-size: {{ self::px(n=18, s=s) }}; color: {{ colors.fg.hex }}; margin-top: 0; }
+.c{{ c.index }} .artist { font-size: {{ self::px(n=14, s=s) }}; }
+.c{{ c.index }} .buttons button { font-size: {{ self::px(n=22, s=s) }}; }
+{%- elif c.kind == "weather" %}
+.c{{ c.index }} .weather-icon { font-size: {{ self::px(n=48, s=s) }}; }
+.c{{ c.index }} .temp { font-size: {{ self::px(n=30, s=s) }}; }
+.c{{ c.index }} .desc { font-size: {{ self::px(n=14, s=s) }}; }
+{%- elif c.kind == "countdown" %}
+.c{{ c.index }} .days { font-size: {{ self::px(n=46, s=s) }}; }
+.c{{ c.index }} .desc { font-size: {{ self::px(n=14, s=s) }}; }
+{%- elif c.kind == "note" %}
+.c{{ c.index }} .note { font-size: {{ self::px(n=17, s=s) }}; }
+{%- elif c.kind == "widget" %}
+.c{{ c.index }} label { font-size: {{ self::px(n=18, s=s) }}; }
+{%- endif %}
+{%- endfor %}
+{%- endif %}

@@ -1,4 +1,129 @@
 ; Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+{%- if desk | length > 0 %}
+{#- Раскладка из plove studio: каждая карточка — своё окно в своей точке. #}
+{%- for c in desk %}
+{%- set i = c.index %}{% set o = c.opts %}
+{%- if c.kind == "clock" %}
+
+(defpoll d{{ i }}_time :interval "{% if o.seconds %}1s{% else %}5s{% endif %}" "date '+%H:%M{% if o.seconds %}:%S{% endif %}'")
+{%- if o.date %}
+(defpoll d{{ i }}_date :interval "60s" "date '+%A, %d %B'")
+{%- endif %}
+{%- elif c.kind == "worldclock" %}
+{%- for zone in c.zones %}
+{%- set cmd = "TZ='" ~ zone ~ "' date +%H:%M" %}
+(defpoll d{{ i }}_z{{ loop.index0 }} :interval "10s" {{ cmd | json_encode() }})
+{%- endfor %}
+{%- elif c.kind == "system" %}
+
+(defpoll d{{ i }}_disk :interval "60s" "df --output=pcent / | tail -1 | tr -dc 0-9")
+{%- elif c.kind == "player" %}
+
+(deflisten d{{ i }}_title :initial ""
+  "playerctl --ignore-player=playerctld --follow metadata --format '{{ "{{" }} title {{ "}}" }}' 2>/dev/null || true")
+(deflisten d{{ i }}_artist :initial ""
+  "playerctl --ignore-player=playerctld --follow metadata --format '{{ "{{" }} artist {{ "}}" }}' 2>/dev/null || true")
+(deflisten d{{ i }}_cover :initial "" "sh ~/.local/share/plove/desk-cover.sh")
+{%- elif c.kind == "weather" %}
+
+{%- set city = o.city | replace(from="'", to="") %}
+{%- set cmd = "sh ~/.local/share/plove/desk-weather.sh '" ~ city ~ "'" %}
+(defpoll d{{ i }}_weather :interval "900s" :initial "{\"icon\": \"󰖐\", \"temp\": \"…\", \"desc\": \"\"}"
+  {{ cmd | json_encode() }})
+{%- elif c.kind == "countdown" %}
+
+{%- set day = o.date | replace(from="'", to="") %}
+{%- set cmd = "echo $(( ( $(date -d '" ~ day ~ "' +%s) - $(date +%s) + 86399 ) / 86400 ))" %}
+(defpoll d{{ i }}_days :interval "600s" {{ cmd | json_encode() }})
+{%- elif c.kind == "widget" and o.id in widgets %}
+
+(defpoll d{{ i }}_w :interval "{{ widgets[o.id].every }}s" {{ widgets[o.id].command | json_encode() }})
+{%- endif %}
+{%- endfor %}
+{%- for c in desk %}
+{%- set i = c.index %}{% set o = c.opts %}
+{%- set ring = c.scale * 64 %}{% set ring = ring | round %}
+{%- set cover = c.scale * 110 %}{% set cover = cover | round %}
+{#- Отступы растут вместе с карточкой. В Tera фильтр сильнее умножения,
+    поэтому сначала считаем, потом округляем. #}
+{%- set thick = c.scale * 6 %}{% set thick = thick | round %}
+{%- set gap14 = c.scale * 14 %}{% set gap14 = gap14 | round %}
+{%- set gap16 = c.scale * 16 %}{% set gap16 = gap16 | round %}
+{%- set gap18 = c.scale * 18 %}{% set gap18 = gap18 | round %}
+
+(defwindow {{ c.window }}
+  :monitor 0
+  :geometry (geometry :x "{{ c.x }}%" :y "{{ c.y }}%" :width "{{ c.w }}px" :height "{{ c.h }}px" :anchor "top left")
+  :stacking "bg"
+  :exclusive false
+{%- if c.kind == "clock" %}
+  (box :class "desktop card desk k_clock c{{ i }}" :orientation "v" :space-evenly false :valign "center"
+    (label :class "time" :text d{{ i }}_time)
+{%- if o.date %}
+    (label :class "date" :text d{{ i }}_date)
+{%- endif %}))
+{%- elif c.kind == "worldclock" %}
+  (box :class "desktop card desk k_worldclock c{{ i }}" :orientation "v" :space-evenly false :valign "center" :spacing {{ thick }}
+{%- for zone in c.zones %}
+{%- set city = zone | split(pat="/") | last | replace(from="_", to=" ") %}
+    (box :space-evenly false
+      (label :class "zone" :hexpand true :xalign 0 :text {{ city | json_encode() }})
+      (label :class "zone-time" :text d{{ i }}_z{{ loop.index0 }}))
+{%- endfor %}))
+{%- elif c.kind == "calendar" %}
+  (box :class "desktop card desk k_calendar c{{ i }}" :orientation "v" :space-evenly false
+    (calendar :class "cal" :show-heading true :show-day-names true)))
+{%- elif c.kind == "system" %}
+  (box :class "desktop card desk k_system c{{ i }}" :halign "fill" :valign "center" :space-evenly true
+    (box :orientation "v" :space-evenly false
+      (circular-progress :class "ring" :value {EWW_CPU.avg} :thickness {{ thick }} :start-at 75 :width {{ ring }} :height {{ ring }}
+        (label :class "ring-text" :text "${round(EWW_CPU.avg, 0)}"))
+      (label :class "ring-label" :text "cpu"))
+    (box :orientation "v" :space-evenly false
+      (circular-progress :class "ring" :value {EWW_RAM.used_mem_perc} :thickness {{ thick }} :start-at 75 :width {{ ring }} :height {{ ring }}
+        (label :class "ring-text" :text "${round(EWW_RAM.used_mem_perc, 0)}"))
+      (label :class "ring-label" :text "ram"))
+    (box :orientation "v" :space-evenly false
+      (circular-progress :class "ring" :value d{{ i }}_disk :thickness {{ thick }} :start-at 75 :width {{ ring }} :height {{ ring }}
+        (label :class "ring-text" :text d{{ i }}_disk))
+      (label :class "ring-label" :text "disk"))))
+{%- elif c.kind == "player" %}
+  (box :class "desktop card desk k_player c{{ i }}" :space-evenly false :spacing {{ gap14 }} :visible {d{{ i }}_title != ""}
+    (box :class "cover" :width {{ cover }} :height {{ cover }} :valign "center" :visible {d{{ i }}_cover != ""}
+      :style "background-image: url('${d{{ i }}_cover}');")
+    (box :orientation "v" :space-evenly false :valign "center" :hexpand true
+      (label :class "song" :xalign 0 :limit-width 28 :text d{{ i }}_title)
+      (label :class "artist" :xalign 0 :limit-width 32 :text d{{ i }}_artist)
+      (box :class "buttons" :halign "start" :spacing {{ gap18 }} :space-evenly false
+        (button :onclick "playerctl --ignore-player=playerctld previous" "󰒮")
+        (button :onclick "playerctl --ignore-player=playerctld play-pause" "󰐎")
+        (button :onclick "playerctl --ignore-player=playerctld next" "󰒭")))))
+{%- elif c.kind == "weather" %}
+  (box :class "desktop card desk k_weather c{{ i }}" :space-evenly false :spacing {{ gap16 }} :valign "center"
+    (label :class "weather-icon" :text {d{{ i }}_weather.icon})
+    (box :orientation "v" :space-evenly false :valign "center"
+      (label :class "temp" :xalign 0 :text {d{{ i }}_weather.temp})
+      (label :class "desc" :xalign 0 :limit-width 24 :text {d{{ i }}_weather.desc})))
+{%- elif c.kind == "countdown" %}
+  (box :class "desktop card desk k_countdown c{{ i }}" :orientation "v" :space-evenly false :valign "center"
+    (label :class "days" :text d{{ i }}_days)
+    {%- set label = "дн. до: " ~ o.title %}
+    (label :class "desc" :text {{ label | json_encode() }})))
+{%- elif c.kind == "note" %}
+  (box :class "desktop card desk k_note c{{ i }}" :orientation "v" :space-evenly false :valign "center"
+    (label :class "note" :wrap true :xalign 0 :text {{ o.text | json_encode() }})))
+{%- elif c.kind == "widget" and o.id in widgets %}
+{%- set w = widgets[o.id] %}
+{%- set parts = w.text | replace(from='"', to='\\"') | split(pat="{value}") %}
+{%- if parts | length > 1 %}{% set before = parts | first %}{% set after = parts | last %}
+{%- else %}{% set first = parts | first %}{% set before = first ~ " " %}{% set after = "" %}{% endif %}
+  (box :class "desktop card desk k_widget w_{{ o.id }} c{{ i }}" :halign "center" :valign "center" :space-evenly false
+    (label :text "{% if w.icon %}{{ w.icon }} {% endif %}{{ before }}${d{{ i }}_w}{{ after }}")))
+{%- else %}
+  (box))
+{%- endif %}
+{%- endfor %}
+{%- else %}
 {%- set cards = options.cards %}
 {%- if options.anchor == "center" %}{% set anchor = "center" %}{% set x = "0%" %}{% set y = "-10%" %}
 {%- elif options.anchor == "left" %}{% set anchor = "center left" %}{% set x = "4%" %}{% set y = "0%" %}
@@ -79,3 +204,4 @@
       (label :text "{% if w.icon %}{{ w.icon }} {% endif %}{{ before }}${w_{{ card }}}{{ after }}"))
 {%- endif %}
 {%- endfor %}))
+{%- endif %}
