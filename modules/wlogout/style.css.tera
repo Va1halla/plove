@@ -12,9 +12,13 @@ button {
     border: {{ style.border }}px solid transparent;
     border-radius: {{ style.radius_box }}px;
     margin: 12px;
+    /* Одинаковые кнопки при любой длине подписи; значок постоянного
+       размера и выше подписи, чтобы они не налезали друг на друга. */
+    min-width: 120px;
+    min-height: 120px;
     background-repeat: no-repeat;
-    background-position: center;
-    background-size: 22%;
+    background-position: center 38%;
+    background-size: 64px;
 }
 
 button:focus, button:hover {

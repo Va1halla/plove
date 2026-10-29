@@ -12,6 +12,8 @@ templates:
     dest: ~/.config/waybar/style.css
   - src: sep.sh.tera
     dest: ~/.local/share/plove/waybar-sep.sh
+  - src: calc.sh.tera
+    dest: ~/.local/share/plove/calc.sh
 reload: pkill -SIGUSR2 waybar
 autostart: true
 # Фоновый процесс: plove остановит его, если модуль уберут из райса.

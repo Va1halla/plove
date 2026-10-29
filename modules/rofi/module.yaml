@@ -3,7 +3,8 @@
 id: rofi
 role: launcher
 exec: rofi -show drun
-dmenu: rofi -dmenu -i
+# -p '': без подписи «dmenu» слева от строки поиска.
+dmenu: rofi -dmenu -i -p ''
 packages: [rofi]
 compatible_with:
   compositor: [hyprland]

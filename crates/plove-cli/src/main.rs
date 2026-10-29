@@ -641,6 +641,7 @@ fn print_plan(plan: &Plan, env: &Env) {
             FileStatus::Create => ("+", "новый"),
             FileStatus::Update => ("~", "изменится"),
             FileStatus::Unchanged => ("=", "без изменений"),
+            FileStatus::Remove => ("-", "удалится: программы больше нет в райсе"),
         };
         println!("  {mark} {:<38} {note}", env.display(&file.path));
     }

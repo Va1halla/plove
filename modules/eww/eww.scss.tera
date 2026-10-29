@@ -9,7 +9,7 @@ window {
 }
 
 .desktop {
-  font-family: "{{ fonts.ui }}", "{{ fonts.mono }}";
+  font-family: "{{ fonts.ui }}", "{{ icon_font }}", "{{ fonts.mono }}";
   color: {{ colors.fg.hex }};
 }
 

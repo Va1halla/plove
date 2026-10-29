@@ -1,0 +1,31 @@
+#!/bin/sh
+# Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+# Калькулятор с панели (модуль calculator) в меню лаунчера: набрали
+# выражение, Enter — ответ встаёт первой строкой; выбрали строку с
+# ответом — он скопирован. Esc — выход. Лаунчер сразу ловит клавиатуру,
+# поэтому печатать можно без щелчка в поле.
+
+calc() {
+    if command -v qalc >/dev/null 2>&1; then
+        qalc -t -- "$1" 2>/dev/null | tail -1
+    elif printf '%s' "$1" | grep -q '[^0-9+*/%^()., -]'; then
+        # Без qalc — только арифметика: никаких букв в awk.
+        echo "?"
+    else
+        awk "BEGIN { print ($(printf '%s' "$1" | tr ',' '.')) }" 2>/dev/null
+    fi
+}
+
+history=""
+while :; do
+    input=$(printf '%s' "$history" | {{ dmenu | default(value="rofi -dmenu -i -p ''") }}) || exit 0
+    [ -n "$input" ] || exit 0
+    case "$input" in
+    *" = "*)
+        printf '%s' "${input##* = }" | wl-copy
+        exit 0
+        ;;
+    esac
+    history="$input = $(calc "$input")
+$history"
+done

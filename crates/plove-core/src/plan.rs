@@ -31,6 +31,9 @@ pub enum FileStatus {
     Update,
     /// Файл уже такой, как нужно.
     Unchanged,
+    /// Конфиг программы, которую убрали из райса: plove его удалит
+    /// (копия останется в поколении, `plove rollback` вернёт).
+    Remove,
 }
 
 pub struct FileChange {
@@ -305,6 +308,31 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
                 bail!("два модуля пишут в один файл {}", rendered.dest);
             }
             files.push(file_change(path, rendered.content.into_bytes()));
+        }
+    }
+
+    // Конфиги программ, которых в райсе нет (убрали сейчас или когда-то
+    // раньше). Удаляем только то, что записала сама plove: иначе остались
+    // бы устаревшие файлы, а с ними и ошибки (тема yazi старого формата
+    // ломала yazi, хотя его в райсе уже не было).
+    let written: Vec<PathBuf> = state::list(env)
+        .unwrap_or_default()
+        .into_iter()
+        .flat_map(|g| g.record.files.into_iter().map(|f| f.path))
+        .collect();
+    for module in registry.iter() {
+        if spec.components.values().any(|c| *c == module.manifest.id) {
+            continue;
+        }
+        for entry in &module.manifest.templates {
+            let path = env.expand(&entry.dest);
+            if path.exists() && written.contains(&path) && !files.iter().any(|f| f.path == path) {
+                files.push(FileChange {
+                    path,
+                    status: FileStatus::Remove,
+                    content: Vec::new(),
+                });
+            }
         }
     }
 

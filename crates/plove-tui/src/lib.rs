@@ -1325,6 +1325,7 @@ impl App {
                     Color::Yellow,
                 ),
                 FileStatus::Unchanged => ("=", "без изменений", Color::DarkGray),
+                FileStatus::Remove => ("-", "удалится: программы больше нет в райсе", Color::Red),
             };
             let path = env_display(&f.path);
             lines.push(Line::styled(

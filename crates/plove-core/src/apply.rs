@@ -14,7 +14,7 @@ use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 
-use crate::plan::Plan;
+use crate::plan::{FileStatus, Plan};
 use crate::state;
 use crate::system::{self, Env};
 
@@ -64,7 +64,12 @@ pub fn apply(plan: &Plan, env: &Env, options: &ApplyOptions) -> Result<ApplyRepo
         let snapshot = state::snapshot(env, &plan.spec, &paths, &plan.reloads)?;
         generation = Some(snapshot.number);
         for file in &changed {
-            write_atomic(&file.path, &file.content)?;
+            if file.status == FileStatus::Remove {
+                fs::remove_file(&file.path)
+                    .with_context(|| format!("не удалось удалить {}", file.path.display()))?;
+            } else {
+                write_atomic(&file.path, &file.content)?;
+            }
         }
     }
 

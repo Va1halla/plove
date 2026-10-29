@@ -38,7 +38,7 @@ fn apply_is_idempotent_and_rollback_restores() {
     // Первое применение: все конфиги новые, kitty и ~/.zshrc меняются.
     let first = plan::build(example_spec(), &registry, &env).unwrap();
     assert!(first.warnings.iter().all(|w| !w.contains("занята")));
-    assert_eq!(first.changed_files().len(), 34);
+    assert_eq!(first.changed_files().len(), 36);
     let report = apply(&first, &env, &options).unwrap();
     assert_eq!(report.generation, Some(1));
 
@@ -272,4 +272,36 @@ fn settings_reach_commands() {
     assert!(hypr.contains("wf-recorder --audio"));
     assert!(file("fuzzel/fuzzel.ini").contains("width=60"));
     assert!(plan.on_apply.iter().any(|c| c.ends_with("cursor-size 32")));
+}
+
+/// Конфиг убранной из райса программы удаляется, а откат его возвращает.
+#[test]
+fn removed_module_config_is_deleted() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let options = ApplyOptions {
+        skip_packages: true,
+        no_confirm: true,
+    };
+    let first = plan::build(example_spec(), &registry, &env).unwrap();
+    apply(&first, &env, &options).unwrap();
+    let yazi = home.path().join(".config/yazi/theme.toml");
+    assert!(yazi.exists());
+
+    let mut spec = example_spec();
+    spec.components.remove("terminal_files");
+    let second = plan::build(spec, &registry, &env).unwrap();
+    let removed: Vec<_> = second
+        .files
+        .iter()
+        .filter(|f| f.status == FileStatus::Remove)
+        .map(|f| f.path.clone())
+        .collect();
+    assert_eq!(removed, vec![yazi.clone()]);
+    apply(&second, &env, &options).unwrap();
+    assert!(!yazi.exists());
+
+    state::rollback(&env).unwrap();
+    assert!(yazi.exists());
 }

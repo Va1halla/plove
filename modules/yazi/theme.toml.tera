@@ -22,6 +22,8 @@ rules = [
 	{ mime = "image/*", fg = "{% if ansi | length == 16 %}{{ ansi.3.hex }}{% else %}{{ colors.accent.hex }}{% endif %}" },
 	{ mime = "{audio,video}/*", fg = "{% if ansi | length == 16 %}{{ ansi.5.hex }}{% else %}{{ colors.accent.hex }}{% endif %}" },
 	{ mime = "application/{zip,rar,7z*,tar,gzip,xz,zstd,bzip*,lzma,compress,archive,cpio,arj,xar,ms-cab*}", fg = "{% if ansi | length == 16 %}{{ ansi.1.hex }}{% else %}{{ colors.accent.hex }}{% endif %}" },
-	{ name = "*/", fg = "{{ colors.accent.hex }}" },
-	{ name = "*", fg = "{{ colors.fg.hex }}" },
+	# Папки и остальные файлы. В yazi 26 ключ называется url (раньше name),
+	# со старым yazi не запускался вовсе: «at least one of url or mime».
+	{ url = "*/", fg = "{{ colors.accent.hex }}" },
+	{ url = "*", fg = "{{ colors.fg.hex }}" },
 ]

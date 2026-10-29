@@ -4,10 +4,12 @@
 #   popups.sh toggle <меню> <якорь> <отступ>   — открыть под модулем или закрыть
 #   popups.sh close <меню>
 #   popups.sh audio | sinks | net | wifi        — JSON для eww
-#   popups.sh calc <выражение> | copy | connect <сеть> | mixer | netsettings
+#   popups.sh connect <сеть> | mixer | netsettings | wifi-toggle
 
 E="eww -c $HOME/.config/eww-popups"
-MENUS="volume network clock calculator"
+# Метки «мышь заходила в меню» и номер последнего открытия.
+RUN="${XDG_RUNTIME_DIR:-/tmp}/plove-popups"
+MENUS="volume network clock"
 
 json_escape() {
     printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
@@ -50,6 +52,22 @@ toggle)
     done
     $E update "$2_open=true"
     $E open "$2" --anchor "$3" --pos "$4"
+{%- if options.close_on_leave %}
+    # Меню закрывается, когда мышь из него ушла. Если же в него так и не
+    # зашли, оно висело бы до повторного щелчка: закрываем через 5 секунд.
+    # Номер открытия — чтобы старый таймер не закрыл меню, открытое заново.
+    mkdir -p "$RUN"
+    rm -f "$RUN/$2.hovered"
+    echo $$ > "$RUN/$2.opened"
+    (
+        sleep 5
+        [ -e "$RUN/$2.hovered" ] || [ "$(cat "$RUN/$2.opened" 2>/dev/null)" != "$$" ] || close "$2"
+    ) >/dev/null 2>&1 &
+{%- endif %}
+    ;;
+hovered)
+    mkdir -p "$RUN"
+    touch "$RUN/$2.hovered"
     ;;
 close)
     close "$2"
@@ -137,25 +155,5 @@ mixer)
     for app in wiremix pulsemixer alsamixer; do
         command -v $app >/dev/null 2>&1 && { in_terminal $app; exit 0; }
     done
-    ;;
-calc)
-    expr=$2
-    if [ -z "$expr" ]; then
-        result=""
-    elif command -v qalc >/dev/null 2>&1; then
-        result=$(qalc -t -- "$expr" 2>/dev/null | tail -1)
-    else
-        # Без qalc — только арифметика: никаких букв в awk.
-        if printf '%s' "$expr" | grep -q '[^0-9+*/%^()., -]'; then
-            result="?"
-        else
-            result=$(awk "BEGIN { print ($(printf '%s' "$expr" | tr ',' '.')) }" 2>/dev/null)
-        fi
-    fi
-    $E update "calc_result=$result"
-    ;;
-copy)
-    result=$($E get calc_result 2>/dev/null)
-    [ -n "$result" ] && printf '%s' "$result" | wl-copy
     ;;
 esac
