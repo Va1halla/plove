@@ -178,6 +178,24 @@ pub fn package_installed(name: &str) -> Option<bool> {
         .map(|status| status.success())
 }
 
+/// Семейства шрифтов, которые видит fontconfig, по алфавиту.
+/// Пусто, если fc-list нет.
+pub fn font_families() -> Vec<String> {
+    let Ok(out) = Command::new("fc-list").args([":", "family"]).output() else {
+        return Vec::new();
+    };
+    let mut families: Vec<String> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        // «Inter,Inter Light»: первое имя — само семейство.
+        .filter_map(|line| line.split(',').next())
+        .map(|f| f.trim().to_string())
+        .filter(|f| !f.is_empty())
+        .collect();
+    families.sort();
+    families.dedup();
+    families
+}
+
 /// Поставить пакеты через `sudo pacman`. Вывод pacman и вопрос пароля
 /// идут прямо в терминал пользователя. `no_confirm` — без вопроса
 /// «Приступить к установке?»: иначе `plove apply -y` ждал бы ответа.

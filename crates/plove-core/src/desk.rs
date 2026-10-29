@@ -9,7 +9,8 @@ use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::spec::RiceSpec;
+use crate::spec::{check_font, Color, Palette, RiceSpec, COLOR_NAMES};
+use crate::theme::StyleContext;
 
 /// Карточка на рабочем столе, как она записана в райсе:
 /// `{ kind: weather, at: [80, 6], with: { city: Москва } }`.
@@ -26,6 +27,44 @@ pub struct DeskCard {
     /// Параметры вида; чего нет — берётся по умолчанию.
     #[serde(default, skip_serializing_if = "serde_yaml::Mapping::is_empty")]
     pub with: serde_yaml::Mapping,
+    /// Оформление этой карточки поверх стиля райса.
+    #[serde(default, skip_serializing_if = "Look::is_empty")]
+    pub look: Look,
+}
+
+/// Оформление карточки: `look: { font: Orbitron, fill: none, radius: 24 }`.
+/// Чего нет — как у остальных карточек по стилю райса. Цвета — имена из
+/// палитры (accent, fg, red…) или `#rrggbb`.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Look {
+    /// Шрифт всей карточки; значки берутся из Nerd Font райса.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub font: Option<String>,
+    /// Цвет крупных цифр, колец и выделения.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent: Option<String>,
+    /// Цвет обычного текста; подписи — он же, бледнее.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    /// Фон: цвет или `none` — без фона.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill: Option<String>,
+    /// Непрозрачность фона, от 0 до 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opacity: Option<f64>,
+    /// Скругление углов, px. Больше половины высоты — «таблетка».
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub radius: Option<u32>,
+    /// Рамка цвета accent, px.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub border: Option<u32>,
+}
+
+impl Look {
+    pub fn is_empty(&self) -> bool {
+        *self == Look::default()
+    }
 }
 
 fn one() -> f64 {
@@ -267,8 +306,70 @@ pub fn validate(spec: &RiceSpec) -> Result<()> {
                 bail!("desktop, карточка {n}: в widgets нет виджета «{id}»");
             }
         }
+        check_look(&card.look, &spec.theme.palette)
+            .map_err(|e| anyhow::anyhow!("desktop, карточка {n} ({}): look.{e}", kind.id))?;
     }
     Ok(())
+}
+
+fn check_look(look: &Look, palette: &Palette) -> Result<()> {
+    if let Some(font) = &look.font {
+        check_font("font", font)?;
+    }
+    let colors = [
+        ("accent", &look.accent),
+        ("text", &look.text),
+        ("fill", &look.fill),
+    ];
+    for (what, color) in colors {
+        let Some(color) = color else { continue };
+        if !(what == "fill" && color == "none") && palette.named(color).is_none() {
+            bail!(
+                "{what}: «{color}» — не цвет. Можно {} или #rrggbb{}",
+                COLOR_NAMES.join(", "),
+                if what == "fill" { ", или none" } else { "" }
+            );
+        }
+    }
+    if look.opacity.is_some_and(|o| !(0.0..=1.0).contains(&o)) {
+        bail!("opacity от 0 до 1");
+    }
+    if look.radius.is_some_and(|r| r > 200) {
+        bail!("radius от 0 до 200");
+    }
+    if look.border.is_some_and(|b| b > 12) {
+        bail!("border от 0 до 12");
+    }
+    Ok(())
+}
+
+/// Оформление для шаблонов: готовые CSS-значения или null, если как в райсе.
+fn look_context(look: &Look, spec: &RiceSpec) -> serde_json::Value {
+    let palette = &spec.theme.palette;
+    let color = |c: &Option<String>| c.as_deref().and_then(|c| palette.named(c));
+    let rgba = |c: Color, a: f64| format!("rgba({}, {}, {}, {})", c.r, c.g, c.b, round2(a));
+    let fill = match (look.fill.as_deref(), look.opacity) {
+        (Some("none"), _) => Some("transparent".to_string()),
+        (None, None) => None,
+        (_, opacity) => {
+            let base = color(&look.fill).unwrap_or(palette.bg);
+            // Без opacity — как у остальных карточек; у сплошного цвета — непрозрачный.
+            let style = StyleContext::new(spec.theme.style, &spec.theme.geometry);
+            let theme = (style.bg_alpha - 0.25).max(0.15);
+            let alpha = opacity.unwrap_or(if look.fill.is_some() { 1.0 } else { theme });
+            Some(rgba(base, alpha))
+        }
+    };
+    let text = color(&look.text);
+    json!({
+        "font": look.font,
+        "accent": color(&look.accent).map(|c| c.hex()),
+        "text": text.map(|c| c.hex()),
+        "muted": text.map(|c| rgba(c, 0.65)),
+        "fill": fill,
+        "radius": look.radius,
+        "border": look.border,
+    })
 }
 
 /// Карточки для шаблонов eww: имя окна, размер в пикселях и параметры
@@ -324,6 +425,7 @@ pub fn context(spec: &RiceSpec) -> Vec<serde_json::Value> {
                 "h": (size.1 as f64 * card.scale).round() as u32,
                 "opts": opts,
                 "zones": zones,
+                "look": look_context(&card.look, spec),
             }))
         })
         .collect()
@@ -331,6 +433,10 @@ pub fn context(spec: &RiceSpec) -> Vec<serde_json::Value> {
 
 fn round1(x: f64) -> f64 {
     (x * 10.0).round() / 10.0
+}
+
+fn round2(x: f64) -> f64 {
+    (x * 100.0).round() / 100.0
 }
 
 #[cfg(test)]

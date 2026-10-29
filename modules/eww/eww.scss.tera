@@ -153,5 +153,28 @@ window {
 {%- elif c.kind == "widget" %}
 .c{{ c.index }} label { font-size: {{ self::px(n=18, s=s) }}; }
 {%- endif %}
+{#- Оформление карточки из look: поверх всего, что выше. #}
+{%- set l = c.look %}
+{%- set k = ".c" ~ c.index %}
+{%- if l.font %}
+{{ k }}, {{ k }} * { font-family: "{{ l.font }}", "{{ icon_font }}"; }
+{%- endif %}
+{%- if l.text %}
+{{ k }}, {{ k }} .song { color: {{ l.text }}; }
+{{ k }} .zone, {{ k }} .desc, {{ k }} .artist, {{ k }} .ring-label, {{ k }} .cal:indeterminate { color: {{ l.muted }}; }
+{%- endif %}
+{%- if l.accent %}
+{{ k }} .time, {{ k }} .zone-time, {{ k }} .temp, {{ k }} .days, {{ k }} .weather-icon, {{ k }} .ring, {{ k }} .cal.header, {{ k }} .cal.button, {{ k }} .buttons button:hover { color: {{ l.accent }}; }
+{{ k }} .cal:selected { background-color: {{ l.accent }}; }
+{%- endif %}
+{%- if l.fill %}
+{{ k }} { background-color: {{ l.fill }}; }
+{%- endif %}
+{%- if l.radius is number %}
+{{ k }} { border-radius: {{ l.radius }}px; }
+{%- endif %}
+{%- if l.border %}
+{{ k }} { border: {{ l.border }}px solid {% if l.accent %}{{ l.accent }}{% else %}{{ colors.accent.hex }}{% endif %}; }
+{%- endif %}
 {%- endfor %}
 {%- endif %}

@@ -59,7 +59,7 @@ pub struct Widget {
     /// Подпись; `{value}` заменяется выводом команды.
     #[serde(default = "default_widget_text")]
     pub text: String,
-    /// Цвет: accent, fg, muted, red, green, yellow, blue, magenta, cyan.
+    /// Цвет: имя из [`COLOR_NAMES`] (accent, fg, red…) или `#rrggbb`.
     #[serde(default = "default_widget_color")]
     pub color: String,
     /// Команда по щелчку.
@@ -101,20 +101,54 @@ fn default_widget_color() -> String {
 impl Widget {
     /// Цвет виджета как `#rrggbb` из палитры райса.
     pub fn resolve_color(&self, palette: &Palette) -> Result<Color> {
-        let ansi = |i: usize| palette.ansi.get(i).copied().unwrap_or(palette.accent);
-        Ok(match self.color.as_str() {
-            "accent" => palette.accent,
-            "fg" => palette.fg,
-            "muted" => palette.bg.mix(palette.fg, 0.5),
+        match palette.named(&self.color) {
+            Some(color) => Ok(color),
+            None => bail!(
+                "у виджета цвет «{}»: можно {} или #rrggbb",
+                self.color,
+                COLOR_NAMES.join(", ")
+            ),
+        }
+    }
+}
+
+/// Имя шрифта попадает в кавычки в CSS, Lua и конфигах программ:
+/// без кавычек, скобок и прочего, что там что-то значит.
+pub fn check_font(what: &str, name: &str) -> Result<()> {
+    let plain = !name.trim().is_empty()
+        && name.len() <= 64
+        && name
+            .chars()
+            .all(|c| c.is_alphanumeric() || " -_.+".contains(c));
+    if !plain {
+        bail!("{what}: «{name}» не похоже на имя шрифта (буквы, цифры, пробел, - _ . +)");
+    }
+    Ok(())
+}
+
+/// Имена цветов палитры, которые можно писать вместо `#rrggbb`.
+pub const COLOR_NAMES: [&str; 11] = [
+    "accent", "fg", "bg", "muted", "surface", "red", "green", "yellow", "blue", "magenta", "cyan",
+];
+
+impl Palette {
+    /// Цвет по имени из [`COLOR_NAMES`] или `#rrggbb`. `None` — не цвет.
+    pub fn named(&self, name: &str) -> Option<Color> {
+        let ansi = |i: usize| self.ansi.get(i).copied().unwrap_or(self.accent);
+        Some(match name {
+            "accent" => self.accent,
+            "fg" => self.fg,
+            "bg" => self.bg,
+            "muted" => self.bg.mix(self.fg, 0.5),
+            "surface" => self.bg.mix(self.fg, 0.15),
             "red" => ansi(1),
             "green" => ansi(2),
             "yellow" => ansi(3),
             "blue" => ansi(4),
             "magenta" => ansi(5),
             "cyan" => ansi(6),
-            other => bail!(
-                "у виджета цвет «{other}»: можно accent, fg, muted, red, green, yellow, blue, magenta, cyan"
-            ),
+            hex if hex.starts_with('#') => Color::parse(hex).ok()?,
+            _ => return None,
         })
     }
 }
@@ -267,7 +301,7 @@ pub struct Palette {
     pub ansi: Vec<Color>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Fonts {
     /// Шрифт интерфейса: панель, уведомления.
@@ -403,6 +437,12 @@ impl RiceSpec {
         let opacity = self.theme.geometry.opacity;
         if !(0.0..=1.0).contains(&opacity) {
             bail!("geometry.opacity должен быть от 0.0 до 1.0, а сейчас {opacity}");
+        }
+        let fonts = &self.theme.fonts;
+        check_font("fonts.ui", &fonts.ui)?;
+        check_font("fonts.mono", &fonts.mono)?;
+        if !(6..=32).contains(&fonts.size) {
+            bail!("fonts.size от 6 до 32, а сейчас {}", fonts.size);
         }
         if !self.components.contains_key("compositor") {
             bail!("в components обязательно должен быть compositor");

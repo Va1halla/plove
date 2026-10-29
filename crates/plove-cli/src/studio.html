@@ -86,6 +86,14 @@
     border: 1px solid var(--ui-line); border-radius: 6px; padding: 6px 8px;
   }
   #props input[type=range] { width: 100%; }
+  #props select {
+    width: 100%; font: inherit; color: var(--ui-text); background: var(--ui-bg);
+    border: 1px solid var(--ui-line); border-radius: 6px; padding: 5px 6px;
+  }
+  #props .row select { flex: 1; min-width: 0; }
+  #props input[type=color] { width: 40px; height: 32px; padding: 2px; background: var(--ui-bg); border: 1px solid var(--ui-line); border-radius: 6px; }
+  #props h4 { margin: 18px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ui-muted); border-top: 1px solid var(--ui-line); padding-top: 12px; }
+  #props .sample { margin-top: 6px; padding: 8px 10px; background: var(--ui-bg); border-radius: 6px; font-size: 16px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   #props .row { display: flex; gap: 8px; }
   #props .check { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--ui-text); font-size: 14px; }
   #props .about { color: var(--ui-muted); font-size: 12px; margin: 0 0 8px; }
@@ -117,7 +125,7 @@
   <p class="hint">Перетаскивайте карточки мышью, размер — за уголок. <kbd>Del</kbd> удаляет, стрелки двигают точнее, <kbd>Shift</kbd> — без привязки к краям и центру.</p>
 </aside>
 <main id="stage-wrap"><div id="stage"><div class="guide v" id="gv"></div><div class="guide h" id="gh"></div></div></main>
-<aside id="props"><h2>Карточка</h2><div id="form"><p class="about">Выберите карточку на столе или добавьте новую слева.</p></div></aside>
+<aside id="props"><h2 id="props-title">Карточка</h2><div id="form"><p class="about">Выберите карточку на столе или добавьте новую слева.</p></div></aside>
 
 <script>
 "use strict";
@@ -126,6 +134,8 @@ let cards = [];           // раскладка: {kind, at:[x,y], scale, with:{}
 let selected = -1;
 let ratio = 1;            // точек страницы на точку экрана
 let dirty = false;
+let fonts = null;         // шрифты системы: {ui, mono, size}
+let savedFonts = "";      // они же, как сохранены в райсе (JSON)
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -134,7 +144,9 @@ const kindOf = (id) => state.catalog.find((k) => k.id === id);
 async function load() {
   const res = await fetch("/api/state");
   state = await res.json();
-  cards = state.desktop.map((c) => ({ kind: c.kind, at: [...c.at], scale: c.scale ?? 1, with: { ...(c.with || {}) } }));
+  cards = state.desktop.map((c) => ({ kind: c.kind, at: [...c.at], scale: c.scale ?? 1, with: { ...(c.with || {}) }, look: { ...(c.look || {}) } }));
+  fonts = { ui: state.theme.fonts.ui, mono: state.theme.fonts.mono, size: state.theme.fonts.size };
+  savedFonts = JSON.stringify(fonts);
   document.title = `plove studio — ${state.name}`;
   $("file").textContent = state.file;
   const t = state.theme;
@@ -183,7 +195,7 @@ const zones = (card) => String(opt(card, "zones")).split(",").map((s) => s.trim(
 
 function add(kind) {
   const [sw, sh] = state.screen;
-  const card = { kind, at: [0, 0], scale: 1, with: {} };
+  const card = { kind, at: [0, 0], scale: 1, with: {}, look: {} };
   card.at = freeSpot(card);
   if (kind === "widget") {
     const ids = Object.keys(state.widgets);
@@ -239,14 +251,21 @@ function cardElement(card, i) {
   el.style.top = `${card.at[1]}%`;
   el.style.width = `${w * ratio}px`;
   el.style.height = `${h * ratio}px`;
-  el.style.color = t.colors.fg.hex;
-  el.style.fontFamily = `"${t.fonts.ui}", system-ui, sans-serif`;
+  const look = looks(card), l = card.look;
+  el.style.color = look.text;
+  el.style.fontFamily = look.font;
   el.style.fontSize = `${15 * s}px`;
   el.style.padding = `${st.pad * s}px ${st.pad * 2 * s}px`;
+  const themeAlpha = Math.max(0.15, st.bg_alpha - 0.25);
   if (card.kind !== "clock" && st.glass !== "none") {
-    el.style.background = `rgba(${t.colors.bg.rgb}, ${Math.max(0.15, st.bg_alpha - 0.25)})`;
+    el.style.background = `rgba(${t.colors.bg.rgb}, ${themeAlpha})`;
     el.style.borderRadius = `${st.radius_box * s}px`;
   }
+  // Оформление карточки — как в eww.scss: поверх стиля райса.
+  if (l.fill === "none") el.style.background = "transparent";
+  else if (l.fill || l.opacity != null) el.style.background = rgba(named(l.fill) || t.colors.bg.hex, l.opacity ?? (l.fill ? 1 : themeAlpha));
+  if (l.radius != null) el.style.borderRadius = `${l.radius * ratio}px`;
+  if (l.border) el.style.border = `${l.border * ratio}px solid ${look.accent}`;
   el.innerHTML = content(card, s);
   const handle = document.createElement("div");
   handle.className = "handle";
@@ -255,11 +274,27 @@ function cardElement(card, i) {
   return el;
 }
 
+// Цвет по имени из палитры или #rrggbb.
+const named = (v) => (!v ? null : v.startsWith("#") ? v : state.colors[v] || null);
+const rgba = (hex, a) => `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, ${a})`;
+
+// Цвета и шрифты карточки с учётом её look.
+function looks(card) {
+  const c = state.theme.colors, l = card.look, text = named(l.text);
+  return {
+    accent: named(l.accent) || c.accent.hex,
+    text: text || c.fg.hex,
+    muted: text ? rgba(text, 0.65) : c.muted.hex,
+    font: l.font ? `"${l.font}", "${fonts.ui}", sans-serif` : `"${fonts.ui}", system-ui, sans-serif`,
+    mono: l.font ? `"${l.font}", monospace` : `"${fonts.mono}", monospace`,
+  };
+}
+
 const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 function content(card, s) {
   const c = state.theme.colors, px = (n) => `${n * s}px`;
-  const accent = c.accent.hex, muted = c.muted.hex, mono = `"${state.theme.fonts.mono}", monospace`;
+  const { accent, muted, mono, text } = looks(card);
   const now = new Date();
   const hm = (d) => d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
   switch (card.kind) {
@@ -296,7 +331,7 @@ function content(card, s) {
         return `<div class="c-ring"><svg width="${64 * s}" height="${64 * s}" viewBox="0 0 64 64">` +
           `<circle cx="32" cy="32" r="${r}" fill="none" stroke="${c.surface.hex}" stroke-width="6"/>` +
           `<circle cx="32" cy="32" r="${r}" fill="none" stroke="${accent}" stroke-width="6" stroke-dasharray="${len * v / 100} ${len}" transform="rotate(-90 32 32)"/>` +
-          `<text x="32" y="37" text-anchor="middle" fill="${c.fg.hex}" font-size="15">${v}</text></svg>` +
+          `<text x="32" y="37" text-anchor="middle" fill="${text}" font-size="15">${v}</text></svg>` +
           `<span style="font-size:${px(13)};color:${muted};margin-top:${px(4)}">${label}</span></div>`;
       }).join("") + `</div>`;
     case "player":
@@ -404,7 +439,7 @@ stage.addEventListener("pointerdown", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if (selected < 0 || e.target.tagName === "INPUT") return;
+  if (selected < 0 || ["INPUT", "SELECT"].includes(e.target.tagName)) return;
   const card = cards[selected];
   const step = e.shiftKey ? 2 : 0.5;
   const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
@@ -429,9 +464,12 @@ function remove() {
 function form() {
   const box = $("form");
   if (selected < 0 || !cards[selected]) {
+    $("props-title").textContent = "Система";
     box.innerHTML = `<p class="about">Выберите карточку на столе или добавьте новую слева.</p>`;
+    fontsForm(box);
     return;
   }
+  $("props-title").textContent = "Карточка";
   const card = cards[selected], k = kindOf(card.kind);
   box.innerHTML = "";
   const h = document.createElement("h3");
@@ -489,6 +527,7 @@ function form() {
     row.appendChild(input);
   }
   box.append(pos, row);
+  lookForm(box, card);
   const actions = document.createElement("div");
   actions.className = "actions";
   const dup = document.createElement("button");
@@ -504,6 +543,115 @@ function form() {
   del.onclick = remove;
   actions.append(dup, del);
   box.appendChild(actions);
+}
+
+// ---------- Оформление и шрифты ----------
+
+const COLOR_TITLES = {
+  accent: "акцент", fg: "текст", bg: "фон", muted: "приглушённый", surface: "поверхность",
+  red: "красный", green: "зелёный", yellow: "жёлтый", blue: "синий", magenta: "пурпурный", cyan: "голубой",
+};
+
+function el(tag, text, cls) {
+  const e = document.createElement(tag);
+  if (text != null) e.textContent = text;
+  if (cls) e.className = cls;
+  return e;
+}
+
+function setLook(card, key, value) {
+  if (value == null || value === "") delete card.look[key];
+  else card.look[key] = value;
+}
+
+// Пока тянут ползунок или пипетку, панель не перестраиваем.
+function touched() { dirty = true; status("Есть несохранённые изменения"); redraw(); }
+
+function lookForm(box, card) {
+  box.append(el("h4", "Оформление"));
+  fontSelect(box, "Шрифт", card.look.font || "", "all", "как в системе", (v) => { setLook(card, "font", v); changed(); });
+  colorField(box, card, "Акцент: цифры, кольца", "accent", false);
+  colorField(box, card, "Текст", "text", false);
+  colorField(box, card, "Фон", "fill", true);
+  rangeField(box, card, "Непрозрачность фона", "opacity", 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`, 0.6);
+  rangeField(box, card, "Скругление углов", "radius", 0, 100, 1, (v) => `${v} px`, state.theme.style.radius_box);
+  rangeField(box, card, "Рамка цвета акцента", "border", 0, 12, 1, (v) => (v ? `${v} px` : "нет"), 0);
+  if (Object.keys(card.look).length) {
+    const reset = el("button", "Оформление как в теме");
+    reset.style.marginTop = "12px";
+    reset.onclick = () => { card.look = {}; changed(); };
+    box.append(reset);
+  }
+}
+
+function colorField(box, card, title, key, allowNone) {
+  const row = el("div", null, "row");
+  const select = el("select");
+  select.add(new Option("как в теме", ""));
+  if (allowNone) select.add(new Option("без фона", "none"));
+  for (const name of Object.keys(COLOR_TITLES)) {
+    const hex = state.colors[name];
+    if (!hex) continue;
+    const o = new Option(`● ${COLOR_TITLES[name] || name}`, name);
+    o.style.color = hex;
+    select.add(o);
+  }
+  select.add(new Option("свой цвет", "custom"));
+  const pick = el("input");
+  pick.type = "color";
+  const cur = card.look[key];
+  select.value = cur == null ? "" : cur.startsWith("#") ? "custom" : cur;
+  pick.value = named(cur) || state.colors[key === "fill" ? "bg" : key === "text" ? "fg" : "accent"];
+  select.onchange = () => { setLook(card, key, select.value === "custom" ? pick.value : select.value); changed(); };
+  pick.oninput = () => { setLook(card, key, pick.value); select.value = "custom"; touched(); };
+  pick.onchange = () => changed();
+  row.append(select, pick);
+  box.append(el("label", title), row);
+}
+
+function rangeField(box, card, title, key, min, max, step, fmt, fallback) {
+  const label = el("label");
+  const show = () => { const v = card.look[key]; label.textContent = `${title}: ${v == null ? "как в теме" : fmt(v)}`; };
+  const input = el("input");
+  input.type = "range"; input.min = min; input.max = max; input.step = step;
+  input.value = card.look[key] ?? fallback;
+  input.oninput = () => { setLook(card, key, Number(input.value)); show(); touched(); };
+  input.onchange = () => changed();
+  show();
+  box.append(label, input);
+}
+
+// Список шрифтов: что plove поставит сам и что уже есть в системе.
+// which: "ui", "mono" (только Nerd Font: в них значки) или "all".
+function fontSelect(box, title, value, which, empty, onchange) {
+  const select = el("select");
+  if (empty) select.add(new Option(empty, ""));
+  const known = state.fonts.known.filter((f) => which === "all" || f.mono === (which === "mono"));
+  const group = (label) => { const g = document.createElement("optgroup"); g.label = label; select.append(g); return g; };
+  const add = (g, name, text) => { const o = new Option(text, name); o.style.fontFamily = `"${name}"`; g.append(o); };
+  const ready = group("Поставит plove");
+  for (const f of known) add(ready, f.name, f.installed ? f.name : `${f.name} — поставится`);
+  const others = state.fonts.installed.filter((n) => !known.some((f) => f.name === n) &&
+    (which !== "mono" || / Nerd Font$/.test(n)));
+  if (others.length) { const g = group("Уже стоят"); for (const n of others) add(g, n, n); }
+  if (value && ![...select.options].some((o) => o.value === value)) add(group("В райсе"), value, value);
+  select.value = value;
+  select.onchange = () => onchange(select.value);
+  const sample = el("div", "12:45 · Съешь ещё этих мягких булок", "sample");
+  sample.style.fontFamily = value ? `"${value}", sans-serif` : `"${fonts.ui}", sans-serif`;
+  box.append(el("label", title), select, sample);
+}
+
+function fontsForm(box) {
+  box.append(el("h4", "Шрифты системы"));
+  box.append(el("p", "Панель, уведомления, меню и терминал. Шрифт с пометкой «поставится» plove установит при «Применить».", "about"));
+  const set = (key) => (v) => { fonts[key] = v; dirty = true; status("Есть несохранённые изменения"); render(); };
+  fontSelect(box, "Интерфейс", fonts.ui, "ui", null, set("ui"));
+  fontSelect(box, "Моноширинный: терминал и значки", fonts.mono, "mono", null, set("mono"));
+  const size = el("input");
+  size.type = "number"; size.min = 6; size.max = 32; size.value = fonts.size;
+  size.onchange = () => { fonts.size = Math.round(clamp(Number(size.value) || 11, 6, 32)); dirty = true; status("Есть несохранённые изменения"); };
+  box.append(el("label", "Размер, pt"), size);
 }
 
 // В файл пишем только то, что отличается от значения по умолчанию.
@@ -526,14 +674,20 @@ async function send(path) {
       const out = { kind: c.kind, at: c.at };
       if (c.scale !== 1) out.scale = c.scale;
       if (Object.keys(c.with).length) out.with = c.with;
+      if (Object.keys(c.look).length) out.look = c.look;
       return out;
     }),
+    fonts,
   });
   status(path === "/api/apply" ? "Применяю… (вывод — в терминале)" : "Сохраняю…");
   try {
     const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-Plove": "1" }, body });
     const data = await res.json();
-    if (data.ok) { dirty = false; status(data.message); }
+    if (data.ok) {
+      dirty = false; status(data.message);
+      // Панель на картинке стола перерисована новым шрифтом.
+      if (JSON.stringify(fonts) !== savedFonts) { savedFonts = JSON.stringify(fonts); stage.style.backgroundImage = `url(/desktop.png?${Date.now()})`; }
+    }
     else status(data.error, true);
   } catch (err) {
     status("Нет связи с plove studio: он ещё запущен?", true);
@@ -542,7 +696,7 @@ async function send(path) {
 $("save").onclick = () => send("/api/save");
 $("apply").onclick = () => send("/api/apply");
 window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
-setInterval(() => { if (!document.querySelector(".dragging") && document.activeElement.tagName !== "INPUT") redraw(); }, 30000);
+setInterval(() => { if (!document.querySelector(".dragging") && !["INPUT", "SELECT"].includes(document.activeElement.tagName)) redraw(); }, 30000);
 
 load();
 </script>

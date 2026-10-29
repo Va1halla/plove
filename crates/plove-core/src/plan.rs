@@ -381,12 +381,26 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         package_names.extend(module.manifest.aur.iter().map(|p| (p.clone(), true)));
     }
     let fonts = &spec.theme.fonts;
-    for font in [&fonts.ui, &fonts.mono] {
+    let card_fonts = spec.desktop.iter().filter_map(|c| c.look.font.as_ref());
+    let mut installed_fonts: Option<Vec<String>> = None;
+    for font in [&fonts.ui, &fonts.mono].into_iter().chain(card_fonts) {
         match font_package(font) {
             Some(package) => package_names.push((package.to_string(), false)),
-            None => warnings.push(format!(
-                "не знаю, какой пакет ставит шрифт «{font}». Установите его вручную"
-            )),
+            None => {
+                // Свой шрифт, который уже стоит, — не повод для предупреждения.
+                let installed = installed_fonts.get_or_insert_with(|| {
+                    if env.sandbox {
+                        Vec::new()
+                    } else {
+                        system::font_families()
+                    }
+                });
+                if !installed.contains(font) {
+                    warnings.push(format!(
+                        "не знаю, какой пакет ставит шрифт «{font}». Установите его вручную"
+                    ));
+                }
+            }
         }
     }
     let mut packages: Vec<PackageStatus> = Vec::new();

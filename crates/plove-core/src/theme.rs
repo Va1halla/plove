@@ -197,21 +197,58 @@ fn round2(x: f64) -> f64 {
     (x * 100.0).round() / 100.0
 }
 
+/// Шрифт, который plove умеет поставить: имя семейства, пакет Arch
+/// и моноширинный ли он. Моноширинные — с Nerd Font: в них есть значки.
+pub struct FontInfo {
+    pub name: &'static str,
+    pub package: &'static str,
+    pub mono: bool,
+}
+
+const fn font(name: &'static str, package: &'static str, mono: bool) -> FontInfo {
+    FontInfo {
+        name,
+        package,
+        mono,
+    }
+}
+
+/// Все пакеты из официальных репозиториев (extra), без AUR.
+pub const FONTS: &[FontInfo] = &[
+    font("Inter", "inter-font", false),
+    font("Noto Sans", "noto-fonts", false),
+    font("Roboto", "ttf-roboto", false),
+    font("Cantarell", "cantarell-fonts", false),
+    font("Ubuntu", "ttf-ubuntu-font-family", false),
+    font("Fira Sans", "ttf-fira-sans", false),
+    font("IBM Plex Sans", "ttf-ibm-plex", false),
+    font("Source Sans 3", "adobe-source-sans-fonts", false),
+    font("Open Sans", "ttf-opensans", false),
+    font("Lato", "ttf-lato", false),
+    font("Montserrat", "ttf-montserrat", false),
+    font("Overpass", "otf-overpass", false),
+    font("Nunito", "ttf-nunito", false),
+    font("DejaVu Sans", "ttf-dejavu", false),
+    font("JetBrainsMono Nerd Font", "ttf-jetbrains-mono-nerd", true),
+    font("FiraCode Nerd Font", "ttf-firacode-nerd", true),
+    font("Iosevka Nerd Font", "ttf-iosevka-nerd", true),
+    font("Hack Nerd Font", "ttf-hack-nerd", true),
+    font("CaskaydiaCove Nerd Font", "ttf-cascadia-code-nerd", true),
+    font("Mononoki Nerd Font", "ttf-mononoki-nerd", true),
+    font("VictorMono Nerd Font", "ttf-victor-mono-nerd", true),
+    font("SauceCodePro Nerd Font", "ttf-sourcecodepro-nerd", true),
+    font("UbuntuMono Nerd Font", "ttf-ubuntu-mono-nerd", true),
+    font("GeistMono Nerd Font", "otf-geist-mono-nerd", true),
+    font("CommitMono Nerd Font", "otf-commit-mono-nerd", true),
+    font("SpaceMono Nerd Font", "ttf-space-mono-nerd", true),
+    font("RobotoMono Nerd Font", "ttf-roboto-mono-nerd", true),
+    font("ZedMono Nerd Font", "ttf-zed-mono-nerd", true),
+];
+
 /// Какой пакет Arch ставит этот шрифт. `None` — не знаем,
 /// тогда план предупредит, что шрифт нужно поставить вручную.
-pub fn font_package(font: &str) -> Option<&'static str> {
-    // `match` — это switch из C#, только он обязан покрыть все варианты.
-    match font {
-        "JetBrainsMono Nerd Font" => Some("ttf-jetbrains-mono-nerd"),
-        "FiraCode Nerd Font" => Some("ttf-firacode-nerd"),
-        "Iosevka Nerd Font" => Some("ttf-iosevka-nerd"),
-        "Hack Nerd Font" => Some("ttf-hack-nerd"),
-        "Inter" => Some("inter-font"),
-        "Noto Sans" => Some("noto-fonts"),
-        "Roboto" => Some("ttf-roboto"),
-        "Cantarell" => Some("cantarell-fonts"),
-        _ => None,
-    }
+pub fn font_package(name: &str) -> Option<&'static str> {
+    FONTS.iter().find(|f| f.name == name).map(|f| f.package)
 }
 
 #[cfg(test)]

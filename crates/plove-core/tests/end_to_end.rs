@@ -414,3 +414,45 @@ fn yuck_depth(text: &str) -> Result<i32, usize> {
     }
     Ok(depth)
 }
+
+/// Оформление карточки из look попадает в eww.scss, ошибка в цвете — понятная.
+#[test]
+fn desk_card_look() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let mut spec = example_spec();
+    spec.desktop = serde_yaml::from_str(
+        "[{kind: clock, at: [5, 8], look: {font: Orbitron, accent: red, fill: '#000000', opacity: 0.5, radius: 30, border: 2}},
+          {kind: note, at: [50, 50], look: {fill: none, text: fg}}]",
+    )
+    .unwrap();
+    spec.validate().unwrap();
+    let plan = plan::build(spec.clone(), &registry, &env).unwrap();
+    let file = plan
+        .files
+        .iter()
+        .find(|f| f.path.ends_with("eww/eww.scss"))
+        .unwrap();
+    let scss = String::from_utf8(file.content.clone()).unwrap();
+    let red = spec.theme.palette.named("red").unwrap().hex();
+    assert!(
+        scss.contains(".c0, .c0 * { font-family: \"Orbitron\""),
+        "{scss}"
+    );
+    assert!(scss.contains(".c0 .time, .c0 .zone-time"));
+    assert!(scss.contains(&format!("{{ color: {red}; }}")));
+    assert!(scss.contains(".c0 { background-color: rgba(0, 0, 0, 0.5); }"));
+    assert!(scss.contains(".c0 { border-radius: 30px; }"));
+    assert!(scss.contains(&format!(".c0 {{ border: 2px solid {red}; }}")));
+    assert!(scss.contains(".c1 { background-color: transparent; }"));
+    // Шрифт не из списка plove и не установлен — предупреждение, а не ошибка.
+    assert!(plan.warnings.iter().any(|w| w.contains("Orbitron")));
+
+    spec.desktop[0].look.accent = Some("pink".into());
+    let error = spec.validate().unwrap_err().to_string();
+    assert!(error.contains("look.accent: «pink» — не цвет"), "{error}");
+    spec.desktop[0].look.accent = None;
+    spec.desktop[0].look.font = Some("Bad\"; }".into());
+    assert!(spec.validate().is_err());
+}

@@ -19,7 +19,7 @@ use std::time::Duration;
 use anyhow::{bail, Context, Result};
 use plove_core::desk::{self, DeskCard};
 use plove_core::modules::Registry;
-use plove_core::spec::RiceSpec;
+use plove_core::spec::{RiceSpec, COLOR_NAMES};
 use plove_core::system::Env;
 use plove_core::theme;
 use serde_json::json;
@@ -31,6 +31,7 @@ struct Studio<'a> {
     spec: RiceSpec,
     file: PathBuf,
     env: &'a Env,
+    registry: &'a Registry,
     /// Картинка рабочего стола без карточек, PNG.
     desktop_png: Vec<u8>,
     /// Размер экрана в логических точках: в них считаются размеры окон eww.
@@ -45,17 +46,12 @@ pub fn run(rice: &str, registry: &Registry, env: &Env, port: u16, open: bool) ->
     if spec.desktop.is_empty() {
         spec.desktop = from_eww_settings(&spec, registry, screen)?;
     }
-    let mut background = spec.clone();
-    // Карточки рисует сама страница, а окна терминала только мешали бы
-    // видеть обои: на картинке остаются обои и панель.
-    background.desktop.clear();
-    background.components.remove("widgets");
-    background.components.remove("terminal");
-    let desktop_png = plove_preview::render_png(&background, registry, env)?;
+    let desktop_png = desktop_png(&spec, registry, env)?;
     let mut studio = Studio {
         spec,
         file,
         env,
+        registry,
         desktop_png,
         screen,
     };
@@ -94,6 +90,16 @@ pub fn run(rice: &str, registry: &Registry, env: &Env, port: u16, open: bool) ->
         }
     }
     Ok(())
+}
+
+/// Картинка стола без карточек. Карточки рисует сама страница, а окна
+/// терминала только мешали бы видеть обои: остаются обои и панель.
+fn desktop_png(spec: &RiceSpec, registry: &Registry, env: &Env) -> Result<Vec<u8>> {
+    let mut background = spec.clone();
+    background.desktop.clear();
+    background.components.remove("widgets");
+    background.components.remove("terminal");
+    plove_preview::render_png(&background, registry, env)
 }
 
 fn load(rice: &str, env: &Env) -> Result<(RiceSpec, PathBuf)> {
@@ -156,6 +162,7 @@ fn from_eww_settings(
                 at: [0.0, 0.0],
                 scale,
                 with: map,
+                look: Default::default(),
             }
         })
         .filter(|c| {
@@ -272,8 +279,29 @@ impl Studio<'_> {
         }
     }
 
+    /// Шрифты на выбор: те, что plove умеет поставить, и все, что уже стоят.
+    fn fonts(&self) -> serde_json::Value {
+        let installed = plove_core::system::font_families();
+        let known: Vec<serde_json::Value> = theme::FONTS
+            .iter()
+            .map(|f| {
+                json!({
+                    "name": f.name,
+                    "mono": f.mono,
+                    "installed": installed.iter().any(|i| i == f.name),
+                })
+            })
+            .collect();
+        json!({ "known": known, "installed": installed })
+    }
+
     /// Всё, что нужно странице: цвета и стиль райса, каталог, карточки.
     fn state(&self) -> serde_json::Value {
+        let palette = &self.spec.theme.palette;
+        let colors: serde_json::Map<String, serde_json::Value> = COLOR_NAMES
+            .iter()
+            .filter_map(|name| Some((name.to_string(), json!(palette.named(name)?.hex()))))
+            .collect();
         let widgets: serde_json::Map<String, serde_json::Value> = self
             .spec
             .widgets
@@ -298,6 +326,8 @@ impl Studio<'_> {
             "desktop": self.spec.desktop,
             "widgets": widgets,
             "eww": self.spec.components.get("widgets") == Some(&"eww".to_string()),
+            "colors": colors,
+            "fonts": self.fonts(),
         })
     }
 
@@ -309,6 +339,10 @@ impl Studio<'_> {
             .context("страница прислала карточки в неверном виде")?;
         let mut spec = self.spec.clone();
         spec.desktop = cards;
+        if !request["fonts"].is_null() {
+            spec.theme.fonts = serde_json::from_value(request["fonts"].clone())
+                .context("страница прислала шрифты в неверном виде")?;
+        }
         // Карточки рисует eww: без него раскладка ничего бы не показала.
         if !spec.desktop.is_empty() {
             spec.components
@@ -331,7 +365,12 @@ impl Studio<'_> {
         );
         std::fs::write(&self.file, text)
             .with_context(|| format!("не удалось записать {}", self.file.display()))?;
+        // Шрифт видно на панели в картинке стола: рисуем её заново.
+        let fonts_changed = spec.theme.fonts != self.spec.theme.fonts;
         self.spec = spec;
+        if fonts_changed {
+            self.desktop_png = desktop_png(&self.spec, self.registry, self.env)?;
+        }
         Ok(())
     }
 
