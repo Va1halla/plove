@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>plove studio</title>
+<style>
+  :root {
+    --ui-bg: #15161c;
+    --ui-panel: #1d1f27;
+    --ui-line: #2c2f3a;
+    --ui-text: #d8dae3;
+    --ui-muted: #8b90a0;
+    --accent: #7aa2f7;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--ui-bg);
+    color: var(--ui-text);
+    font: 14px/1.4 system-ui, sans-serif;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 240px 1fr 280px;
+    grid-template-areas: "top top top" "catalog stage props";
+    user-select: none;
+  }
+  header {
+    grid-area: top;
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--ui-line);
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header .file { color: var(--ui-muted); font-size: 13px; }
+  header .spacer { flex: 1; }
+  #status { color: var(--ui-muted); font-size: 13px; max-width: 40ch; text-align: right; }
+  #status.error { color: #f7768e; }
+  button {
+    font: inherit; color: var(--ui-text);
+    background: var(--ui-panel);
+    border: 1px solid var(--ui-line);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 600; }
+  button.danger:hover { border-color: #f7768e; color: #f7768e; }
+  aside { background: var(--ui-panel); overflow-y: auto; padding: 12px; }
+  #catalog { grid-area: catalog; border-right: 1px solid var(--ui-line); }
+  #props { grid-area: props; border-left: 1px solid var(--ui-line); }
+  aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ui-muted); margin: 4px 0 10px; }
+  .kind {
+    padding: 8px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 4px;
+    border: 1px solid transparent;
+  }
+  .kind:hover { border-color: var(--ui-line); background: #23262f; }
+  .kind b { display: block; font-weight: 600; }
+  .kind span { color: var(--ui-muted); font-size: 12px; }
+  #stage-wrap {
+    grid-area: stage; display: flex; align-items: center; justify-content: center;
+    padding: 16px; overflow: hidden; min-width: 0; min-height: 0;
+  }
+  #stage {
+    position: relative; background-size: cover; background-position: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,.5); border-radius: 6px; overflow: hidden;
+  }
+  .guide { position: absolute; background: #ff4fa3; opacity: .8; pointer-events: none; display: none; }
+  .guide.v { width: 1px; top: 0; bottom: 0; }
+  .guide.h { height: 1px; left: 0; right: 0; }
+  .card {
+    position: absolute; cursor: grab; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: center;
+    outline: 1px dashed transparent; outline-offset: 2px;
+  }
+  .card:hover { outline-color: rgba(255,255,255,.35); }
+  .card.selected { outline: 2px solid var(--accent); }
+  .card.dragging { cursor: grabbing; }
+  .card .handle {
+    position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize;
+    background: linear-gradient(135deg, transparent 50%, var(--accent) 50%); display: none;
+  }
+  .card.selected .handle { display: block; }
+  #props label { display: block; margin: 10px 0 4px; color: var(--ui-muted); font-size: 12px; }
+  #props input[type=text], #props input[type=number] {
+    width: 100%; font: inherit; color: var(--ui-text); background: var(--ui-bg);
+    border: 1px solid var(--ui-line); border-radius: 6px; padding: 6px 8px;
+  }
+  #props input[type=range] { width: 100%; }
+  #props .row { display: flex; gap: 8px; }
+  #props .check { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--ui-text); font-size: 14px; }
+  #props .about { color: var(--ui-muted); font-size: 12px; margin: 0 0 8px; }
+  #props .actions { margin-top: 16px; display: flex; gap: 8px; }
+  .hint { color: var(--ui-muted); font-size: 12px; margin-top: 16px; }
+  kbd { background: #2a2d38; border-radius: 4px; padding: 0 5px; font-size: 11px; }
+  /* Содержимое карточек: те же размеры, что в eww, умноженные на масштаб страницы. */
+  .c-time { font-weight: 700; line-height: 1; text-align: center; }
+  .c-center { text-align: center; }
+  .c-row { display: flex; align-items: center; justify-content: space-between; }
+  .c-rings { display: flex; justify-content: space-evenly; align-items: center; }
+  .c-ring { display: flex; flex-direction: column; align-items: center; }
+  .c-ring svg { display: block; }
+  .c-cal { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; }
+  .c-cover { flex: none; background: linear-gradient(135deg, var(--accent), transparent); opacity: .7; }
+  .c-note { white-space: pre-wrap; word-break: break-word; }
+</style>
+</head>
+<body>
+<header>
+  <h1>plove studio</h1>
+  <span class="file" id="file"></span>
+  <span class="spacer"></span>
+  <span id="status"></span>
+  <button id="save">Сохранить</button>
+  <button id="apply" class="primary">Применить</button>
+</header>
+<aside id="catalog"><h2>Добавить на стол</h2><div id="kinds"></div>
+  <p class="hint">Перетаскивайте карточки мышью, размер — за уголок. <kbd>Del</kbd> удаляет, стрелки двигают точнее, <kbd>Shift</kbd> — без привязки к краям и центру.</p>
+</aside>
+<main id="stage-wrap"><div id="stage"><div class="guide v" id="gv"></div><div class="guide h" id="gh"></div></div></main>
+<aside id="props"><h2>Карточка</h2><div id="form"><p class="about">Выберите карточку на столе или добавьте новую слева.</p></div></aside>
+
+<script>
+"use strict";
+let state = null;         // ответ /api/state
+let cards = [];           // раскладка: {kind, at:[x,y], scale, with:{}}
+let selected = -1;
+let ratio = 1;            // точек страницы на точку экрана
+let dirty = false;
+
+const $ = (id) => document.getElementById(id);
+const stage = $("stage");
+const kindOf = (id) => state.catalog.find((k) => k.id === id);
+
+async function load() {
+  const res = await fetch("/api/state");
+  state = await res.json();
+  cards = state.desktop.map((c) => ({ kind: c.kind, at: [...c.at], scale: c.scale ?? 1, with: { ...(c.with || {}) } }));
+  document.title = `plove studio — ${state.name}`;
+  $("file").textContent = state.file;
+  const t = state.theme;
+  document.documentElement.style.setProperty("--accent", t.colors.accent.hex);
+  stage.style.backgroundImage = "url(/desktop.png)";
+  const kinds = $("kinds");
+  for (const k of state.catalog) {
+    const el = document.createElement("div");
+    el.className = "kind";
+    el.innerHTML = `<b></b><span></span>`;
+    el.querySelector("b").textContent = k.title;
+    el.querySelector("span").textContent = k.about;
+    el.onclick = () => add(k.id);
+    kinds.appendChild(el);
+  }
+  if (!state.eww) status("В райсе нет eww: он добавится при сохранении, чтобы карточки было чем показать.");
+  fit();
+  render();
+}
+
+// Подогнать стол под окно с сохранением пропорций экрана.
+function fit() {
+  const [sw, sh] = state.screen;
+  const wrap = $("stage-wrap");
+  const w = Math.max(200, wrap.clientWidth - 32), h = Math.max(120, wrap.clientHeight - 32);
+  ratio = Math.min(w / sw, h / sh);
+  stage.style.width = `${sw * ratio}px`;
+  stage.style.height = `${sh * ratio}px`;
+}
+window.addEventListener("resize", () => { fit(); render(); });
+
+function defaults(kind) {
+  const out = {};
+  for (const p of kindOf(kind).params) out[p.id] = p.default;
+  return out;
+}
+const opt = (card, id) => (id in card.with ? card.with[id] : defaults(card.kind)[id]);
+
+function size(card) {
+  const k = kindOf(card.kind);
+  let [w, h] = k.size;
+  if (card.kind === "worldclock") h = 40 + 40 * Math.max(1, zones(card).length);
+  return [Math.round(w * card.scale), Math.round(h * card.scale)];
+}
+const zones = (card) => String(opt(card, "zones")).split(",").map((s) => s.trim()).filter(Boolean);
+
+function add(kind) {
+  const [sw, sh] = state.screen;
+  const card = { kind, at: [0, 0], scale: 1, with: {} };
+  card.at = freeSpot(card);
+  if (kind === "widget") {
+    const ids = Object.keys(state.widgets);
+    if (!ids.length) { status("В райсе нет своих виджетов (раздел widgets).", true); return; }
+    card.with.id = ids[0];
+  }
+  cards.push(card);
+  selected = cards.length - 1;
+  changed();
+}
+
+// Свободное место для новой карточки: первое по строкам слева направо,
+// где она ни с кем не пересекается. Если такого нет — центр экрана.
+function freeSpot(card) {
+  const [sw, sh] = state.screen;
+  const [w, h] = size(card);
+  const wp = w / sw * 100, hp = h / sh * 100, gap = 1;
+  const boxes = cards.map((c) => { const [cw, ch] = size(c); return [c.at[0], c.at[1], cw / sw * 100, ch / sh * 100]; });
+  for (let y = 6; y + hp <= 97; y += 2) {
+    for (let x = 3; x + wp <= 97; x += 2) {
+      const hit = boxes.some(([bx, by, bw, bh]) => x < bx + bw + gap && bx < x + wp + gap && y < by + bh + gap && by < y + hp + gap);
+      if (!hit) return [round1(x), round1(y)];
+    }
+  }
+  return [round1(50 - wp / 2), round1(50 - hp / 2)];
+}
+
+const round1 = (x) => Math.round(x * 10) / 10;
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+
+function changed() { dirty = true; status("Есть несохранённые изменения"); render(); }
+
+function status(text, error = false) {
+  const el = $("status");
+  el.textContent = text;
+  el.className = error ? "error" : "";
+}
+
+// ---------- Отрисовка карточек ----------
+
+function render() {
+  for (const el of stage.querySelectorAll(".card")) el.remove();
+  cards.forEach((card, i) => stage.appendChild(cardElement(card, i)));
+  form();
+}
+
+function cardElement(card, i) {
+  const t = state.theme, st = t.style, s = card.scale * ratio;
+  const [w, h] = size(card);
+  const el = document.createElement("div");
+  el.className = "card" + (i === selected ? " selected" : "");
+  el.style.left = `${card.at[0]}%`;
+  el.style.top = `${card.at[1]}%`;
+  el.style.width = `${w * ratio}px`;
+  el.style.height = `${h * ratio}px`;
+  el.style.color = t.colors.fg.hex;
+  el.style.fontFamily = `"${t.fonts.ui}", system-ui, sans-serif`;
+  el.style.fontSize = `${15 * s}px`;
+  el.style.padding = `${st.pad * s}px ${st.pad * 2 * s}px`;
+  if (card.kind !== "clock" && st.glass !== "none") {
+    el.style.background = `rgba(${t.colors.bg.rgb}, ${Math.max(0.15, st.bg_alpha - 0.25)})`;
+    el.style.borderRadius = `${st.radius_box * s}px`;
+  }
+  el.innerHTML = content(card, s);
+  const handle = document.createElement("div");
+  handle.className = "handle";
+  el.appendChild(handle);
+  el.addEventListener("pointerdown", (e) => startDrag(e, i, e.target === handle));
+  return el;
+}
+
+const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function content(card, s) {
+  const c = state.theme.colors, px = (n) => `${n * s}px`;
+  const accent = c.accent.hex, muted = c.muted.hex, mono = `"${state.theme.fonts.mono}", monospace`;
+  const now = new Date();
+  const hm = (d) => d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  switch (card.kind) {
+    case "clock": {
+      const time = opt(card, "seconds") ? now.toLocaleTimeString("ru-RU") : hm(now);
+      const date = now.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
+      return `<div class="c-time" style="font-size:${px(96)};color:${accent};text-shadow:0 4px 16px rgba(${c.bg.rgb},.6)">${time}</div>` +
+        (opt(card, "date") ? `<div class="c-center" style="font-size:${px(20)};margin-top:${px(2)}">${esc(date[0].toUpperCase() + date.slice(1))}</div>` : "");
+    }
+    case "worldclock":
+      return zones(card).map((z) => {
+        let time = "—";
+        try { time = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: z }); } catch (_) {}
+        const city = z.split("/").pop().replace(/_/g, " ");
+        return `<div class="c-row" style="margin:${px(3)} 0"><span style="font-size:${px(17)};color:${muted}">${esc(city)}</span>` +
+          `<b style="font-size:${px(22)};color:${accent};font-family:${mono}">${time}</b></div>`;
+      }).join("");
+    case "calendar": {
+      const y = now.getFullYear(), m = now.getMonth();
+      const first = (new Date(y, m, 1).getDay() + 6) % 7, days = new Date(y, m + 1, 0).getDate();
+      const title = now.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+      let cells = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((d) => `<span style="color:${muted}">${d}</span>`).join("");
+      cells += "<span></span>".repeat(first);
+      for (let d = 1; d <= days; d++) {
+        const today = d === now.getDate();
+        cells += `<span style="${today ? `background:${accent};color:${c.bg.hex};border-radius:${px(6)};font-weight:700` : ""};padding:${px(2)} 0">${d}</span>`;
+      }
+      return `<div class="c-center" style="font-size:${px(15)};color:${accent};font-weight:600;margin-bottom:${px(6)}">${esc(title)}</div>` +
+        `<div class="c-cal" style="font-size:${px(14)};row-gap:${px(4)}">${cells}</div>`;
+    }
+    case "system":
+      return `<div class="c-rings">` + [["cpu", 12], ["ram", 41], ["disk", 63]].map(([label, v]) => {
+        const r = 29, len = 2 * Math.PI * r;
+        return `<div class="c-ring"><svg width="${64 * s}" height="${64 * s}" viewBox="0 0 64 64">` +
+          `<circle cx="32" cy="32" r="${r}" fill="none" stroke="${c.surface.hex}" stroke-width="6"/>` +
+          `<circle cx="32" cy="32" r="${r}" fill="none" stroke="${accent}" stroke-width="6" stroke-dasharray="${len * v / 100} ${len}" transform="rotate(-90 32 32)"/>` +
+          `<text x="32" y="37" text-anchor="middle" fill="${c.fg.hex}" font-size="15">${v}</text></svg>` +
+          `<span style="font-size:${px(13)};color:${muted};margin-top:${px(4)}">${label}</span></div>`;
+      }).join("") + `</div>`;
+    case "player":
+      return `<div style="display:flex;align-items:center;gap:${px(14)}">` +
+        `<div class="c-cover" style="width:${px(110)};height:${px(110)};border-radius:${px(state.theme.style.radius_chip)}"></div>` +
+        `<div><div style="font-size:${px(18)};font-weight:600">Aruarian Dance</div><div style="font-size:${px(14)};color:${muted}">Nujabes</div>` +
+        `<div style="font-size:${px(22)};margin-top:${px(10)};letter-spacing:${px(10)}">⏮ ⏯ ⏭</div></div></div>`;
+    case "weather": {
+      const city = opt(card, "city") || "по IP";
+      return `<div style="display:flex;align-items:center;gap:${px(16)}"><span style="font-size:${px(44)}">☁</span>` +
+        `<div><div style="font-size:${px(30)};font-weight:700;color:${accent}">+7°C</div>` +
+        `<div style="font-size:${px(14)};color:${muted}">Облачно · ${esc(city)}</div></div></div>`;
+    }
+    case "countdown": {
+      const target = new Date(String(opt(card, "date")) + "T00:00:00");
+      const days = isNaN(target) ? "?" : Math.max(0, Math.ceil((target - now) / 86400000));
+      return `<div class="c-center" style="font-size:${px(46)};font-weight:700;color:${accent};line-height:1.1">${days}</div>` +
+        `<div class="c-center" style="font-size:${px(14)};color:${muted}">дн. до: ${esc(opt(card, "title"))}</div>`;
+    }
+    case "note":
+      return `<div class="c-note" style="font-size:${px(17)}">${esc(opt(card, "text"))}</div>`;
+    case "widget": {
+      const w = state.widgets[opt(card, "id")];
+      if (!w) return `<div class="c-center" style="color:${muted}">виджет не выбран</div>`;
+      const text = (w.icon ? w.icon + " " : "") + w.text.replace("{value}", "42");
+      return `<div class="c-center" style="font-size:${px(18)};color:${w.color}">${esc(text)}</div>`;
+    }
+  }
+  return "";
+}
+
+// ---------- Мышь: перенос и размер ----------
+
+function startDrag(e, i, resizing) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  selected = i;
+  const all = stage.querySelectorAll(".card");
+  all.forEach((c, n) => c.classList.toggle("selected", n === i));
+  form();
+  const card = cards[i];
+  const el = all[i];
+  el.classList.add("dragging");
+  el.setPointerCapture(e.pointerId);
+  const start = { x: e.clientX, y: e.clientY, at: [...card.at], scale: card.scale };
+  const [sw, sh] = state.screen;
+  const box = stage.getBoundingClientRect();
+  const move = (ev) => {
+    const dx = (ev.clientX - start.x) / box.width * 100;
+    const dy = (ev.clientY - start.y) / box.height * 100;
+    if (resizing) {
+      const [w0] = size({ ...card, scale: start.scale });
+      const wPx = w0 * ratio + (ev.clientX - start.x);
+      // Не больше, чем помещается до правого и нижнего края экрана.
+      const [w1, h1] = size({ ...card, scale: 1 });
+      const fit = Math.min((100 - card.at[0]) / 100 * sw / w1, (100 - card.at[1]) / 100 * sh / h1);
+      card.scale = Math.floor(clamp(start.scale * wPx / (w0 * ratio), 0.3, Math.min(4, fit)) * 20) / 20;
+    } else {
+      let x = start.at[0] + dx, y = start.at[1] + dy;
+      const [w, h] = size(card);
+      const wp = w / sw * 100, hp = h / sh * 100;
+      x = clamp(x, 0, 100 - wp); y = clamp(y, 0, 100 - hp);
+      const snapped = ev.shiftKey ? { x, y } : snap(x, y, wp, hp);
+      card.at = [round1(snapped.x), round1(snapped.y)];
+    }
+    place(el, card);
+  };
+  const up = () => {
+    el.releasePointerCapture(e.pointerId);
+    el.removeEventListener("pointermove", move);
+    el.removeEventListener("pointerup", up);
+    $("gv").style.display = $("gh").style.display = "none";
+    if (card.at[0] !== start.at[0] || card.at[1] !== start.at[1] || card.scale !== start.scale) changed();
+    else render();
+  };
+  el.addEventListener("pointermove", move);
+  el.addEventListener("pointerup", up);
+}
+
+// Привязка к краям (отступ 3%) и к центру экрана по обеим осям.
+function snap(x, y, wp, hp) {
+  const near = 0.8;
+  const gv = $("gv"), gh = $("gh");
+  gv.style.display = gh.style.display = "none";
+  const xs = [[3, 3], [100 - 3 - wp, 97], [50 - wp / 2, 50]];
+  const ys = [[3, 3], [100 - 3 - hp, 97], [50 - hp / 2, 50]];
+  for (const [pos, line] of xs) if (Math.abs(x - pos) < near) { x = pos; gv.style.left = `${line}%`; gv.style.display = "block"; break; }
+  for (const [pos, line] of ys) if (Math.abs(y - pos) < near) { y = pos; gh.style.top = `${line}%`; gh.style.display = "block"; break; }
+  return { x, y };
+}
+
+function place(el, card) {
+  const [w, h] = size(card);
+  el.style.left = `${card.at[0]}%`;
+  el.style.top = `${card.at[1]}%`;
+  if (el.style.width !== `${w * ratio}px`) {
+    const fresh = cardElement(card, selected);
+    el.replaceChildren(...fresh.childNodes);
+    el.style.cssText = fresh.style.cssText;
+  }
+}
+
+stage.addEventListener("pointerdown", (e) => {
+  if (e.target === stage) { selected = -1; render(); }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (selected < 0 || e.target.tagName === "INPUT") return;
+  const card = cards[selected];
+  const step = e.shiftKey ? 2 : 0.5;
+  const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+  if (e.key === "Delete" || e.key === "Backspace") { remove(); e.preventDefault(); }
+  else if (moves[e.key]) {
+    const [dx, dy] = moves[e.key];
+    card.at = [round1(clamp(card.at[0] + dx, 0, 100)), round1(clamp(card.at[1] + dy, 0, 100))];
+    e.preventDefault();
+    changed();
+  }
+});
+
+function remove() {
+  if (selected < 0) return;
+  cards.splice(selected, 1);
+  selected = -1;
+  changed();
+}
+
+// ---------- Панель свойств ----------
+
+function form() {
+  const box = $("form");
+  if (selected < 0 || !cards[selected]) {
+    box.innerHTML = `<p class="about">Выберите карточку на столе или добавьте новую слева.</p>`;
+    return;
+  }
+  const card = cards[selected], k = kindOf(card.kind);
+  box.innerHTML = "";
+  const h = document.createElement("h3");
+  h.textContent = k.title;
+  h.style.margin = "0 0 4px";
+  const about = document.createElement("p");
+  about.className = "about";
+  about.textContent = k.about;
+  box.append(h, about);
+  for (const p of k.params) {
+    if (typeof p.default === "boolean") {
+      const row = document.createElement("label");
+      row.className = "check";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = opt(card, p.id);
+      input.onchange = () => { setParam(card, p, input.checked); changed(); };
+      row.append(input, document.createTextNode(p.title));
+      box.appendChild(row);
+    } else if (card.kind === "widget" && p.id === "id") {
+      const label = document.createElement("label");
+      label.textContent = p.title;
+      const select = document.createElement("select");
+      select.style.width = "100%";
+      for (const id of Object.keys(state.widgets)) select.add(new Option(id, id, false, id === opt(card, "id")));
+      select.onchange = () => { setParam(card, p, select.value); changed(); };
+      box.append(label, select);
+    } else {
+      const label = document.createElement("label");
+      label.textContent = p.title;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = opt(card, p.id);
+      input.oninput = () => { setParam(card, p, input.value); dirty = true; status("Есть несохранённые изменения"); redraw(); };
+      box.append(label, input);
+    }
+  }
+  const scale = document.createElement("label");
+  scale.textContent = `Размер: ×${card.scale.toFixed(2)}`;
+  const range = document.createElement("input");
+  range.type = "range"; range.min = 0.3; range.max = 4; range.step = 0.05; range.value = card.scale;
+  range.oninput = () => {
+    const [sw, sh] = state.screen, [w1, h1] = size({ ...card, scale: 1 });
+    const fit = Math.min((100 - card.at[0]) / 100 * sw / w1, (100 - card.at[1]) / 100 * sh / h1);
+    card.scale = Math.min(Number(range.value), Math.max(0.3, Math.floor(fit * 20) / 20)); scale.textContent = `Размер: ×${card.scale.toFixed(2)}`; dirty = true; redraw(); };
+  box.append(scale, range);
+  const pos = document.createElement("label");
+  pos.textContent = "Место: % ширины и высоты экрана";
+  const row = document.createElement("div");
+  row.className = "row";
+  for (const axis of [0, 1]) {
+    const input = document.createElement("input");
+    input.type = "number"; input.min = 0; input.max = 100; input.step = 0.5; input.value = card.at[axis];
+    input.onchange = () => { card.at[axis] = round1(clamp(Number(input.value) || 0, 0, 100)); changed(); };
+    row.appendChild(input);
+  }
+  box.append(pos, row);
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  const dup = document.createElement("button");
+  dup.textContent = "Копия";
+  dup.onclick = () => {
+    const copy = JSON.parse(JSON.stringify(card));
+    copy.at = [round1(clamp(card.at[0] + 2, 0, 100)), round1(clamp(card.at[1] + 2, 0, 100))];
+    cards.push(copy); selected = cards.length - 1; changed();
+  };
+  const del = document.createElement("button");
+  del.textContent = "Удалить";
+  del.className = "danger";
+  del.onclick = remove;
+  actions.append(dup, del);
+  box.appendChild(actions);
+}
+
+// В файл пишем только то, что отличается от значения по умолчанию.
+function setParam(card, p, value) {
+  if (value === p.default) delete card.with[p.id];
+  else card.with[p.id] = value;
+}
+
+// Перерисовать карточки, не трогая панель свойств (в ней сейчас печатают).
+function redraw() {
+  for (const el of stage.querySelectorAll(".card")) el.remove();
+  cards.forEach((card, i) => stage.appendChild(cardElement(card, i)));
+}
+
+// ---------- Сохранение ----------
+
+async function send(path) {
+  const body = JSON.stringify({
+    desktop: cards.map((c) => {
+      const out = { kind: c.kind, at: c.at };
+      if (c.scale !== 1) out.scale = c.scale;
+      if (Object.keys(c.with).length) out.with = c.with;
+      return out;
+    }),
+  });
+  status(path === "/api/apply" ? "Применяю… (вывод — в терминале)" : "Сохраняю…");
+  try {
+    const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-Plove": "1" }, body });
+    const data = await res.json();
+    if (data.ok) { dirty = false; status(data.message); }
+    else status(data.error, true);
+  } catch (err) {
+    status("Нет связи с plove studio: он ещё запущен?", true);
+  }
+}
+$("save").onclick = () => send("/api/save");
+$("apply").onclick = () => send("/api/apply");
+window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+setInterval(() => { if (!document.querySelector(".dragging") && document.activeElement.tagName !== "INPUT") redraw(); }, 30000);
+
+load();
+</script>
+</body>
+</html>

@@ -382,7 +382,7 @@ impl RiceSpec {
     }
 
     pub fn to_yaml(&self) -> Result<String> {
-        Ok(serde_yaml::to_string(self)?)
+        Ok(compact_points(&serde_yaml::to_string(self)?))
     }
 
     /// Проверки, которые нельзя выразить одними типами.
@@ -428,6 +428,34 @@ impl RiceSpec {
         crate::desk::validate(self)?;
         Ok(())
     }
+}
+
+/// `at:` из двух чисел — в одну строку: `at: [12.5, 40.0]`, а не столбиком.
+/// serde_yaml сам так не умеет, а раскладку из studio читать удобнее так.
+fn compact_points(yaml: &str) -> String {
+    let lines: Vec<&str> = yaml.lines().collect();
+    let mut out = String::with_capacity(yaml.len());
+    let mut i = 0;
+    while i < lines.len() {
+        let line = lines[i];
+        let item = |n: usize| {
+            lines
+                .get(n)
+                .and_then(|l| l.trim_start().strip_prefix("- "))
+                .filter(|v| v.parse::<f64>().is_ok())
+        };
+        if line.trim_start() == "at:" {
+            if let (Some(x), Some(y)) = (item(i + 1), item(i + 2)) {
+                out.push_str(&format!("{line} [{x}, {y}]\n"));
+                i += 3;
+                continue;
+            }
+        }
+        out.push_str(line);
+        out.push('\n');
+        i += 1;
+    }
+    out
 }
 
 // Модульные тесты живут прямо рядом с кодом. `cargo test` их запускает.

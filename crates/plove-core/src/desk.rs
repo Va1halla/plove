@@ -234,6 +234,33 @@ pub fn validate(spec: &RiceSpec) -> Result<()> {
                 );
             }
         }
+        // Значения попадают в команды оболочки: пускаем только то,
+        // что там нужно, без кавычек и прочих спецсимволов.
+        let text = |key: &str| card.with.get(key).and_then(|v| v.as_str()).unwrap_or("");
+        let zones = text("zones");
+        if !zones
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "_/+-, ".contains(c))
+        {
+            bail!("desktop, карточка {n}: zones — пояса вида Europe/Moscow через запятую");
+        }
+        if kind.id == "countdown" && card.with.contains_key("date") {
+            let date = text("date");
+            let ok = date.len() == 10
+                && date.chars().enumerate().all(|(i, c)| {
+                    if i == 4 || i == 7 {
+                        c == '-'
+                    } else {
+                        c.is_ascii_digit()
+                    }
+                });
+            if !ok {
+                bail!("desktop, карточка {n}: date в виде ГГГГ-ММ-ДД, например 2027-01-01");
+            }
+        }
+        if text("city").contains(['\'', '"', '\\', '`', '$']) {
+            bail!("desktop, карточка {n}: в названии города не должно быть кавычек и $");
+        }
         if kind.id == "widget" {
             let id = card.with.get("id").and_then(|v| v.as_str()).unwrap_or("");
             if !spec.widgets.contains_key(id) {
@@ -327,6 +354,11 @@ mod tests {
         assert!(spec("[{kind: clock, at: [10, 10], with: {city: x}}]").is_err());
         assert!(spec("[{kind: clock, at: [10, 10], with: {seconds: yes please}}]").is_err());
         assert!(spec("[{kind: widget, at: [5, 5], with: {id: nope}}]").is_err());
+        assert!(
+            spec("[{kind: worldclock, at: [5, 5], with: {zones: \"x'; rm -rf ~ #\"}}]").is_err()
+        );
+        assert!(spec("[{kind: countdown, at: [5, 5], with: {date: 'завтра'}}]").is_err());
+        assert!(spec("[{kind: weather, at: [5, 5], with: {city: \"a'b\"}}]").is_err());
     }
 
     #[test]

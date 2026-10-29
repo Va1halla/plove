@@ -810,6 +810,8 @@ dependencies = [
  "plove-core",
  "plove-preview",
  "plove-tui",
+ "serde_json",
+ "serde_yaml",
 ]
 
 [[package]]

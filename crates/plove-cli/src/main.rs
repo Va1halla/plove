@@ -3,6 +3,8 @@
 //! Здесь только разбор аргументов и красивый вывод. Вся работа
 //! делается в plove-core: CLI — тонкий клиент над ядром.
 
+mod studio;
+
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -121,6 +123,17 @@ enum Command {
         /// Модуль, например hyprland
         id: Option<String>,
     },
+    /// Расставить карточки на рабочем столе мышью: редактор в браузере
+    Studio {
+        /// Файл райса или встроенный райс (тогда сохранится копия в ~/.config/plove/rices/)
+        rice: String,
+        /// Порт на 127.0.0.1
+        #[arg(long, default_value_t = 7878)]
+        port: u16,
+        /// Не открывать браузер, только напечатать адрес
+        #[arg(long)]
+        no_open: bool,
+    },
 }
 
 fn main() -> ExitCode {
@@ -154,6 +167,11 @@ fn run(cli: Cli) -> Result<()> {
 
     match command {
         Command::Edit { file } => wizard(&registry, &system_env()?, Some(&file))?,
+        Command::Studio {
+            rice,
+            port,
+            no_open,
+        } => studio::run(&rice, &registry, &system_env()?, port, !no_open)?,
         Command::Plan { rice } => {
             let env = system_env()?;
             let plan = plan::build(load_rice(&rice)?, &registry, &env)?;
