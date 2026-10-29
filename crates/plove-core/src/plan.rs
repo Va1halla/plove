@@ -14,7 +14,7 @@ use crate::spec::{RiceSpec, Wallpaper};
 use crate::state;
 use crate::system::{self, Env};
 use crate::terminal;
-use crate::theme::{font_package, theme_context};
+use crate::theme::{font_package, google_font, theme_context, GOOGLE_FONTS_URL};
 use crate::wallpaper;
 
 /// Куда кладутся обои, нарисованные plove.
@@ -51,9 +51,25 @@ pub struct PackageStatus {
     pub aur: bool,
 }
 
+/// Шрифт с Google Fonts: plove скачивает его в свою папку шрифтов.
+pub struct FontDownload {
+    pub name: String,
+    pub urls: Vec<String>,
+    /// ~/.local/share/fonts/plove/<имя>
+    pub dir: PathBuf,
+    /// Папка уже есть: скачан при прошлом применении.
+    pub installed: bool,
+}
+
+/// Имя папки шрифта: `Space Grotesk` → `space-grotesk`.
+fn font_dir(name: &str) -> String {
+    name.to_lowercase().replace(' ', "-")
+}
+
 pub struct Plan {
     pub spec: RiceSpec,
     pub packages: Vec<PackageStatus>,
+    pub fonts: Vec<FontDownload>,
     pub files: Vec<FileChange>,
     /// Пустые файлы для ручных правок, которых ещё нет.
     pub user_files: Vec<PathBuf>,
@@ -66,6 +82,11 @@ pub struct Plan {
 }
 
 impl Plan {
+    /// Шрифты Google Fonts, которых ещё нет.
+    pub fn missing_fonts(&self) -> Vec<&FontDownload> {
+        self.fonts.iter().filter(|f| !f.installed).collect()
+    }
+
     pub fn missing_packages(&self) -> Vec<&str> {
         self.packages
             .iter()
@@ -94,6 +115,7 @@ impl Plan {
     /// Нечего делать: всё уже применено.
     pub fn is_noop(&self) -> bool {
         self.missing_packages().is_empty()
+            && self.missing_fonts().is_empty()
             && self.changed_files().is_empty()
             && self.user_files.is_empty()
     }
@@ -220,6 +242,26 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         }
     }
     base.insert("dmenu", &dmenu);
+    // Файлы шрифтов Google Fonts по имени: программы на Qt (Quickshell)
+    // подгружают их сами, не дожидаясь перезапуска после скачивания.
+    let google_files: BTreeMap<&str, Vec<String>> = crate::theme::FONTS
+        .iter()
+        .filter(|f| !f.files.is_empty())
+        .map(|f| {
+            let dir = env.expand(&format!("~/.local/share/fonts/plove/{}", font_dir(f.name)));
+            let files = f
+                .files
+                .iter()
+                .map(|file| {
+                    dir.join(file.rsplit('/').next().unwrap_or(file))
+                        .display()
+                        .to_string()
+                })
+                .collect();
+            (f.name, files)
+        })
+        .collect();
+    base.insert("google_fonts", &google_files);
     base.insert("run_in", &run_in);
     // Настройки каждого модуля (`options`): нужны и в шаблонах конфигов,
     // и в командах запуска, клавишах, переменных окружения.
@@ -380,13 +422,46 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         package_names.extend(module.manifest.packages.iter().map(|p| (p.clone(), false)));
         package_names.extend(module.manifest.aur.iter().map(|p| (p.clone(), true)));
     }
+    // Шрифты: системные, карточек стола и настройки модулей `font_*`
+    // (например, шрифт часов на панели Quickshell).
     let fonts = &spec.theme.fonts;
-    let card_fonts = spec.desktop.iter().filter_map(|c| c.look.font.as_ref());
+    let mut font_names: Vec<String> = vec![fonts.ui.clone(), fonts.mono.clone()];
+    font_names.extend(spec.desktop.iter().filter_map(|c| c.look.font.clone()));
+    for (id, options) in &module_opts {
+        for (key, value) in options.as_object().into_iter().flatten() {
+            let Some(name) = value
+                .as_str()
+                .filter(|v| key.starts_with("font_") && !v.is_empty())
+            else {
+                continue;
+            };
+            crate::spec::check_font(&format!("{id}: {key}"), name)?;
+            font_names.push(name.to_string());
+        }
+    }
+    font_names.dedup();
     let mut installed_fonts: Option<Vec<String>> = None;
-    for font in [&fonts.ui, &fonts.mono].into_iter().chain(card_fonts) {
-        match font_package(font) {
-            Some(package) => package_names.push((package.to_string(), false)),
-            None => {
+    let mut downloads: Vec<FontDownload> = Vec::new();
+    for font in &font_names {
+        if downloads.iter().any(|d| &d.name == font) {
+            continue;
+        }
+        match (font_package(font), google_font(font)) {
+            (Some(package), _) => package_names.push((package.to_string(), false)),
+            (None, Some(info)) => {
+                let dir = env.expand(&format!("~/.local/share/fonts/plove/{}", font_dir(font)));
+                downloads.push(FontDownload {
+                    name: font.clone(),
+                    urls: info
+                        .files
+                        .iter()
+                        .map(|f| format!("{GOOGLE_FONTS_URL}{f}"))
+                        .collect(),
+                    installed: dir.is_dir(),
+                    dir,
+                });
+            }
+            (None, None) => {
                 // Свой шрифт, который уже стоит, — не повод для предупреждения.
                 let installed = installed_fonts.get_or_insert_with(|| {
                     if env.sandbox {
@@ -395,7 +470,8 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
                         system::font_families()
                     }
                 });
-                if !installed.contains(font) {
+                if !installed.contains(font) && !warnings.iter().any(|w| w.contains(font.as_str()))
+                {
                     warnings.push(format!(
                         "не знаю, какой пакет ставит шрифт «{font}». Установите его вручную"
                     ));
@@ -489,6 +565,7 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
     Ok(Plan {
         spec,
         packages,
+        fonts: downloads,
         files,
         user_files,
         reloads,

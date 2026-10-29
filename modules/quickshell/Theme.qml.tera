@@ -1,0 +1,59 @@
+// Сгенерировано plove из райса «{{ name }}». Перезаписывается при `plove apply`.
+// Всё, что панель знает о внешнем виде райса: цвета, шрифты по ролям,
+// форма и движение. Компоненты берут значения только отсюда.
+pragma Singleton
+
+import QtQuick
+import Quickshell
+
+Singleton {
+    readonly property color bg: "{{ colors.bg.hex }}"
+    readonly property color surface: "{{ colors.surface.hex }}"
+    readonly property color fg: "{{ colors.fg.hex }}"
+    readonly property color muted: "{{ colors.muted.hex }}"
+    readonly property color accent: "{{ colors.accent.hex }}"
+{#- Красный, зелёный и жёлтый — из 16 цветов терминала, если они заданы. #}
+{%- if ansi | length > 3 %}
+{%- set red = ansi | nth(n=1) %}{% set green = ansi | nth(n=2) %}{% set yellow = ansi | nth(n=3) %}
+{%- else %}
+{%- set red = colors.accent %}{% set green = colors.accent %}{% set yellow = colors.accent %}
+{%- endif %}
+    readonly property color red: "{{ red.hex }}"
+    readonly property color green: "{{ green.hex }}"
+    readonly property color yellow: "{{ yellow.hex }}"
+    // Непрозрачность плашек: из стиля glass.
+    readonly property real alpha: {{ style.bg_alpha }}
+
+    // Шрифты по ролям: часы, подписи, цифры, значки (Nerd Font).
+    readonly property string fontDisplay: "{% if options.font_display %}{{ options.font_display }}{% else %}{{ fonts.ui }}{% endif %}"
+    readonly property string fontText: "{% if options.font_text %}{{ options.font_text }}{% else %}{{ fonts.ui }}{% endif %}"
+    readonly property string fontMono: "{% if options.font_mono %}{{ options.font_mono }}{% else %}{{ fonts.mono }}{% endif %}"
+    readonly property string fontIcons: "{{ icon_font }}"
+    // Пункты в пиксели при 96 dpi.
+{%- set px = fonts.size * 4 / 3 %}
+    readonly property real fontSize: {{ px | round }}
+
+    // Форма: shape {{ style.shape }}, отступы — из плотности.
+    readonly property int radius: {{ style.radius_box }}
+    readonly property int radiusChip: {{ style.radius_chip }}
+    readonly property int gap: {{ geometry.gaps }}
+    readonly property int pad: {{ style.pad }}
+    readonly property int barHeight: {{ style.bar_height }}
+    readonly property int border: {{ style.border }}
+
+    // Движение: одна кривая на всё, как bezier в Hyprland.
+    readonly property int fast: 160
+    readonly property int slow: 320
+    readonly property int easing: Easing.OutCubic
+
+    function fade(c, a) { return Qt.rgba(c.r, c.g, c.b, a); }
+
+    // Шрифты Google Fonts, которые plove скачал: Qt не видит новые шрифты
+    // до перезапуска, поэтому подгружаем файлы сами.
+    property list<FontLoader> loaders: [
+{%- set roles = [options.font_display, options.font_text, options.font_mono] %}
+{%- for font, files in google_fonts %}{% if font in roles %}{% for file in files %}
+        FontLoader { source: "file://{{ file | replace(from="[", to="%5B") | replace(from="]", to="%5D") | replace(from=" ", to="%20") }}" },
+{%- endfor %}{% endif %}{% endfor %}
+    ]
+}

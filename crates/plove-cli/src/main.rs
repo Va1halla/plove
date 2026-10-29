@@ -653,6 +653,18 @@ fn print_plan(plan: &Plan, env: &Env) {
         println!("  {mark} {:<28} {note}{source}", package.name);
     }
 
+    if !plan.fonts.is_empty() {
+        println!("\nШрифты Google Fonts:");
+        for font in &plan.fonts {
+            let (mark, note) = if font.installed {
+                ("=", "уже скачан")
+            } else {
+                ("+", "будет скачан")
+            };
+            println!("  {mark} {:<28} {note}", font.name);
+        }
+    }
+
     println!("\nКонфиги:");
     for file in &plan.files {
         let (mark, note) = match file.status {

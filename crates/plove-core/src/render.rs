@@ -50,9 +50,14 @@ pub fn render_module(
     for entry in &module.manifest.templates {
         let source = module.template(&entry.src)?;
         let what = format!("{}/{}", module.manifest.id, entry.src);
+        let content = if entry.copy {
+            source.to_string()
+        } else {
+            render_str(source, &context, &what)?
+        };
         files.push(RenderedFile {
             dest: entry.dest.clone(),
-            content: render_str(source, &context, &what)?,
+            content,
         });
     }
     Ok(files)

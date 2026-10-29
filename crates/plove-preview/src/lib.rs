@@ -530,6 +530,9 @@ impl Bar {
             .get(id)
             .ok_or_else(|| anyhow!("модуль «{id}» не найден"))?;
         let options = module_options(module, spec.overrides.get(id))?;
+        if id == "quickshell" {
+            return Ok(Bar::quickshell(&options, spec, look));
+        }
         let list = |key: &str| -> Vec<String> {
             options[key]
                 .as_array()
@@ -582,6 +585,57 @@ impl Bar {
             right: list("modules_right"),
             fill,
         })
+    }
+}
+
+impl Bar {
+    /// Панель Quickshell теми же средствами, что и Waybar: segments —
+    /// три острова, island и dock — один остров сверху или снизу, rail —
+    /// вертикальная полоса.
+    fn quickshell(options: &serde_json::Value, spec: &RiceSpec, look: &Look) -> Bar {
+        let list = |key: &str| -> Vec<String> {
+            options[key]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|v| v.as_str())
+                // Имена модулей превью — как у Waybar.
+                .map(|m| if m == "volume" { "pulseaudio" } else { m }.to_string())
+                .collect()
+        };
+        let (left, center, right) = (
+            list("modules_left"),
+            list("modules_center"),
+            list("modules_right"),
+        );
+        let style = options["style"].as_str().unwrap_or("segments");
+        let bg = spec.theme.palette.bg;
+        let mut bar = Bar {
+            top: style != "dock",
+            side: None,
+            floating: true,
+            style: BarStyle::Islands,
+            height: look.style.bar_height as f32,
+            margin: look.gaps,
+            left: Vec::new(),
+            center: Vec::new(),
+            right: Vec::new(),
+            fill: (bg, bg),
+        };
+        match style {
+            "rail" => {
+                bar.side = Some(options["rail_side"].as_str() != Some("right"));
+                (bar.left, bar.center, bar.right) = (left, center, right);
+            }
+            "island" | "dock" => {
+                bar.center = [left, center, right].concat();
+                if style == "dock" {
+                    bar.height = (bar.height * 1.35).round();
+                }
+            }
+            _ => (bar.left, bar.center, bar.right) = (left, center, right),
+        }
+        bar
     }
 }
 

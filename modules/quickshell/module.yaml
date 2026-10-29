@@ -1,0 +1,95 @@
+# Модуль Quickshell: панель на QML вместо Waybar. Свои компоненты plove
+# (shell.qml, Bar*.qml…) копируются как есть; из райса генерируются
+# только Theme.qml (цвета, шрифты, форма) и settings.json (стиль панели,
+# модули). settings.json панель перечитывает сама, Theme.qml Quickshell
+# подхватывает при изменении файла: перезапускать ничего не нужно.
+id: quickshell
+role: bar
+exec: qs -c plove
+packages: [quickshell]
+compatible_with:
+  compositor: [hyprland]
+templates:
+  - src: Theme.qml.tera
+    dest: ~/.config/quickshell/plove/Theme.qml
+  - src: settings.json.tera
+    dest: ~/.config/quickshell/plove/settings.json
+  - { src: shell.qml, dest: ~/.config/quickshell/plove/shell.qml, copy: true }
+  - { src: Config.qml, dest: ~/.config/quickshell/plove/Config.qml, copy: true }
+  - { src: Net.qml, dest: ~/.config/quickshell/plove/Net.qml, copy: true }
+  - { src: Bar.qml, dest: ~/.config/quickshell/plove/Bar.qml, copy: true }
+  - { src: Segment.qml, dest: ~/.config/quickshell/plove/Segment.qml, copy: true }
+  - { src: Group.qml, dest: ~/.config/quickshell/plove/Group.qml, copy: true }
+  - { src: Chip.qml, dest: ~/.config/quickshell/plove/Chip.qml, copy: true }
+  - { src: Workspaces.qml, dest: ~/.config/quickshell/plove/Workspaces.qml, copy: true }
+  - { src: Clock.qml, dest: ~/.config/quickshell/plove/Clock.qml, copy: true }
+  - { src: Tray.qml, dest: ~/.config/quickshell/plove/Tray.qml, copy: true }
+  - { src: Volume.qml, dest: ~/.config/quickshell/plove/Volume.qml, copy: true }
+  - { src: Network.qml, dest: ~/.config/quickshell/plove/Network.qml, copy: true }
+  - { src: Battery.qml, dest: ~/.config/quickshell/plove/Battery.qml, copy: true }
+  - { src: Label.qml, dest: ~/.config/quickshell/plove/Label.qml, copy: true }
+  - { src: net.sh, dest: ~/.local/share/plove/qs-net.sh, copy: true }
+autostart: true
+# Quickshell сам следит за файлами своей папки, а settings.json панель
+# перечитывает сама. Если процесса нет — запускаем.
+reload: "pgrep -x qs >/dev/null || setsid -f {{ exec }} >/dev/null 2>&1"
+process: "qs -c plove"
+stops: [waybar]
+settings:
+  - id: style
+    group: Панель
+    title: Вид панели
+    about: "segments — три плавающие плашки у краёв; rail — тонкая вертикальная полоса у края; island — один островок по центру сверху, раскрывается под мышью; dock — док внизу по центру."
+    choices: [segments, rail, island, dock]
+    default: segments
+  - id: rail_side
+    group: Панель
+    title: Край для rail
+    choices: [left, right]
+    default: left
+  - id: modules_left
+    group: Модули
+    title: Слева
+    about: "У rail — сверху, у island и dock всё идёт подряд: левые, центральные, правые."
+    items: [workspaces, clock, tray, volume, network, battery]
+    default: [workspaces]
+  - id: modules_center
+    group: Модули
+    title: По центру
+    items: [workspaces, clock, tray, volume, network, battery]
+    default: [clock]
+  - id: modules_right
+    group: Модули
+    title: Справа
+    items: [workspaces, clock, tray, volume, network, battery]
+    default: [tray, volume, network, battery]
+  - id: workspace_count
+    group: Рабочие столы
+    title: Всегда показывать столов
+    about: Сколько рабочих столов видно, даже пустых. 0 — только занятые.
+    range: [0, 10]
+    default: 5
+  - id: clock_seconds
+    group: Часы
+    title: Секунды на часах
+    default: false
+  - id: clock_date
+    group: Часы
+    title: Дата рядом с часами
+    about: У island дата появляется, когда наводишь мышь.
+    default: false
+  - id: font_display
+    group: Шрифты
+    title: Шрифт часов
+    about: "Пусто — шрифт интерфейса райса. Например Doto, Space Grotesk, Orbitron: шрифты Google Fonts plove скачает сам."
+    default: ""
+  - id: font_text
+    group: Шрифты
+    title: Шрифт подписей
+    about: Пусто — шрифт интерфейса райса.
+    default: ""
+  - id: font_mono
+    group: Шрифты
+    title: Шрифт цифр
+    about: Проценты и уровни. Пусто — моноширинный шрифт райса.
+    default: ""

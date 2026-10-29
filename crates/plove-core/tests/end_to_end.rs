@@ -423,7 +423,7 @@ fn desk_card_look() {
     let registry = Registry::builtin().unwrap();
     let mut spec = example_spec();
     spec.desktop = serde_yaml::from_str(
-        "[{kind: clock, at: [5, 8], look: {font: Orbitron, accent: red, fill: '#000000', opacity: 0.5, radius: 30, border: 2}},
+        "[{kind: clock, at: [5, 8], look: {font: Fancy Sans, accent: red, fill: '#000000', opacity: 0.5, radius: 30, border: 2}},
           {kind: note, at: [50, 50], look: {fill: none, text: fg}}]",
     )
     .unwrap();
@@ -437,7 +437,7 @@ fn desk_card_look() {
     let scss = String::from_utf8(file.content.clone()).unwrap();
     let red = spec.theme.palette.named("red").unwrap().hex();
     assert!(
-        scss.contains(".c0, .c0 * { font-family: \"Orbitron\""),
+        scss.contains(".c0, .c0 * { font-family: \"Fancy Sans\""),
         "{scss}"
     );
     assert!(scss.contains(".c0 .time, .c0 .zone-time"));
@@ -447,7 +447,7 @@ fn desk_card_look() {
     assert!(scss.contains(&format!(".c0 {{ border: 2px solid {red}; }}")));
     assert!(scss.contains(".c1 { background-color: transparent; }"));
     // Шрифт не из списка plove и не установлен — предупреждение, а не ошибка.
-    assert!(plan.warnings.iter().any(|w| w.contains("Orbitron")));
+    assert!(plan.warnings.iter().any(|w| w.contains("Fancy Sans")));
 
     spec.desktop[0].look.accent = Some("pink".into());
     let error = spec.validate().unwrap_err().to_string();
@@ -455,4 +455,58 @@ fn desk_card_look() {
     spec.desktop[0].look.accent = None;
     spec.desktop[0].look.font = Some("Bad\"; }".into());
     assert!(spec.validate().is_err());
+}
+
+/// Панель Quickshell: свои QML как есть, Theme.qml и settings.json из
+/// райса, Waybar не запускается, шрифты Google Fonts — в плане скачивания.
+#[test]
+fn quickshell_bar() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let mut spec = example_spec();
+    spec.components.insert("bar".into(), "quickshell".into());
+    spec.overrides.remove("waybar");
+    for style in ["segments", "rail", "island", "dock"] {
+        spec.overrides.insert(
+            "quickshell".into(),
+            serde_yaml::from_str(&format!(
+                "{{style: {style}, font_display: Doto, modules_right: [volume, battery]}}"
+            ))
+            .unwrap(),
+        );
+        let plan = plan::build(spec.clone(), &registry, &env).unwrap();
+        let text = |end: &str| {
+            let file = plan.files.iter().find(|f| f.path.ends_with(end)).unwrap();
+            String::from_utf8(file.content.clone()).unwrap()
+        };
+        let settings: serde_json::Value =
+            serde_json::from_str(&text("quickshell/plove/settings.json")).unwrap();
+        assert_eq!(settings["style"], style);
+        assert_eq!(settings["right"], serde_json::json!(["volume", "battery"]));
+        let theme = text("quickshell/plove/Theme.qml");
+        assert!(theme.contains("readonly property string fontDisplay: \"Doto\""));
+        assert!(
+            theme.contains("fonts/plove/doto/Doto%5BROND,wght%5D.ttf"),
+            "{theme}"
+        );
+        // QML копируется как есть, с фигурными скобками.
+        assert!(text("quickshell/plove/Bar.qml").contains("PanelWindow {"));
+        let hypr = text("hypr/hyprland.conf");
+        assert!(hypr.contains("exec-once = qs -c plove"));
+        assert!(!hypr.contains("exec-once = waybar"));
+        assert!(!plan
+            .files
+            .iter()
+            .any(|f| f.path.ends_with("waybar/config.jsonc")));
+        let doto = plan.fonts.iter().find(|f| f.name == "Doto").unwrap();
+        assert!(!doto.installed && doto.urls[0].ends_with("ofl/doto/Doto[ROND,wght].ttf"));
+        assert!(plan.packages.iter().any(|p| p.name == "quickshell"));
+    }
+    // Опечатка в имени шрифта не доходит до QML.
+    spec.overrides.insert(
+        "quickshell".into(),
+        serde_yaml::from_str("{font_text: 'Bad\"; }'}").unwrap(),
+    );
+    assert!(plan::build(spec, &registry, &env).is_err());
 }

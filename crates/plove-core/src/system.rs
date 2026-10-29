@@ -3,6 +3,7 @@
 //! Собрано в одном месте, чтобы остальной код можно было
 //! тестировать без настоящего Arch.
 
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -194,6 +195,38 @@ pub fn font_families() -> Vec<String> {
     families.sort();
     families.dedup();
     families
+}
+
+/// Скачать файлы шрифта в `dir` и обновить кэш fontconfig.
+pub fn download_font(urls: &[String], dir: &Path) -> Result<()> {
+    let parent = dir.parent().context("у папки шрифта нет родителя")?;
+    fs::create_dir_all(parent)?;
+    let partial = dir.with_extension("part");
+    let _ = fs::remove_dir_all(&partial);
+    fs::create_dir_all(&partial)?;
+    for url in urls {
+        let name = url.rsplit('/').next().unwrap_or("font.ttf");
+        let ok = Command::new("curl")
+            // --globoff: в именах вроде Doto[ROND,wght].ttf скобки — не шаблон curl.
+            .args(["-fsSL", "--globoff", "--max-time", "60", "-o"])
+            .arg(partial.join(name))
+            .arg(url)
+            .status()
+            .context("нужен curl")?
+            .success();
+        if !ok {
+            let _ = fs::remove_dir_all(&partial);
+            bail!("curl не смог скачать {url}");
+        }
+    }
+    fs::rename(&partial, dir)?;
+    let _ = Command::new("fc-cache")
+        .arg("-f")
+        .arg(parent)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    Ok(())
 }
 
 /// Поставить пакеты через `sudo pacman`. Вывод pacman и вопрос пароля

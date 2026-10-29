@@ -228,6 +228,10 @@ pub struct TemplateEntry {
     pub src: String,
     /// Куда писать результат. Всегда внутри домашней папки, начинается с `~/`.
     pub dest: String,
+    /// Скопировать как есть, без Tera: например, QML, где `{#` и `{{`
+    /// значат своё.
+    #[serde(default)]
+    pub copy: bool,
 }
 
 pub struct Module {

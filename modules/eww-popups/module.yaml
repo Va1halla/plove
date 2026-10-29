@@ -12,7 +12,7 @@ aur: [eww]
 packages: [libqalculate, wl-clipboard]
 compatible_with:
   compositor: [hyprland]
-  bar: [waybar]
+  bar: [waybar, quickshell]
 templates:
   - src: eww.yuck.tera
     dest: ~/.config/eww-popups/eww.yuck

@@ -179,7 +179,8 @@ enum Action {
 
 /// Роли, для которых мастер предлагает выбрать программу:
 /// (роль, подпись, можно ли обойтись без неё).
-const PROGRAM_ROLES: [(&str, &str, bool); 8] = [
+const PROGRAM_ROLES: [(&str, &str, bool); 9] = [
+    ("bar", "Программа панели", false),
     ("terminal", "Терминал", false),
     ("launcher", "Лаунчер", false),
     ("notifications", "Уведомления", false),
@@ -225,6 +226,14 @@ const STYLE_TOKENS: [(&str, &str, &[&str]); 7] = [
 
 const POSITIONS: [&str; 4] = ["top", "bottom", "left", "right"];
 
+/// Виды панели Quickshell: (значение настройки style, подпись).
+const QS_STYLES: [(&str, &str); 4] = [
+    ("segments", "плашки у краёв"),
+    ("rail", "вертикальная полоса"),
+    ("island", "островок по центру"),
+    ("dock", "док снизу"),
+];
+
 /// Настройки, которые мастер позволяет поменять поверх готового райса.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Settings {
@@ -232,6 +241,8 @@ struct Settings {
     russian: bool,
     /// Индекс в POSITIONS.
     position: usize,
+    /// Индекс в QS_STYLES: у панели Quickshell вместо стороны — вид.
+    qs_style: usize,
     /// Индексы вариантов в STYLE_TOKENS.
     style: [usize; 7],
     programs: Vec<Program>,
@@ -323,16 +334,30 @@ impl Settings {
         let position = get("waybar", "position")
             .and_then(Value::as_str)
             .unwrap_or("top");
+        let qs_style = get("quickshell", "style")
+            .and_then(Value::as_str)
+            .unwrap_or("segments");
         Settings {
             russian: get("hyprland", "kb_layout")
                 .and_then(Value::as_str)
                 .is_some_and(|l| l.contains("ru")),
             position: POSITIONS.iter().position(|p| *p == position).unwrap_or(0),
+            qs_style: QS_STYLES
+                .iter()
+                .position(|(s, _)| *s == qs_style)
+                .unwrap_or(0),
             style: indexes,
             programs,
             colors: ColorPick::for_spec(spec),
             accent: 0,
         }
+    }
+
+    /// Панель — Quickshell: строка «Панель» тогда выбирает её вид.
+    fn quickshell(&self) -> bool {
+        self.programs
+            .iter()
+            .any(|p| p.role == "bar" && p.choices[p.current] == "quickshell")
     }
 
     fn len(&self) -> usize {
@@ -344,7 +369,16 @@ impl Settings {
     fn apply_to(&self, spec: &mut RiceSpec) {
         let layout = if self.russian { "us,ru" } else { "us" };
         set(spec, "hyprland", "kb_layout", layout.into());
-        set(spec, "waybar", "position", POSITIONS[self.position].into());
+        if self.quickshell() {
+            set(
+                spec,
+                "quickshell",
+                "style",
+                QS_STYLES[self.qs_style].0.into(),
+            );
+        } else {
+            set(spec, "waybar", "position", POSITIONS[self.position].into());
+        }
         let mut style = serde_yaml::Mapping::new();
         for (i, (key, _, variants)) in STYLE_TOKENS.iter().enumerate() {
             style.insert((*key).into(), variants[self.style[i]].into());
@@ -380,6 +414,7 @@ impl Settings {
         };
         match row {
             0 => self.russian = !self.russian,
+            1 if self.quickshell() => self.qs_style = cycle(self.qs_style, QS_STYLES.len()),
             1 => self.position = cycle(self.position, POSITIONS.len()),
             r if r < Self::SWITCHES => {
                 let i = r - 2;
@@ -412,7 +447,11 @@ impl Settings {
         } else {
             "только us"
         };
-        let position = ["сверху", "снизу", "слева", "справа"][self.position];
+        let position = if self.quickshell() {
+            QS_STYLES[self.qs_style].1
+        } else {
+            ["сверху", "снизу", "слева", "справа"][self.position]
+        };
         let mut rows = vec![
             ("Раскладка", layout.to_string()),
             ("Панель", position.to_string()),
@@ -591,6 +630,7 @@ impl App {
             settings: Settings {
                 russian: false,
                 position: 0,
+                qs_style: 0,
                 style: [0; 7],
                 programs: Vec::new(),
                 colors: None,
@@ -1451,6 +1491,30 @@ mod tests {
         settings.apply_to(&mut spec);
         assert_eq!(spec.components["launcher"], "rofi");
         assert!(!spec.components.contains_key("widgets"));
+    }
+
+    /// Панель Quickshell: строка «Панель» выбирает её вид, а не сторону.
+    #[test]
+    fn quickshell_bar_has_styles() {
+        let registry = Registry::builtin().unwrap();
+        let mut spec = presets::get("tokyo-night").unwrap().unwrap();
+        let mut settings = Settings::from_spec(&spec, &registry);
+        let bar = Settings::SWITCHES
+            + settings
+                .programs
+                .iter()
+                .position(|p| p.role == "bar")
+                .unwrap();
+        // Варианты по алфавиту: quickshell, waybar.
+        settings.change(bar, false);
+        assert!(settings.quickshell());
+        settings.change(1, true);
+        settings.change(1, true);
+        assert_eq!(settings.rows()[1].1, "островок по центру");
+        settings.apply_to(&mut spec);
+        assert_eq!(spec.components["bar"], "quickshell");
+        assert_eq!(spec.overrides["quickshell"]["style"], "island");
+        plan::build(spec, &registry, &Env::sandbox(std::env::temp_dir())).unwrap();
     }
 
     /// Райс из картинки: строки подбора цветов пересчитывают палитру,

@@ -199,10 +199,13 @@ fn round2(x: f64) -> f64 {
 
 /// Шрифт, который plove умеет поставить: имя семейства, пакет Arch
 /// и моноширинный ли он. Моноширинные — с Nerd Font: в них есть значки.
+/// Шрифты без пакета (`package` пустой) скачиваются с Google Fonts:
+/// `files` — пути в репозитории google/fonts.
 pub struct FontInfo {
     pub name: &'static str,
     pub package: &'static str,
     pub mono: bool,
+    pub files: &'static [&'static str],
 }
 
 const fn font(name: &'static str, package: &'static str, mono: bool) -> FontInfo {
@@ -210,10 +213,25 @@ const fn font(name: &'static str, package: &'static str, mono: bool) -> FontInfo
         name,
         package,
         mono,
+        files: &[],
     }
 }
 
-/// Все пакеты из официальных репозиториев (extra), без AUR.
+const fn google(name: &'static str, mono: bool, files: &'static [&'static str]) -> FontInfo {
+    FontInfo {
+        name,
+        package: "",
+        mono,
+        files,
+    }
+}
+
+/// Откуда скачиваются шрифты Google Fonts (лицензия OFL).
+pub const GOOGLE_FONTS_URL: &str = "https://raw.githubusercontent.com/google/fonts/main/ofl/";
+
+/// Пакеты из официальных репозиториев (extra), без AUR, и шрифты
+/// Google Fonts для крупных цифр и заголовков. Моноширинные из Google
+/// Fonts — без значков, поэтому для терминала их не предлагаем.
 pub const FONTS: &[FontInfo] = &[
     font("Inter", "inter-font", false),
     font("Noto Sans", "noto-fonts", false),
@@ -243,12 +261,49 @@ pub const FONTS: &[FontInfo] = &[
     font("SpaceMono Nerd Font", "ttf-space-mono-nerd", true),
     font("RobotoMono Nerd Font", "ttf-roboto-mono-nerd", true),
     font("ZedMono Nerd Font", "ttf-zed-mono-nerd", true),
+    google("Doto", false, &["doto/Doto[ROND,wght].ttf"]),
+    google(
+        "Space Grotesk",
+        false,
+        &["spacegrotesk/SpaceGrotesk[wght].ttf"],
+    ),
+    google(
+        "Space Mono",
+        false,
+        &[
+            "spacemono/SpaceMono-Regular.ttf",
+            "spacemono/SpaceMono-Bold.ttf",
+        ],
+    ),
+    google("Manrope", false, &["manrope/Manrope[wght].ttf"]),
+    google("Outfit", false, &["outfit/Outfit[wght].ttf"]),
+    google("Sora", false, &["sora/Sora[wght].ttf"]),
+    google(
+        "Poppins",
+        false,
+        &[
+            "poppins/Poppins-Regular.ttf",
+            "poppins/Poppins-Medium.ttf",
+            "poppins/Poppins-SemiBold.ttf",
+            "poppins/Poppins-Bold.ttf",
+        ],
+    ),
+    google("Rubik", false, &["rubik/Rubik[wght].ttf"]),
+    google("Orbitron", false, &["orbitron/Orbitron[wght].ttf"]),
 ];
 
 /// Какой пакет Arch ставит этот шрифт. `None` — не знаем,
 /// тогда план предупредит, что шрифт нужно поставить вручную.
 pub fn font_package(name: &str) -> Option<&'static str> {
-    FONTS.iter().find(|f| f.name == name).map(|f| f.package)
+    FONTS
+        .iter()
+        .find(|f| f.name == name && !f.package.is_empty())
+        .map(|f| f.package)
+}
+
+/// Шрифт с Google Fonts, если это он.
+pub fn google_font(name: &str) -> Option<&'static FontInfo> {
+    FONTS.iter().find(|f| f.name == name && !f.files.is_empty())
 }
 
 #[cfg(test)]

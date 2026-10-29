@@ -56,6 +56,18 @@ pub fn apply(plan: &Plan, env: &Env, options: &ApplyOptions) -> Result<ApplyRepo
         }
     }
 
+    // Шрифты Google Fonts: качаем во временную папку и переносим целиком,
+    // чтобы недокачанный шрифт не считался установленным. Без сети райс
+    // всё равно применится, просто с запасным шрифтом.
+    if !options.skip_packages && !env.sandbox {
+        for font in plan.missing_fonts() {
+            match system::download_font(&font.urls, &font.dir) {
+                Ok(()) => println!("Шрифт {} скачан в {}", font.name, env.display(&font.dir)),
+                Err(e) => eprintln!("Не удалось скачать шрифт {}: {e:#}", font.name),
+            }
+        }
+    }
+
     // 2–3. Снимок старых файлов и запись новых.
     let changed = plan.changed_files();
     let mut generation = None;
