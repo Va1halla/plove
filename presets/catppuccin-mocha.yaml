@@ -21,7 +21,7 @@ components:
   launcher: rofi
   notifications: qs-notifications
   power: wlogout
-  widgets: eww
+  widgets: qs-desktop
   lock: hyprlock
   idle: hypridle
   screenshot: grim

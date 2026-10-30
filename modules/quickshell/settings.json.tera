@@ -13,5 +13,6 @@
   "date": {{ options.clock_date }},
   "terminal": {{ run_in | json_encode() }},
   "notifications": {{ components.notifications | default(value="") == "qs-notifications" }},
+  "desktop": {{ components.widgets | default(value="") == "qs-desktop" }},
   "lua": {{ hypr_lua }}
 }

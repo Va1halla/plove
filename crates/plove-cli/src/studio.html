@@ -162,7 +162,7 @@ async function load() {
     el.onclick = () => add(k.id);
     kinds.appendChild(el);
   }
-  if (!state.eww) status("В райсе нет eww: он добавится при сохранении, чтобы карточки было чем показать.");
+  if (!state.eww) status(`Карточки пока нечем показать: при сохранении в райс добавится ${state.engine}.`);
   fit();
   render();
 }
@@ -257,7 +257,7 @@ function cardElement(card, i) {
   el.style.fontSize = `${15 * s}px`;
   el.style.padding = `${st.pad * s}px ${st.pad * 2 * s}px`;
   const themeAlpha = Math.max(0.15, st.bg_alpha - 0.25);
-  if (card.kind !== "clock" && st.glass !== "none") {
+  if (card.kind !== "clock" && card.kind !== "dotclock" && st.glass !== "none") {
     el.style.background = `rgba(${t.colors.bg.rgb}, ${themeAlpha})`;
     el.style.borderRadius = `${st.radius_box * s}px`;
   }
@@ -289,6 +289,21 @@ function looks(card) {
     mono: l.font ? `"${l.font}", monospace` : `"${fonts.mono}", monospace`,
   };
 }
+
+// Точки 5×7 для «Точечных часов»: как в DotText.qml.
+const DOTS = {
+  "0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
+  "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+  "2": ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
+  "3": ["11111", "00010", "00100", "00010", "00001", "10001", "01110"],
+  "4": ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
+  "5": ["11111", "10000", "11110", "00001", "00001", "10001", "01110"],
+  "6": ["00110", "01000", "10000", "11110", "10001", "10001", "01110"],
+  "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+  "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
+  "9": ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
+  ":": ["0", "0", "1", "0", "1", "0", "0"],
+};
 
 const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -353,6 +368,36 @@ function content(card, s) {
     }
     case "note":
       return `<div class="c-note" style="font-size:${px(17)}">${esc(opt(card, "text"))}</div>`;
+    case "dotclock": {
+      // Те же точки 5×7, что рисует панель (DotText.qml).
+      const time = opt(card, "seconds") ? now.toLocaleTimeString("ru-RU") : hm(now);
+      const dot = (opt(card, "seconds") ? 8 : 12) * s;
+      const html = time.split("").map((ch) => {
+        const rows = DOTS[ch] || DOTS["0"];
+        const cols = rows[0].length;
+        const cells = rows.join("").split("").map((b) => `<i style="width:${dot}px;height:${dot}px;border-radius:50%;background:${b === "1" ? accent : "rgba(255,255,255,.08)"}"></i>`).join("");
+        return `<span style="display:inline-grid;grid-template-columns:repeat(${cols},${dot}px);gap:${dot * 0.3}px;margin:0 ${dot * 0.45}px">${cells}</span>`;
+      }).join("");
+      const date = now.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "long", year: "numeric" }).toUpperCase();
+      return `<div class="c-center">${html}</div>` + (opt(card, "date") ? `<div class="c-center" style="font-size:${px(14)};letter-spacing:${px(2)};color:${muted};font-family:${mono};margin-top:${px(12)}">${esc(date)}</div>` : "");
+    }
+    case "metric": {
+      const info = { cpu: ["ПРОЦЕССОР", "󰻠", 23], ram: ["ПАМЯТЬ", "󰍛", 41], disk: ["ДИСК", "󰋊", 63], temp: ["ТЕМПЕРАТУРА", "󰔏", 56] }[opt(card, "source")] || ["?", "", 0];
+      const value = opt(card, "source") === "temp" ? `${info[2]}°` : `${info[2]}%`;
+      return `<div style="font-size:${px(12)};font-weight:700;letter-spacing:1px;color:${muted}">${info[0]}</div>` +
+        `<div class="c-row" style="margin:${px(8)} 0"><span style="font-size:${px(22)};font-family:'${state.theme.icon_font}'">${info[1]}</span><b style="font-size:${px(34)}">${value}</b></div>` +
+        `<div style="height:${px(6)};border-radius:${px(3)};background:rgba(255,255,255,.12)"><div style="width:${info[2]}%;height:100%;border-radius:${px(3)};background:${accent}"></div></div>`;
+    }
+    case "sparkline": {
+      const cpu = opt(card, "source") !== "ram";
+      const pts = Array.from({ length: 60 }, (_, i) => 0.25 + 0.18 * Math.sin(i / 5) + 0.1 * Math.sin(i * 1.7));
+      const line = pts.map((v, i) => `${(i / 59) * 100},${(1 - v) * 100}`).join(" ");
+      return `<div class="c-row"><span style="font-size:${px(12)};font-weight:700;letter-spacing:1px;color:${muted}">${cpu ? "ПРОЦЕССОР" : "ПАМЯТЬ"} · 2 МИН</span>` +
+        `<b style="font-size:${px(20)};color:${accent};font-family:${mono}">${Math.round(pts[59] * 100)}%</b></div>` +
+        `<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:${px(80)};margin-top:${px(6)}">` +
+        `<polygon points="0,100 ${line} 100,100" fill="${accent}" opacity=".25"/>` +
+        `<polyline points="${line}" fill="none" stroke="${accent}" stroke-width="${2 * s}" vector-effect="non-scaling-stroke"/></svg>`;
+    }
     case "widget": {
       const w = state.widgets[opt(card, "id")];
       if (!w) return `<div class="c-center" style="color:${muted}">виджет не выбран</div>`;

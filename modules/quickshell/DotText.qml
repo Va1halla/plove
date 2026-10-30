@@ -1,0 +1,48 @@
+// Цифры из точек 5×7, как на табло: горящие точки — цвет, погасшие —
+// еле видны. Свой рисунок, без шрифта.
+import QtQuick
+
+Row {
+    id: dots
+
+    property string text: "00:00"
+    property real dot: 8            // диаметр точки
+    property color on: Theme.accent
+    property color off: Theme.fade(Theme.fg, 0.08)
+    spacing: dot * 0.9
+
+    readonly property var glyphs: ({
+        "0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
+        "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+        "2": ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
+        "3": ["11111", "00010", "00100", "00010", "00001", "10001", "01110"],
+        "4": ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
+        "5": ["11111", "10000", "11110", "00001", "00001", "10001", "01110"],
+        "6": ["00110", "01000", "10000", "11110", "10001", "10001", "01110"],
+        "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+        "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
+        "9": ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
+        ":": ["0", "0", "1", "0", "1", "0", "0"]
+    })
+
+    Repeater {
+        model: dots.text.split("")
+        Grid {
+            required property string modelData
+            readonly property var rows: dots.glyphs[modelData] || dots.glyphs["0"]
+            columns: rows[0].length
+            spacing: dots.dot * 0.3
+            Repeater {
+                model: parent.rows.join("").split("")
+                Rectangle {
+                    required property string modelData
+                    width: dots.dot
+                    height: dots.dot
+                    radius: dots.dot / 2
+                    color: modelData === "1" ? dots.on : dots.off
+                    Behavior on color { ColorAnimation { duration: 400 } }
+                }
+            }
+        }
+    }
+}

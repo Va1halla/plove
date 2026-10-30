@@ -1486,7 +1486,8 @@ mod tests {
         settings.change(launcher, true);
         settings.change(launcher, true);
         settings.change(launcher, false);
-        // eww стоит первым после «нет»: шаг назад — без виджетов.
+        // Варианты: «нет», eww, qs-desktop (так в tokyo-night): два шага назад — без виджетов.
+        settings.change(widgets, false);
         settings.change(widgets, false);
         settings.apply_to(&mut spec);
         assert_eq!(spec.components["launcher"], "rofi");

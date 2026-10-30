@@ -49,6 +49,25 @@ templates:
   - { src: SidePanel.qml, dest: ~/.config/quickshell/plove/SidePanel.qml, copy: true }
   - { src: Bell.qml, dest: ~/.config/quickshell/plove/Bell.qml, copy: true }
   - { src: Osd.qml, dest: ~/.config/quickshell/plove/Osd.qml, copy: true }
+  - { src: Desk.qml, dest: ~/.config/quickshell/plove/Desk.qml, copy: true }
+  - { src: Sys.qml, dest: ~/.config/quickshell/plove/Sys.qml, copy: true }
+  - { src: DeskWindow.qml, dest: ~/.config/quickshell/plove/DeskWindow.qml, copy: true }
+  - { src: Card.qml, dest: ~/.config/quickshell/plove/Card.qml, copy: true }
+  - { src: CalendarGrid.qml, dest: ~/.config/quickshell/plove/CalendarGrid.qml, copy: true }
+  - { src: Ring.qml, dest: ~/.config/quickshell/plove/Ring.qml, copy: true }
+  - { src: DotText.qml, dest: ~/.config/quickshell/plove/DotText.qml, copy: true }
+  - { src: CardClock.qml, dest: ~/.config/quickshell/plove/CardClock.qml, copy: true }
+  - { src: CardDotclock.qml, dest: ~/.config/quickshell/plove/CardDotclock.qml, copy: true }
+  - { src: CardWorldclock.qml, dest: ~/.config/quickshell/plove/CardWorldclock.qml, copy: true }
+  - { src: CardCalendar.qml, dest: ~/.config/quickshell/plove/CardCalendar.qml, copy: true }
+  - { src: CardSystem.qml, dest: ~/.config/quickshell/plove/CardSystem.qml, copy: true }
+  - { src: CardPlayer.qml, dest: ~/.config/quickshell/plove/CardPlayer.qml, copy: true }
+  - { src: CardWeather.qml, dest: ~/.config/quickshell/plove/CardWeather.qml, copy: true }
+  - { src: CardCountdown.qml, dest: ~/.config/quickshell/plove/CardCountdown.qml, copy: true }
+  - { src: CardNote.qml, dest: ~/.config/quickshell/plove/CardNote.qml, copy: true }
+  - { src: CardWidget.qml, dest: ~/.config/quickshell/plove/CardWidget.qml, copy: true }
+  - { src: CardMetric.qml, dest: ~/.config/quickshell/plove/CardMetric.qml, copy: true }
+  - { src: CardSparkline.qml, dest: ~/.config/quickshell/plove/CardSparkline.qml, copy: true }
   - { src: net.sh, dest: ~/.local/share/plove/qs-net.sh, copy: true }
   - { src: reload.sh, dest: ~/.local/share/plove/qs-reload.sh, copy: true }
 autostart: true

@@ -99,7 +99,7 @@ pub enum Value {
 }
 
 /// Все виды карточек.
-pub const CATALOG: [Kind; 9] = [
+pub const CATALOG: [Kind; 12] = [
     Kind {
         id: "clock",
         title: "Часы",
@@ -188,6 +188,46 @@ pub const CATALOG: [Kind; 9] = [
             id: "text",
             title: "Текст",
             default: Value::Text("Не забыть"),
+        }],
+    },
+    Kind {
+        id: "dotclock",
+        title: "Точечные часы",
+        about: "Крупные цифры из точек, как на табло. Только с панелью Quickshell.",
+        size: (480, 170),
+        params: &[
+            Param {
+                id: "seconds",
+                title: "Секунды",
+                default: Value::Switch(false),
+            },
+            Param {
+                id: "date",
+                title: "Дата под часами",
+                default: Value::Switch(true),
+            },
+        ],
+    },
+    Kind {
+        id: "metric",
+        title: "Показатель",
+        about: "Одно число крупно и полоса под ним: cpu, ram, disk или temp. Только с панелью Quickshell.",
+        size: (220, 120),
+        params: &[Param {
+            id: "source",
+            title: "Что показывать: cpu, ram, disk, temp",
+            default: Value::Text("cpu"),
+        }],
+    },
+    Kind {
+        id: "sparkline",
+        title: "График",
+        about: "Загрузка за последние две минуты линией: cpu или ram. Только с панелью Quickshell.",
+        size: (320, 130),
+        params: &[Param {
+            id: "source",
+            title: "Что показывать: cpu или ram",
+            default: Value::Text("cpu"),
         }],
     },
     Kind {
@@ -283,6 +323,19 @@ pub fn validate(spec: &RiceSpec) -> Result<()> {
         {
             bail!("desktop, карточка {n}: zones — пояса вида Europe/Moscow через запятую");
         }
+        let source = card.with.get("source").and_then(|v| v.as_str());
+        let sources: &[&str] = match kind.id {
+            "metric" => &["cpu", "ram", "disk", "temp"],
+            "sparkline" => &["cpu", "ram"],
+            _ => &[],
+        };
+        if let Some(source) = source.filter(|s| !sources.contains(s)) {
+            bail!(
+                "desktop, карточка {n} ({}): source «{source}» — можно {}",
+                kind.id,
+                sources.join(", ")
+            );
+        }
         if kind.id == "countdown" && card.with.contains_key("date") {
             let date = text("date");
             let ok = date.len() == 10
@@ -361,12 +414,37 @@ fn look_context(look: &Look, spec: &RiceSpec) -> serde_json::Value {
         }
     };
     let text = color(&look.text);
+    // Для QML: #AARRGGBB вместо rgba(…) из CSS.
+    let argb = |c: Color, a: f64| {
+        format!(
+            "#{:02x}{:02x}{:02x}{:02x}",
+            (a.clamp(0.0, 1.0) * 255.0).round() as u8,
+            c.r,
+            c.g,
+            c.b
+        )
+    };
+    let fill_argb = match (look.fill.as_deref(), look.opacity) {
+        (Some("none"), _) => Some("#00000000".to_string()),
+        (None, None) => None,
+        (_, opacity) => {
+            let base = color(&look.fill).unwrap_or(palette.bg);
+            let style = StyleContext::new(spec.theme.style, &spec.theme.geometry);
+            let theme = (style.bg_alpha - 0.25).max(0.15);
+            Some(argb(
+                base,
+                opacity.unwrap_or(if look.fill.is_some() { 1.0 } else { theme }),
+            ))
+        }
+    };
     json!({
         "font": look.font,
         "accent": color(&look.accent).map(|c| c.hex()),
         "text": text.map(|c| c.hex()),
         "muted": text.map(|c| rgba(c, 0.65)),
+        "muted_argb": text.map(|c| argb(c, 0.65)),
         "fill": fill,
+        "fill_argb": fill_argb,
         "radius": look.radius,
         "border": look.border,
     })

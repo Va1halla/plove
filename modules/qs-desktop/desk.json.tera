@@ -1,0 +1,6 @@
+{#- Сгенерировано plove: карточки рабочего стола для панели Quickshell.
+    Без раскладки из studio — одни часы посередине, как раньше у eww. -#}
+{
+  "cards": {% if desk | length > 0 %}{{ desk | json_encode() }}{% else %}[{"index": 0, "kind": "clock", "x": 31.0, "y": 36.0, "scale": 1.0, "w": 440, "h": 190, "opts": {"seconds": false, "date": true}, "zones": [], "look": {}}]{% endif %},
+  "widgets": {{ widgets | json_encode() }}
+}

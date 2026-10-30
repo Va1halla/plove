@@ -852,6 +852,8 @@ impl BarText<'_> {
             "backlight" => ("\u{f00df}", "свет", "70%"),
             "window" => ("", "", "nvim ~/plove"),
             "tray" => ("", "", ""),
+            // Колокольчик уведомлений панели Quickshell.
+            "bell" => ("\u{f009a}", "", ""),
             "launcher" => {
                 let text = if self.labels == Labels::Text {
                     "apps"

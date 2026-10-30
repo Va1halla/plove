@@ -102,6 +102,16 @@ fn desktop_png(spec: &RiceSpec, registry: &Registry, env: &Env) -> Result<Vec<u8
     plove_preview::render_png(&background, registry, env)
 }
 
+/// Чем рисовать карточки: при панели Quickshell — ею самой (qs-desktop),
+/// иначе eww.
+fn desk_engine(spec: &RiceSpec) -> &'static str {
+    if spec.components.get("bar").map(String::as_str) == Some("quickshell") {
+        "qs-desktop"
+    } else {
+        "eww"
+    }
+}
+
 fn load(rice: &str, env: &Env) -> Result<(RiceSpec, PathBuf)> {
     let path = Path::new(rice);
     if path.exists() {
@@ -325,7 +335,8 @@ impl Studio<'_> {
             "catalog": desk::catalog_json(),
             "desktop": self.spec.desktop,
             "widgets": widgets,
-            "eww": self.spec.components.get("widgets") == Some(&"eww".to_string()),
+            "eww": self.spec.components.contains_key("widgets"),
+            "engine": desk_engine(&self.spec),
             "colors": colors,
             "fonts": self.fonts(),
         })
@@ -343,11 +354,13 @@ impl Studio<'_> {
             spec.theme.fonts = serde_json::from_value(request["fonts"].clone())
                 .context("страница прислала шрифты в неверном виде")?;
         }
-        // Карточки рисует eww: без него раскладка ничего бы не показала.
+        // Карточки рисует панель Quickshell (qs-desktop) или eww: без них
+        // раскладка ничего бы не показала.
         if !spec.desktop.is_empty() {
+            let engine = desk_engine(&spec);
             spec.components
                 .entry("widgets".into())
-                .or_insert_with(|| "eww".into());
+                .or_insert_with(|| engine.into());
         }
         spec.validate()?;
         if let Some(dir) = self.file.parent() {

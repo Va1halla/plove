@@ -1,0 +1,14 @@
+# Модуль qs-desktop: карточки рабочего стола из `plove studio` рисует
+# панель Quickshell (на нижнем слое, под окнами) вместо eww. Своей
+# программы нет: модуль пишет раскладку desk.json, панель следит за ним.
+id: qs-desktop
+role: widgets
+compatible_with:
+  compositor: [hyprland]
+  bar: [quickshell]
+# curl — погода с wttr.in.
+packages: [curl]
+templates:
+  - src: desk.json.tera
+    dest: ~/.config/quickshell/plove/desk.json
+  - { src: weather.sh, dest: ~/.local/share/plove/qs-weather.sh, copy: true }

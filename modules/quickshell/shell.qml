@@ -26,4 +26,10 @@ ShellRoot {
         model: Quickshell.screens
         Bar {}
     }
+
+    // Карточки рабочего стола (модуль qs-desktop).
+    Variants {
+        model: Quickshell.screens
+        DeskWindow {}
+    }
 }

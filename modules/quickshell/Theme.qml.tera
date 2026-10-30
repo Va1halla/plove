@@ -21,14 +21,18 @@ Singleton {
     readonly property color red: "{{ red.hex }}"
     readonly property color green: "{{ green.hex }}"
     readonly property color yellow: "{{ yellow.hex }}"
-    // Непрозрачность плашек: из стиля glass.
+    // Непрозрачность плашек: из стиля glass. Без стекла у карточек стола нет фона.
     readonly property real alpha: {{ style.bg_alpha }}
+    readonly property bool glass: {{ style.glass != "none" }}
 
     // Шрифты по ролям: часы, подписи, цифры, значки (Nerd Font).
     readonly property string fontDisplay: "{% if options.font_display %}{{ options.font_display }}{% else %}{{ fonts.ui }}{% endif %}"
     readonly property string fontText: "{% if options.font_text %}{{ options.font_text }}{% else %}{{ fonts.ui }}{% endif %}"
     readonly property string fontMono: "{% if options.font_mono %}{{ options.font_mono }}{% else %}{{ fonts.mono }}{% endif %}"
     readonly property string fontIcons: "{{ icon_font }}"
+    // Шрифты райса без настроек панели: ими пишут карточки рабочего стола.
+    readonly property string fontUi: "{{ fonts.ui }}"
+    readonly property string fontSystemMono: "{{ fonts.mono }}"
     // Пункты в пиксели при 96 dpi.
 {%- set px = fonts.size * 4 / 3 %}
     readonly property real fontSize: {{ px | round }}

@@ -13,7 +13,7 @@ use plove_core::state;
 use plove_core::system::Env;
 
 /// tokyo-night в прежнем наборе: панель Waybar, меню eww-popups,
-/// уведомления mako. Многие тесты проверяют их конфиги.
+/// уведомления mako, карточки eww. Многие тесты проверяют их конфиги.
 /// Панель Quickshell (по умолчанию в готовых райсах) — в своих тестах.
 fn example_spec() -> RiceSpec {
     let mut spec = presets::get("tokyo-night").unwrap().unwrap();
@@ -21,6 +21,7 @@ fn example_spec() -> RiceSpec {
     spec.components.insert("popups".into(), "eww-popups".into());
     spec.components
         .insert("notifications".into(), "mako".into());
+    spec.components.insert("widgets".into(), "eww".into());
     spec
 }
 
@@ -599,4 +600,41 @@ fn hyprland_lua_config() {
         let text = String::from_utf8_lossy(&out.stdout);
         assert!(text.contains("config ok"), "{text}");
     }
+}
+
+/// Карточки стола на панели Quickshell: раскладка в desk.json с look
+/// для QML, новые виды и проверка их параметров; eww не нужен.
+#[test]
+fn quickshell_desktop() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let mut spec = presets::get("tokyo-night").unwrap().unwrap();
+    assert_eq!(spec.components["widgets"], "qs-desktop");
+    spec.desktop = serde_yaml::from_str(
+        "[{kind: dotclock, at: [30, 33]},
+          {kind: metric, at: [3, 8], with: {source: ram}, look: {fill: accent, opacity: 0.5}},
+          {kind: sparkline, at: [3, 70], scale: 1.5}]",
+    )
+    .unwrap();
+    spec.validate().unwrap();
+    let plan = plan::build(spec.clone(), &registry, &env).unwrap();
+    let file = |end: &str| plan.files.iter().find(|f| f.path.ends_with(end)).unwrap();
+    let desk: serde_json::Value =
+        serde_json::from_slice(&file("quickshell/plove/desk.json").content).unwrap();
+    let cards = desk["cards"].as_array().unwrap();
+    assert_eq!(cards.len(), 3);
+    assert_eq!(cards[1]["opts"]["source"], "ram");
+    let accent = spec.theme.palette.accent;
+    let argb = format!("#80{:02x}{:02x}{:02x}", accent.r, accent.g, accent.b);
+    assert_eq!(cards[1]["look"]["fill_argb"], argb.as_str());
+    assert_eq!(cards[2]["w"], 480);
+    let settings: serde_json::Value =
+        serde_json::from_slice(&file("quickshell/plove/settings.json").content).unwrap();
+    assert_eq!(settings["desktop"], true);
+    assert!(!plan.files.iter().any(|f| f.path.ends_with("eww/eww.yuck")));
+
+    spec.desktop[1].with.insert("source".into(), "gpu".into());
+    let error = spec.validate().unwrap_err().to_string();
+    assert!(error.contains("source «gpu»"), "{error}");
 }
