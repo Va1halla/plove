@@ -1,6 +1,6 @@
 {
     "label" : "lock",
-    "action" : "pidof hyprlock || hyprlock",
+    "action" : "{{ apps.lock | default(value="pidof hyprlock || hyprlock") }}",
     "text" : "Заблокировать",
     "keybind" : "l"
 }

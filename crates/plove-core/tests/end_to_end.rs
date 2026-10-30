@@ -666,3 +666,28 @@ fn quickshell_launcher() {
         .iter()
         .any(|f| f.path.ends_with("plove/qs-dmenu.sh")));
 }
+
+/// Блокировка на Quickshell: Super+L, hypridle и меню выхода зовут IPC
+/// панели, а не hyprlock.
+#[test]
+fn quickshell_lock() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let mut spec = presets::get("tokyo-night").unwrap().unwrap();
+    spec.components.insert("lock".into(), "qs-lock".into());
+    spec.components.insert("power".into(), "power-menu".into());
+    let plan = plan::build(spec, &registry, &env).unwrap();
+    let text = |end: &str| {
+        let file = plan.files.iter().find(|f| f.path.ends_with(end)).unwrap();
+        String::from_utf8(file.content.clone()).unwrap()
+    };
+    let hypr = text("hypr/hyprland.conf");
+    assert!(hypr.contains("$mod, L, exec, qs -c plove ipc call plove lock"));
+    assert!(hypr.contains("Заблокировать) qs -c plove ipc call plove lock ;;"));
+    assert!(text("hypr/hypridle.conf").contains("qs -c plove ipc call plove lock"));
+    assert!(!plan
+        .files
+        .iter()
+        .any(|f| f.path.ends_with("hypr/hyprlock.conf") && f.status != FileStatus::Remove));
+}

@@ -78,6 +78,7 @@ Singleton {
             property string terminal: ""
             property bool notifications: false
             property bool desktop: false
+            property string wallpaper: ""
             property bool lua: false
         }
     }

@@ -7,7 +7,7 @@ packages: [hypridle]
 autostart: true
 compatible_with:
   compositor: [hyprland]
-  lock: [hyprlock]
+  lock: [hyprlock, qs-lock]
 templates:
   - src: hypridle.conf.tera
     dest: ~/.config/hypr/hypridle.conf

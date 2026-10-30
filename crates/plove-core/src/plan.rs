@@ -303,14 +303,23 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         context.insert("options", &module_opts[module.manifest.id.as_str()]);
         context
     };
+    // Два прохода: команда может ссылаться на команды других ролей
+    // (меню выхода блокирует экран через {{ apps.lock }}).
     let mut apps: BTreeMap<String, String> = BTreeMap::new();
-    for module in &modules {
-        if let Some(exec) = &module.manifest.exec {
-            let what = format!("{}/module.yaml (exec)", module.manifest.id);
-            apps.insert(
-                module.manifest.role.clone(),
-                render::render_str(exec, &with_options(module, &base), &what)?,
-            );
+    for pass in 0..2 {
+        let known = apps.clone();
+        for module in &modules {
+            if let Some(exec) = &module.manifest.exec {
+                let what = format!("{}/module.yaml (exec)", module.manifest.id);
+                let mut context = with_options(module, &base);
+                if pass == 1 {
+                    context.insert("apps", &known);
+                }
+                apps.insert(
+                    module.manifest.role.clone(),
+                    render::render_str(exec, &context, &what)?,
+                );
+            }
         }
     }
 

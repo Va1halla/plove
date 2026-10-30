@@ -69,6 +69,8 @@ templates:
   - { src: CardMetric.qml, dest: ~/.config/quickshell/plove/CardMetric.qml, copy: true }
   - { src: CardSparkline.qml, dest: ~/.config/quickshell/plove/CardSparkline.qml, copy: true }
   - { src: Launcher.qml, dest: ~/.config/quickshell/plove/Launcher.qml, copy: true }
+  - { src: Lock.qml, dest: ~/.config/quickshell/plove/Lock.qml, copy: true }
+  - { src: LockView.qml, dest: ~/.config/quickshell/plove/LockView.qml, copy: true }
   - { src: net.sh, dest: ~/.local/share/plove/qs-net.sh, copy: true }
   - { src: dmenu.sh, dest: ~/.local/share/plove/qs-dmenu.sh, copy: true }
   - { src: reload.sh, dest: ~/.local/share/plove/qs-reload.sh, copy: true }

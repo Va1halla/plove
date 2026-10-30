@@ -20,9 +20,13 @@ ShellRoot {
         function launcher(): void { launcher.open ? launcher.close("") : launcher.show(); }
         // dmenu: строки из файла, выбор — в <файл>.out (qs-dmenu.sh).
         function dmenu(path: string, prompt: string): void { launcher.dmenu(path, prompt); }
+        // Заблокировать экран (модуль qs-lock) и посмотреть экран блокировки без блокировки.
+        function lock(): void { lock.locked = true; }
+        function lockPreview(): void { lock.preview = !lock.preview; }
     }
 
     Launcher { id: launcher }
+    Lock { id: lock }
     Toasts {}
     Osd {}
     SidePanel {}

@@ -1,0 +1,12 @@
+# Модуль qs-lock: экран блокировки рисует панель Quickshell (размытые
+# обои, часы точками, пароль через PAM, как у hyprlock). Своей программы
+# нет: блокирует IPC-вызов. Посмотреть экран без блокировки:
+#   qs -c plove ipc call plove lockPreview
+id: qs-lock
+role: lock
+exec: qs -c plove ipc call plove lock
+compatible_with:
+  compositor: [hyprland]
+  bar: [quickshell]
+binds:
+  - "$mod, L, exec, {{ exec }}"
