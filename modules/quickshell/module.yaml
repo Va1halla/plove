@@ -40,13 +40,21 @@ templates:
   - { src: CalendarPopup.qml, dest: ~/.config/quickshell/plove/CalendarPopup.qml, copy: true }
   - { src: CalcPopup.qml, dest: ~/.config/quickshell/plove/CalcPopup.qml, copy: true }
   - { src: Calculator.qml, dest: ~/.config/quickshell/plove/Calculator.qml, copy: true }
+  - { src: Notifs.qml, dest: ~/.config/quickshell/plove/Notifs.qml, copy: true }
+  - { src: Brightness.qml, dest: ~/.config/quickshell/plove/Brightness.qml, copy: true }
+  - { src: NotifCard.qml, dest: ~/.config/quickshell/plove/NotifCard.qml, copy: true }
+  - { src: Toasts.qml, dest: ~/.config/quickshell/plove/Toasts.qml, copy: true }
+  - { src: Tile.qml, dest: ~/.config/quickshell/plove/Tile.qml, copy: true }
+  - { src: Media.qml, dest: ~/.config/quickshell/plove/Media.qml, copy: true }
+  - { src: SidePanel.qml, dest: ~/.config/quickshell/plove/SidePanel.qml, copy: true }
+  - { src: Bell.qml, dest: ~/.config/quickshell/plove/Bell.qml, copy: true }
   - { src: net.sh, dest: ~/.local/share/plove/qs-net.sh, copy: true }
+  - { src: reload.sh, dest: ~/.local/share/plove/qs-reload.sh, copy: true }
 autostart: true
-# Quickshell сам перечитывает свои файлы, но первый же записанный файл
-# запускает перезагрузку, когда новых компонентов ещё нет. Поэтому после
-# записи всех файлов просим ещё одну, полную (IpcHandler в shell.qml).
-# Если панель не отвечает или не запущена — запускаем заново.
-reload: "qs -c plove ipc call plove reload >/dev/null 2>&1 || { pkill -x qs; setsid -f {{ exec }} >/dev/null 2>&1; }"
+# Quickshell сама перечитывает свои файлы, но уже на первом записанном,
+# когда новых компонентов ещё нет. После записи всех файлов reload.sh
+# просит ещё одну, полную перезагрузку (IpcHandler в shell.qml).
+reload: "sh ~/.local/share/plove/qs-reload.sh"
 process: "qs -c plove"
 stops: [waybar]
 settings:
@@ -64,19 +72,19 @@ settings:
   - id: modules_left
     group: Модули
     title: Слева
-    about: "У rail — сверху, у island и dock всё идёт подряд: левые, центральные, правые. Щелчок по часам, звуку, сети и калькулятору открывает их меню."
-    items: [workspaces, clock, tray, volume, network, battery, calculator]
+    about: "У rail — сверху, у island и dock всё идёт подряд: левые, центральные, правые. Щелчок по часам, звуку, сети и калькулятору открывает их меню, по колокольчику (bell) — боковую панель с уведомлениями и быстрыми настройками."
+    items: [workspaces, clock, tray, volume, network, battery, calculator, bell]
     default: [workspaces]
   - id: modules_center
     group: Модули
     title: По центру
-    items: [workspaces, clock, tray, volume, network, battery, calculator]
+    items: [workspaces, clock, tray, volume, network, battery, calculator, bell]
     default: [clock]
   - id: modules_right
     group: Модули
     title: Справа
-    items: [workspaces, clock, tray, volume, network, battery, calculator]
-    default: [tray, calculator, volume, network, battery]
+    items: [workspaces, clock, tray, volume, network, battery, calculator, bell]
+    default: [tray, calculator, volume, network, battery, bell]
   - id: workspace_count
     group: Рабочие столы
     title: Всегда показывать столов

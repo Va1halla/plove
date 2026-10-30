@@ -19,7 +19,7 @@ components:
   terminal: kitty
   wallpaper: swww
   launcher: fuzzel
-  notifications: mako
+  notifications: qs-notifications
   power: wlogout
   widgets: eww
   lock: hyprlock

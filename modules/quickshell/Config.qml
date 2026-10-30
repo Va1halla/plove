@@ -17,6 +17,8 @@ Singleton {
 
     // Открытое выпадающее меню: volume, network, calendar, calculator или "".
     property string popup: ""
+    // Боковая панель открыта.
+    property bool panel: false
     function toggle(name) {
         if (popup === name) {
             popup = "";
@@ -74,6 +76,7 @@ Singleton {
             property string time: "HH:mm"
             property bool date: false
             property string terminal: ""
+            property bool notifications: false
             property bool lua: false
         }
     }

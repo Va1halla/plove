@@ -207,6 +207,9 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
     // Hyprland 0.57+ читает конфиг на Lua, и `hyprctl dispatch` там тоже
     // принимает Lua. Готовые команды — чтобы модули не повторяли условие.
     base.insert("hypr_lua", &env.hyprland_lua);
+    // Какие программы в райсе по ролям: панели Quickshell, например, важно,
+    // её ли дело уведомления.
+    base.insert("components", &spec.components);
     let hyprctl: BTreeMap<&str, &str> = if env.hyprland_lua {
         BTreeMap::from([
             ("exit", "hyprctl dispatch 'hl.dsp.exit()'"),

@@ -16,7 +16,8 @@ Grid {
         volume: "Volume.qml",
         network: "Network.qml",
         battery: "Battery.qml",
-        calculator: "Calculator.qml"
+        calculator: "Calculator.qml",
+        bell: "Bell.qml"
     })
 
     flow: vertical ? Grid.TopToBottom : Grid.LeftToRight

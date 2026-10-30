@@ -12,13 +12,15 @@ use plove_core::spec::RiceSpec;
 use plove_core::state;
 use plove_core::system::Env;
 
-/// tokyo-night с панелью Waybar и её меню eww-popups: многие тесты
-/// проверяют их конфиги.
+/// tokyo-night в прежнем наборе: панель Waybar, меню eww-popups,
+/// уведомления mako. Многие тесты проверяют их конфиги.
 /// Панель Quickshell (по умолчанию в готовых райсах) — в своих тестах.
 fn example_spec() -> RiceSpec {
     let mut spec = presets::get("tokyo-night").unwrap().unwrap();
     spec.components.insert("bar".into(), "waybar".into());
     spec.components.insert("popups".into(), "eww-popups".into());
+    spec.components
+        .insert("notifications".into(), "mako".into());
     spec
 }
 
@@ -516,6 +518,24 @@ fn quickshell_bar() {
         assert!(!doto.installed && doto.urls[0].ends_with("ofl/doto/Doto[ROND,wght].ttf"));
         assert!(plan.packages.iter().any(|p| p.name == "quickshell"));
     }
+    // Уведомления — дело панели: свой сервер, Super+N — боковая панель, mako не нужен.
+    spec.overrides.remove("quickshell");
+    spec.components
+        .insert("notifications".into(), "qs-notifications".into());
+    let plan = plan::build(spec.clone(), &registry, &env).unwrap();
+    let text = |end: &str| {
+        let file = plan.files.iter().find(|f| f.path.ends_with(end)).unwrap();
+        String::from_utf8(file.content.clone()).unwrap()
+    };
+    let settings: serde_json::Value =
+        serde_json::from_str(&text("quickshell/plove/settings.json")).unwrap();
+    assert_eq!(settings["notifications"], true);
+    assert!(text("hypr/hyprland.conf").contains("$mod, N, exec, qs -c plove ipc call plove panel"));
+    assert!(!plan
+        .files
+        .iter()
+        .any(|f| f.path.ends_with("mako/config") && f.status != FileStatus::Remove));
+
     // Опечатка в имени шрифта не доходит до QML.
     spec.overrides.insert(
         "quickshell".into(),

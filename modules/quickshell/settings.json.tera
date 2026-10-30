@@ -12,5 +12,6 @@
   "time": {{ time | json_encode() }},
   "date": {{ options.clock_date }},
   "terminal": {{ run_in | json_encode() }},
+  "notifications": {{ components.notifications | default(value="") == "qs-notifications" }},
   "lua": {{ hypr_lua }}
 }

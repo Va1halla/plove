@@ -76,7 +76,7 @@ decoration {
 # Размытие под панелью, лаунчером, уведомлениями и меню выхода.
 # Синтаксис Hyprland 0.53+: «эффект значение, match:namespace регулярка».
 # ignore_alpha 0 — не размывать полностью прозрачные места (края панели-островов).
-layerrule = blur on, ignore_alpha 0, match:namespace ^(waybar|plove-bar|rofi|launcher)$
+layerrule = blur on, ignore_alpha 0, match:namespace ^(waybar|plove-bar|plove-panel|rofi|launcher)$
 layerrule = blur on, match:namespace ^(swaync-control-center|swaync-notification-window|notifications|logout_dialog)$
 
 animations {

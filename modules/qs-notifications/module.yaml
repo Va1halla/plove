@@ -1,0 +1,15 @@
+# Модуль qs-notifications: уведомления показывает сама панель Quickshell
+# (свой сервер уведомлений, всплывающие карточки и боковая панель).
+# Своей программы нет: модуль только занимает роль уведомлений, чтобы
+# mako или swaync не спорили с панелью за D-Bus.
+id: qs-notifications
+role: notifications
+# notify-send — проверить: notify-send привет
+packages: [libnotify]
+stops: [mako, swaync, dunst]
+compatible_with:
+  compositor: [hyprland]
+  bar: [quickshell]
+binds:
+  # Боковая панель: уведомления, быстрые настройки, плеер.
+  - "$mod, N, exec, qs -c plove ipc call plove panel"

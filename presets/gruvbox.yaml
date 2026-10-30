@@ -19,7 +19,7 @@ components:
   terminal: alacritty
   wallpaper: swaybg
   launcher: fuzzel
-  notifications: mako
+  notifications: qs-notifications
   power: power-menu
   lock: hyprlock
   idle: hypridle

@@ -19,7 +19,7 @@ components:
   terminal: kitty
   wallpaper: swaybg
   launcher: rofi
-  notifications: swaync
+  notifications: qs-notifications
   power: power-menu
   lock: hyprlock
   idle: hypridle

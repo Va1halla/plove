@@ -58,7 +58,7 @@ components:
   terminal: kitty
   wallpaper: swaybg
   launcher: fuzzel
-  notifications: mako
+  notifications: qs-notifications
   power: power-menu
   lock: hyprlock
   idle: hypridle

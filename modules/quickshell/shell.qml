@@ -12,7 +12,12 @@ ShellRoot {
         function reload(): void { Quickshell.reload(true); }
         // Открыть или закрыть меню панели: volume, network, calendar, calculator.
         function toggle(name: string): void { Config.toggle(name); }
+        // Боковая панель: уведомления, быстрые настройки, плеер.
+        function panel(): void { Config.panel = !Config.panel; }
     }
+
+    Toasts {}
+    SidePanel {}
 
     Variants {
         model: Quickshell.screens
