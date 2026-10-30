@@ -78,6 +78,7 @@ decoration {
 # ignore_alpha 0 — не размывать полностью прозрачные места (края панели-островов).
 layerrule = blur on, ignore_alpha 0, match:namespace ^(waybar|plove-bar|plove-panel|rofi|launcher)$
 layerrule = blur on, match:namespace ^(swaync-control-center|swaync-notification-window|notifications|logout_dialog)$
+layerrule = blur on, ignore_alpha 0.1, match:namespace ^plove-desktop$
 
 animations {
 {%- if options.animations == "none" %}

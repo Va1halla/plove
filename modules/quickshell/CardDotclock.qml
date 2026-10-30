@@ -1,27 +1,28 @@
-// Карточка «Точечные часы»: время точками 5×7 и дата мелко.
+// Карточка «Точечные часы»: время точками 5×7 и дата капителями.
 import QtQuick
 import Quickshell
 
 Column {
+    id: root
     property var card
     anchors.centerIn: parent
-    spacing: card ? card.px(12) : 12
-
-    SystemClock { id: clock; precision: card && card.opts.seconds ? SystemClock.Seconds : SystemClock.Minutes }
+    spacing: card ? card.px(14) : 14
+    SystemClock { id: clock; precision: root.card && root.card.opts.seconds ? SystemClock.Seconds : SystemClock.Minutes }
 
     DotText {
         anchors.horizontalCenter: parent.horizontalCenter
-        text: Qt.formatDateTime(clock.date, card && card.opts.seconds ? "HH:mm:ss" : "HH:mm")
-        dot: card ? card.px(card.opts.seconds ? 8 : 12) : 12
-        on: card ? card.accent : Theme.accent
+        text: Qt.formatDateTime(clock.date, root.card && root.card.opts.seconds ? "HH:mm:ss" : "HH:mm")
+        dot: root.card ? root.card.px(root.card.opts.seconds ? 8 : 12) : 12
+        on: root.card ? (root.card.style === "soft" ? root.card.ink : root.card.accent) : Theme.accent
+        off: Theme.fade(root.card ? root.card.ink : Theme.fg, 0.07)
     }
-    Text {
+    CardLabel {
         anchors.horizontalCenter: parent.horizontalCenter
-        visible: card && card.opts.date !== false
-        text: clock.date.toLocaleDateString(Qt.locale(), "ddd · d MMMM · yyyy").toUpperCase()
-        color: card ? card.muted : Theme.muted
-        font.family: card ? card.mono : Theme.fontMono
-        font.pixelSize: card ? card.px(14) : 14
-        font.letterSpacing: card ? card.px(2) : 2
+        visible: !root.card || root.card.opts.date !== false
+        card: root.card
+        text: clock.date.toLocaleDateString(Qt.locale(), "ddd · d MMMM · yyyy")
+        font.pixelSize: root.card ? root.card.px(14) : 14
+        font.letterSpacing: 2
+        font.capitalization: Font.AllUppercase
     }
 }

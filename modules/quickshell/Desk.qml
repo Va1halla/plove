@@ -9,6 +9,8 @@ import Quickshell.Io
 Singleton {
     readonly property bool enabled: Config.s.desktop
     readonly property var cards: data.cards
+    // Вид карточек: glass, dots, soft или classic.
+    readonly property string style: data.style
     readonly property var widgets: data.widgets
 
     FileView {
@@ -18,6 +20,7 @@ Singleton {
         onFileChanged: reload()
         JsonAdapter {
             id: data
+            property string style: "glass"
             property var cards: []
             property var widgets: ({})
         }

@@ -1,21 +1,19 @@
-// Карточка «Система»: кольца процессора, памяти и диска.
+// Карточка «Система»: кольца процессора, памяти и диска в стиле карточки.
 import QtQuick
 
 Row {
+    id: root
     property var card
     anchors.centerIn: parent
-    spacing: card ? card.px(26) : 26
+    spacing: card ? card.px(card.style === "classic" ? 26 : 22) : 26
     Repeater {
         model: [["cpu", Sys.cpu], ["ram", Sys.ram], ["disk", Sys.disk]]
         Ring {
             required property var modelData
+            card: root.card
             label: modelData[0]
             value: modelData[1]
-            size: parent.card ? parent.card.px(64) : 64
-            accent: parent.card ? parent.card.accent : Theme.accent
-            ink: parent.card ? parent.card.ink : Theme.fg
-            muted: parent.card ? parent.card.muted : Theme.muted
-            font: parent.card ? parent.card.mono : Theme.fontMono
+            size: root.card ? root.card.px(root.card.style === "classic" ? 64 : 70) : 64
         }
     }
 }

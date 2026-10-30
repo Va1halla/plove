@@ -1,29 +1,28 @@
-// Карточка «Обратный отсчёт»: сколько дней до даты.
+// Карточка «Обратный отсчёт»: дни крупно и подпись.
 import QtQuick
 import Quickshell
 
 Column {
+    id: root
     property var card
     anchors.centerIn: parent
+    spacing: card ? card.px(6) : 6
     SystemClock { id: clock; precision: SystemClock.Hours }
     readonly property int days: {
         if (!card) return 0;
         const target = new Date(card.opts.date + "T00:00:00");
         return isNaN(target) ? 0 : Math.max(0, Math.ceil((target - clock.date) / 86400000));
     }
-    Text {
+    BigValue {
         anchors.horizontalCenter: parent.horizontalCenter
-        text: parent.days
-        color: parent.card ? parent.card.accent : Theme.accent
-        font.family: parent.card ? parent.card.display : Theme.fontDisplay
-        font.pixelSize: parent.card ? parent.card.px(46) : 46
-        font.bold: true
+        card: root.card
+        value: root.days
+        size: 52
+        color: root.card ? root.card.accent : Theme.accent
     }
-    Text {
+    CardLabel {
         anchors.horizontalCenter: parent.horizontalCenter
-        text: "дн. до: " + (parent.card ? parent.card.opts.title : "")
-        color: parent.card ? parent.card.muted : Theme.muted
-        font.family: parent.card ? parent.card.font : Theme.fontText
-        font.pixelSize: parent.card ? parent.card.px(14) : 14
+        card: root.card
+        text: "дн. до: " + (root.card ? root.card.opts.title : "")
     }
 }

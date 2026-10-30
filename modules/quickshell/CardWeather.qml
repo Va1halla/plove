@@ -1,14 +1,30 @@
-// Карточка «Погода»: wttr.in раз в 15 минут (qs-weather.sh).
+// Карточка «Погода»: значок, крупная температура, описание, ощущается
+// как и строка прогноза на три дня (wttr.in раз в 15 минут).
 import QtQuick
 import Quickshell
 import Quickshell.Io
 
-Row {
+Item {
     id: root
     property var card
-    property var now: ({ icon: "󰖐", temp: "…", desc: "" })
-    anchors.verticalCenter: parent.verticalCenter
-    spacing: card ? card.px(16) : 16
+    anchors.fill: parent
+    property var report: null
+
+    // Коды погоды WWO → значки Nerd Font.
+    function icon(code) {
+        const c = parseInt(code);
+        if (c === 113) return "󰖙";
+        if (c === 116) return "󰖕";
+        if (c === 119 || c === 122) return "󰖐";
+        if ([143, 248, 260].indexOf(c) >= 0) return "󰖑";
+        if ([200, 386, 389, 392, 395].indexOf(c) >= 0) return "󰙾";
+        if ([179, 182, 185, 227, 230, 317, 320, 323, 326, 329, 332, 335, 338, 350, 362, 365, 368, 371, 374, 377].indexOf(c) >= 0) return "󰖘";
+        if ([176, 263, 266, 293, 296, 353].indexOf(c) >= 0) return "󰖗";
+        return "󰖖";
+    }
+    readonly property var now: report ? report.current_condition[0] : null
+    readonly property var days: report ? report.weather.slice(0, 3) : []
+    readonly property bool roomy: card ? root.height > card.px(100) : true
 
     Process {
         id: fetch
@@ -16,35 +32,87 @@ Row {
         running: root.card !== undefined
         stdout: StdioCollector {
             onStreamFinished: {
-                try { root.now = JSON.parse(text); } catch (e) {}
+                try { root.report = JSON.parse(text); } catch (e) { root.report = null; }
             }
         }
     }
     Timer { interval: 900000; running: true; repeat: true; onTriggered: fetch.running = true }
 
-    Text {
-        anchors.verticalCenter: parent.verticalCenter
-        text: root.now.icon
-        color: root.card ? root.card.accent : Theme.accent
-        font.family: Theme.fontIcons
-        font.pixelSize: root.card ? root.card.px(48) : 48
-    }
-    Column {
-        anchors.verticalCenter: parent.verticalCenter
+    Row {
+        id: top
+        spacing: root.card ? root.card.px(14) : 14
         Text {
-            text: root.now.temp
+            id: glyph
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.now ? root.icon(root.now.weatherCode) : "󰖪"
             color: root.card ? root.card.accent : Theme.accent
-            font.family: root.card ? root.card.display : Theme.fontDisplay
-            font.pixelSize: root.card ? root.card.px(30) : 30
-            font.bold: true
+            font.family: Theme.fontIcons
+            font.pixelSize: root.card ? root.card.px(52) : 52
         }
-        Text {
-            width: root.card ? root.card.width - root.card.px(48 + 16 + Theme.pad * 4) : 180
-            text: root.now.desc
-            elide: Text.ElideRight
-            color: root.card ? root.card.muted : Theme.muted
-            font.family: root.card ? root.card.font : Theme.fontText
-            font.pixelSize: root.card ? root.card.px(14) : 14
+        BigValue {
+            id: temp
+            anchors.verticalCenter: parent.verticalCenter
+            card: root.card
+            value: root.now ? parseInt(root.now.temp_C) : 0
+            text: root.now ? "" : "—"
+            prefix: root.now && parseInt(root.now.temp_C) > 0 ? "+" : ""
+            suffix: "°"
+            size: root.card && root.card.style === "dots" ? 32 : 44
+        }
+        Column {
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 2
+            Text {
+                width: root.width - glyph.width - temp.width - top.spacing * 2
+                text: root.now ? (root.now.lang_ru ? root.now.lang_ru[0].value : root.now.weatherDesc[0].value) : "нет связи"
+                elide: Text.ElideRight
+                color: root.card ? root.card.ink : Theme.fg
+                font.family: root.card ? root.card.font : Theme.fontText
+                font.pixelSize: root.card ? root.card.px(15) : 15
+                font.weight: Font.DemiBold
+            }
+            CardLabel {
+                width: root.width - glyph.width - temp.width - top.spacing * 2
+                elide: Text.ElideRight
+                card: root.card
+                text: root.now ? "ощущается " + root.now.FeelsLikeC + "° · " + root.now.humidity + "%" : ""
+            }
+        }
+    }
+
+    // Прогноз: день, значок, максимум и минимум.
+    Row {
+        visible: root.roomy && root.days.length > 0
+        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+        Repeater {
+            model: root.days
+            Column {
+                required property var modelData
+                required property int index
+                width: root.width / 3
+                spacing: root.card ? root.card.px(3) : 3
+                CardLabel {
+                    card: root.card
+                    text: index === 0 ? "сегодня" : new Date(modelData.date + "T12:00:00").toLocaleDateString(Qt.locale(), "dddd")
+                }
+                Row {
+                    spacing: root.card ? root.card.px(6) : 6
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.icon(modelData.hourly[4].weatherCode)
+                        color: root.card ? root.card.accent : Theme.accent
+                        font.family: Theme.fontIcons
+                        font.pixelSize: root.card ? root.card.px(17) : 17
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: modelData.maxtempC + "° " + modelData.mintempC + "°"
+                        color: root.card ? root.card.ink : Theme.fg
+                        font.family: root.card ? root.card.mono : Theme.fontMono
+                        font.pixelSize: root.card ? root.card.px(14) : 14
+                    }
+                }
+            }
         }
     }
 }

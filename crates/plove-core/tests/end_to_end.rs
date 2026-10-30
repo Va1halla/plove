@@ -337,7 +337,7 @@ fn desk_cards_become_eww_windows() {
     let yuck = file("eww/eww.yuck");
     assert!(yuck.contains("(defwindow desktop\n"), "{yuck}");
     assert!(yuck.contains("(defwindow desktop1\n"));
-    assert!(yuck.contains(":x \"70%\" :y \"6%\" :width \"480px\" :height \"165px\""));
+    assert!(yuck.contains(":x \"70%\" :y \"6%\" :width \"510px\" :height \"255px\""));
     assert!(yuck.contains("desk-weather.sh 'Москва'"));
     let scss = file("eww/eww.scss");
     assert!(scss.contains(".c1 .temp { font-size: 45px; }"), "{scss}");
@@ -622,6 +622,8 @@ fn quickshell_desktop() {
     let file = |end: &str| plan.files.iter().find(|f| f.path.ends_with(end)).unwrap();
     let desk: serde_json::Value =
         serde_json::from_slice(&file("quickshell/plove/desk.json").content).unwrap();
+    // Вид карточек tokyo-night — dots (настройка style модуля qs-desktop).
+    assert_eq!(desk["style"], "dots");
     let cards = desk["cards"].as_array().unwrap();
     assert_eq!(cards.len(), 3);
     assert_eq!(cards[1]["opts"]["source"], "ram");

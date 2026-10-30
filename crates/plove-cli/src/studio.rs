@@ -337,6 +337,13 @@ impl Studio<'_> {
             "widgets": widgets,
             "eww": self.spec.components.contains_key("widgets"),
             "engine": desk_engine(&self.spec),
+            "card_style": self
+                .spec
+                .overrides
+                .get("qs-desktop")
+                .and_then(|o| o.get("style"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("glass"),
             "colors": colors,
             "fonts": self.fonts(),
         })
@@ -350,6 +357,15 @@ impl Studio<'_> {
             .context("страница прислала карточки в неверном виде")?;
         let mut spec = self.spec.clone();
         spec.desktop = cards;
+        // Вид карточек — настройка style модуля qs-desktop.
+        if let Some(style) = request["card_style"].as_str() {
+            if desk_engine(&spec) == "qs-desktop" {
+                spec.overrides
+                    .entry("qs-desktop".into())
+                    .or_default()
+                    .insert("style".into(), style.into());
+            }
+        }
         if !request["fonts"].is_null() {
             spec.theme.fonts = serde_json::from_value(request["fonts"].clone())
                 .context("страница прислала шрифты в неверном виде")?;

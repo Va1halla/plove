@@ -40,6 +40,7 @@ components:
   picker: hyprpicker
   emoji: rofimoji
 overrides:
+  qs-desktop: { style: soft }
   quickshell: { style: rail }
   hyprland: { animations: snappy, kb_layout: "us,ru" }
   waybar:

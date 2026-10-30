@@ -1,59 +1,48 @@
-// Карточка «Показатель»: подпись, значок, одно число крупно и полоса.
+// Карточка «Показатель»: подпись, значок, одно число крупно (плавно
+// перетекает) и полоса уровня в стиле карточки.
 import QtQuick
 
-Column {
+Item {
     id: root
     property var card
+    anchors.fill: parent
     readonly property string source: card ? card.opts.source || "cpu" : "cpu"
     readonly property var info: ({
-        cpu: { title: "ПРОЦЕССОР", icon: "󰻠", value: Sys.cpu, text: Math.round(Sys.cpu * 100) + "%" },
-        ram: { title: "ПАМЯТЬ", icon: "󰍛", value: Sys.ram, text: Math.round(Sys.ram * 100) + "%" },
-        disk: { title: "ДИСК", icon: "󰋊", value: Sys.disk, text: Math.round(Sys.disk * 100) + "%" },
-        temp: { title: "ТЕМПЕРАТУРА", icon: "󰔏", value: Sys.temp < 0 ? 0 : Sys.temp / 100, text: Sys.temp < 0 ? "—" : Math.round(Sys.temp) + "°" }
+        cpu: { title: "Процессор", icon: "󰻠", value: Sys.cpu, number: Sys.cpu * 100, suffix: "%", detail: "" },
+        ram: { title: "Память", icon: "󰍛", value: Sys.ram, number: Sys.ram * 100, suffix: "%", detail: Sys.ramText },
+        disk: { title: "Диск", icon: "󰋊", value: Sys.disk, number: Sys.disk * 100, suffix: "%", detail: Sys.diskText },
+        temp: { title: "Температура", icon: "󰔏", value: Sys.temp < 0 ? 0 : Sys.temp / 100, number: Math.max(0, Sys.temp), suffix: "°", detail: Sys.temp < 0 ? "нет датчика" : "" }
     })[source]
-    anchors.verticalCenter: parent.verticalCenter
-    width: parent.width
-    spacing: card ? card.px(8) : 8
+    readonly property color level: root.info.value > 0.85 ? Theme.red : (card ? card.accent : Theme.accent)
 
+    CardLabel { id: title; card: root.card; text: root.info.title }
     Text {
-        text: root.info.title
+        anchors { right: parent.right; verticalCenter: title.verticalCenter }
+        text: root.info.icon
         color: root.card ? root.card.muted : Theme.muted
-        font.family: root.card ? root.card.font : Theme.fontText
-        font.pixelSize: root.card ? root.card.px(12) : 12
-        font.letterSpacing: 1
-        font.bold: true
+        font.family: Theme.fontIcons
+        font.pixelSize: root.card ? root.card.px(18) : 18
     }
-    Item {
-        width: parent.width
-        height: big.height
-        Text {
-            anchors { left: parent.left; verticalCenter: parent.verticalCenter }
-            text: root.info.icon
-            color: root.card ? root.card.ink : Theme.fg
-            font.family: Theme.fontIcons
-            font.pixelSize: root.card ? root.card.px(22) : 22
-        }
-        Text {
-            id: big
-            anchors.right: parent.right
-            text: root.info.text
-            color: root.card ? root.card.ink : Theme.fg
-            font.family: root.card ? root.card.display : Theme.fontDisplay
-            font.pixelSize: root.card ? root.card.px(34) : 34
-            font.bold: true
-        }
+    BigValue {
+        id: number
+        anchors { left: parent.left; verticalCenter: parent.verticalCenter; verticalCenterOffset: root.card ? -root.card.px(2) : 0 }
+        card: root.card
+        value: root.info.number
+        suffix: root.info.suffix
+        text: root.source === "temp" && Sys.temp < 0 ? "—" : ""
+        size: 36
     }
-    Rectangle {
-        width: parent.width
-        height: root.card ? root.card.px(6) : 6
-        radius: height / 2
-        color: Theme.fade(root.card ? root.card.ink : Theme.fg, 0.12)
-        Rectangle {
-            width: parent.width * Math.max(0.02, Math.min(1, root.info.value))
-            height: parent.height
-            radius: parent.radius
-            color: root.info.value > 0.85 ? Theme.red : (root.card ? root.card.accent : Theme.accent)
-            Behavior on width { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
-        }
+    CardLabel {
+        anchors { right: parent.right; baseline: number.bottom }
+        card: root.card
+        text: root.info.detail
+        font.capitalization: Font.MixedCase
+        font.letterSpacing: 0
+    }
+    Meter {
+        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+        card: root.card
+        value: root.info.value
+        color: root.level
     }
 }

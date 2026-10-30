@@ -14,6 +14,8 @@ Column {
     property color muted: Theme.muted
     property string font: Theme.fontText
     property string mono: Theme.fontMono
+    // Заголовок и дни недели капителями (виды карточек кроме classic).
+    property bool caps: false
     spacing: Math.round(cell / 4)
 
     SystemClock { id: clock; precision: SystemClock.Minutes }
@@ -52,6 +54,8 @@ Column {
             font.family: cal.font
             font.pixelSize: Math.round(cal.text * 1.1)
             font.bold: true
+            font.capitalization: cal.caps ? Font.AllUppercase : Font.MixedCase
+            font.letterSpacing: cal.caps ? 1.5 : 0
         }
         Text {
             anchors { right: parent.right; verticalCenter: parent.verticalCenter }
@@ -76,6 +80,7 @@ Column {
                 color: cal.muted
                 font.family: cal.font
                 font.pixelSize: Math.round(cal.text * 0.85)
+                font.capitalization: cal.caps ? Font.AllUppercase : Font.MixedCase
             }
         }
         Repeater {
@@ -85,7 +90,8 @@ Column {
                 readonly property bool today: cal.shift === 0 && modelData === clock.date.getDate()
                 width: cal.cell
                 height: cal.cell * 0.86
-                radius: Math.min(Theme.radiusChip, height / 2)
+                // Сегодня — таблетка во всю клетку.
+                radius: cal.caps ? height / 2 : Math.min(Theme.radiusChip, height / 2)
                 color: today ? cal.accent : "transparent"
                 Text {
                     anchors.centerIn: parent

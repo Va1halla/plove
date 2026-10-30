@@ -153,8 +153,8 @@ pub const CATALOG: [Kind; 12] = [
     Kind {
         id: "weather",
         title: "Погода",
-        about: "Погода сейчас с wttr.in, без ключей. Пустой город — по IP.",
-        size: (320, 110),
+        about: "Погода сейчас и прогноз на три дня с wttr.in, без ключей. Пустой город — по IP.",
+        size: (340, 170),
         params: &[Param {
             id: "city",
             title: "Город",

@@ -136,6 +136,7 @@ let ratio = 1;            // точек страницы на точку экр�
 let dirty = false;
 let fonts = null;         // шрифты системы: {ui, mono, size}
 let savedFonts = "";      // они же, как сохранены в райсе (JSON)
+let cardStyle = "glass";  // вид карточек qs-desktop: glass, dots, soft, classic
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -147,6 +148,7 @@ async function load() {
   cards = state.desktop.map((c) => ({ kind: c.kind, at: [...c.at], scale: c.scale ?? 1, with: { ...(c.with || {}) }, look: { ...(c.look || {}) } }));
   fonts = { ui: state.theme.fonts.ui, mono: state.theme.fonts.mono, size: state.theme.fonts.size };
   savedFonts = JSON.stringify(fonts);
+  cardStyle = state.card_style || "glass";
   document.title = `plove studio — ${state.name}`;
   $("file").textContent = state.file;
   const t = state.theme;
@@ -257,9 +259,33 @@ function cardElement(card, i) {
   el.style.fontSize = `${15 * s}px`;
   el.style.padding = `${st.pad * s}px ${st.pad * 2 * s}px`;
   const themeAlpha = Math.max(0.15, st.bg_alpha - 0.25);
-  if (card.kind !== "clock" && card.kind !== "dotclock" && st.glass !== "none") {
-    el.style.background = `rgba(${t.colors.bg.rgb}, ${themeAlpha})`;
-    el.style.borderRadius = `${st.radius_box * s}px`;
+  const style = styleOf(), clockish = card.kind === "clock" || card.kind === "dotclock";
+  const frameless = clockish && (style === "classic" || style === "glass");
+  if (style === "classic") {
+    if (!clockish && st.glass !== "none") {
+      el.style.background = `rgba(${t.colors.bg.rgb}, ${themeAlpha})`;
+      el.style.borderRadius = `${st.radius_box * s}px`;
+    }
+  } else {
+    // Те же виды, что рисует панель (Card.qml).
+    el.style.padding = `${18 * s * ratio}px ${22 * s * ratio}px`;
+    if (!frameless) {
+      el.style.borderRadius = `${({ glass: 26, dots: 20, soft: 24 })[style] * s * ratio}px`;
+      if (style === "glass") {
+        el.style.background = `linear-gradient(rgba(255,255,255,.13), rgba(255,255,255,0) 55%), rgba(${t.colors.bg.rgb}, .30)`;
+        el.style.backdropFilter = "blur(14px)";
+        el.style.border = "1px solid rgba(255,255,255,.16)";
+        el.style.boxShadow = `0 ${8 * ratio}px ${40 * ratio}px rgba(0,0,0,.32)`;
+      } else if (style === "dots") {
+        const step = 10 * s * ratio;
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,.06) ${1.1 * s * ratio}px, transparent ${1.3 * s * ratio}px) 0 0 / ${step}px ${step}px, rgba(14,14,14,.94)`;
+        el.style.border = "1px solid rgba(255,255,255,.07)";
+        el.style.fontFamily = `"${fonts.mono}", monospace`;
+      } else {
+        el.style.background = darkTheme() ? t.colors.fg.hex : t.colors.bg.hex;
+        el.style.boxShadow = `0 ${8 * ratio}px ${28 * ratio}px rgba(0,0,0,${darkTheme() ? 0.35 : 0.14})`;
+      }
+    }
   }
   // Оформление карточки — как в eww.scss: поверх стиля райса.
   if (l.fill === "none") el.style.background = "transparent";
@@ -279,12 +305,20 @@ const named = (v) => (!v ? null : v.startsWith("#") ? v : state.colors[v] || nul
 const rgba = (hex, a) => `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, ${a})`;
 
 // Цвета и шрифты карточки с учётом её look.
+// Вид карточек панели Quickshell (см. Card.qml); у eww — всегда classic.
+const styleOf = () => (state.engine === "qs-desktop" ? cardStyle : "classic");
+const darkTheme = () => {
+  const [r, g, b] = state.theme.colors.bg.rgb.split(",").map(Number);
+  return (Math.max(r, g, b) + Math.min(r, g, b)) / 510 < 0.5;
+};
+
 function looks(card) {
-  const c = state.theme.colors, l = card.look, text = named(l.text);
+  const c = state.theme.colors, l = card.look, text = named(l.text), style = styleOf();
+  const ink = style === "dots" ? "#f2f2f2" : style === "soft" ? (darkTheme() ? c.bg.hex : c.fg.hex) : c.fg.hex;
   return {
     accent: named(l.accent) || c.accent.hex,
-    text: text || c.fg.hex,
-    muted: text ? rgba(text, 0.65) : c.muted.hex,
+    text: text || ink,
+    muted: rgba(text || ink, style === "dots" ? 0.55 : 0.62),
     font: l.font ? `"${l.font}", "${fonts.ui}", sans-serif` : `"${fonts.ui}", system-ui, sans-serif`,
     mono: l.font ? `"${l.font}", monospace` : `"${fonts.mono}", monospace`,
   };
@@ -314,9 +348,12 @@ function content(card, s) {
   const hm = (d) => d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
   switch (card.kind) {
     case "clock": {
+      // В виде dots часы — из точек, как «Точечные часы».
+      if (styleOf() === "dots") return content({ ...card, kind: "dotclock" }, s);
       const time = opt(card, "seconds") ? now.toLocaleTimeString("ru-RU") : hm(now);
       const date = now.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
-      return `<div class="c-time" style="font-size:${px(96)};color:${accent};text-shadow:0 4px 16px rgba(${c.bg.rgb},.6)">${time}</div>` +
+      const soft = styleOf() === "soft";
+      return `<div class="c-time" style="font-size:${px(soft ? 104 : 96)};font-weight:${soft ? 900 : 700};color:${soft ? text : accent};${soft ? "" : `text-shadow:0 4px 16px rgba(${c.bg.rgb},.6)`}">${time}</div>` +
         (opt(card, "date") ? `<div class="c-center" style="font-size:${px(20)};margin-top:${px(2)}">${esc(date[0].toUpperCase() + date.slice(1))}</div>` : "");
     }
     case "worldclock":
@@ -697,6 +734,14 @@ function fontsForm(box) {
   size.type = "number"; size.min = 6; size.max = 32; size.value = fonts.size;
   size.onchange = () => { fonts.size = Math.round(clamp(Number(size.value) || 11, 6, 32)); dirty = true; status("Есть несохранённые изменения"); };
   box.append(el("label", "Размер, pt"), size);
+  if (state.engine === "qs-desktop") {
+    box.append(el("h4", "Вид карточек"));
+    const select = el("select");
+    for (const [id, title] of [["glass", "стекло: размытие и мягкая тень"], ["dots", "точки: чёрные карточки, цифры из точек"], ["soft", "мягкий: светлые карточки, крупные цифры"], ["classic", "классика: как у eww"]])
+      select.add(new Option(title, id, false, id === cardStyle));
+    select.onchange = () => { cardStyle = select.value; changed(); };
+    box.append(el("label", "Для всех карточек; оформление отдельной — в её разделе"), select);
+  }
 }
 
 // В файл пишем только то, что отличается от значения по умолчанию.
@@ -723,6 +768,7 @@ async function send(path) {
       return out;
     }),
     fonts,
+    card_style: cardStyle,
   });
   status(path === "/api/apply" ? "Применяю… (вывод — в терминале)" : "Сохраняю…");
   try {

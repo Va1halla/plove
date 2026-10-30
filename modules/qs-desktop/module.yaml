@@ -12,3 +12,10 @@ templates:
   - src: desk.json.tera
     dest: ~/.config/quickshell/plove/desk.json
   - { src: weather.sh, dest: ~/.local/share/plove/qs-weather.sh, copy: true }
+settings:
+  - id: style
+    group: Рабочий стол
+    title: Вид карточек
+    about: "glass — матовое стекло с размытием под карточкой и мягкой тенью; dots — почти чёрные карточки, цифры из точек, точечная сетка и один цвет акцента (как у Nothing); soft — светлые карточки с крупными жирными цифрами и толстыми полосами; classic — как было у eww. Оформление отдельной карточки (look) — поверх вида."
+    choices: [glass, dots, soft, classic]
+    default: glass
