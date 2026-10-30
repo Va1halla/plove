@@ -1505,16 +1505,20 @@ mod tests {
                 .iter()
                 .position(|p| p.role == "bar")
                 .unwrap();
-        // Варианты по алфавиту: quickshell, waybar.
-        settings.change(bar, false);
+        // В готовых райсах панель — Quickshell; tokyo-night — плашками.
         assert!(settings.quickshell());
+        assert_eq!(settings.rows()[1].1, "плашки у краёв");
         settings.change(1, true);
         settings.change(1, true);
         assert_eq!(settings.rows()[1].1, "островок по центру");
         settings.apply_to(&mut spec);
         assert_eq!(spec.components["bar"], "quickshell");
         assert_eq!(spec.overrides["quickshell"]["style"], "island");
-        plan::build(spec, &registry, &Env::sandbox(std::env::temp_dir())).unwrap();
+        plan::build(spec.clone(), &registry, &Env::sandbox(std::env::temp_dir())).unwrap();
+        // Обратно на Waybar: строка «Панель» снова выбирает сторону.
+        settings.change(bar, true);
+        assert!(!settings.quickshell());
+        assert_eq!(settings.rows()[1].1, "сверху");
     }
 
     /// Райс из картинки: строки подбора цветов пересчитывают палитру,
@@ -1597,7 +1601,7 @@ mod tests {
         let mut spec = presets::get("gruvbox").unwrap().unwrap();
         let mut settings = Settings::from_spec(&spec, &registry);
         settings.russian = true;
-        settings.position = 2;
+        settings.qs_style = 2;
         settings.style = [2, 2, 3, 3, 0, 1, 2];
         settings.apply_to(&mut spec);
         assert_eq!(Settings::from_spec(&spec, &registry), settings);

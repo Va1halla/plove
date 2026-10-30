@@ -54,7 +54,7 @@ theme:
   geometry: { gaps: 10, border: 2, radius: 10, opacity: 0.93 }
 components:
   compositor: hyprland
-  bar: waybar
+  bar: quickshell
   terminal: kitty
   wallpaper: swaybg
   launcher: fuzzel
@@ -74,6 +74,7 @@ components:
   editor: neovim
 overrides:
   hyprland: { kb_layout: "us,ru" }
+  quickshell: { style: island }
 "##;
 
 /// Райс вокруг своей картинки: палитра из неё, остальное из [`BLANK`].

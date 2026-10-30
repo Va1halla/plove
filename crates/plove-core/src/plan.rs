@@ -157,11 +157,12 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
             }
         }
     }
+    // Настройки модуля, которого сейчас нет в райсе (например, waybar при
+    // панели Quickshell), — запас на случай переключения, не ошибка.
+    // Предупреждаем только об опечатках: такого модуля нет вовсе.
     for id in spec.overrides.keys() {
-        if !modules.iter().any(|m| m.manifest.id == *id) {
-            warnings.push(format!(
-                "overrides для «{id}» не используются: такого модуля нет в components"
-            ));
+        if registry.get(id).is_none() {
+            warnings.push(format!("overrides для «{id}»: такого модуля нет"));
         }
     }
 

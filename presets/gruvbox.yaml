@@ -15,7 +15,7 @@ theme:
   wallpaper: { generate: rings }
 components:
   compositor: hyprland
-  bar: waybar
+  bar: quickshell
   terminal: alacritty
   wallpaper: swaybg
   launcher: fuzzel
@@ -40,6 +40,7 @@ components:
   picker: hyprpicker
   emoji: rofimoji
 overrides:
+  quickshell: { style: rail }
   hyprland: { animations: snappy, kb_layout: "us,ru" }
   waybar:
     modules_left: [workspaces, window]

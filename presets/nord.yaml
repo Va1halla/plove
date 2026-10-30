@@ -15,7 +15,7 @@ theme:
   wallpaper: { generate: hills }
 components:
   compositor: hyprland
-  bar: waybar
+  bar: quickshell
   terminal: kitty
   wallpaper: swaybg
   launcher: rofi
@@ -40,6 +40,7 @@ components:
   picker: hyprpicker
   emoji: rofimoji
 overrides:
+  quickshell: { style: segments }
   hyprland: { animations: smooth, kb_layout: "us,ru" }
   waybar:
     modules_left: [workspaces]

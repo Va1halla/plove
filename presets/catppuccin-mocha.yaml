@@ -15,7 +15,7 @@ theme:
   wallpaper: { generate: waves }
 components:
   compositor: hyprland
-  bar: waybar
+  bar: quickshell
   terminal: ghostty
   wallpaper: swww
   launcher: rofi
@@ -42,6 +42,7 @@ components:
   picker: hyprpicker
   emoji: rofimoji
 overrides:
+  quickshell: { style: island }
   hyprland: { animations: smooth, kb_layout: "us,ru" }
   waybar:
     position: bottom

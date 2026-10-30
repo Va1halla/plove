@@ -184,11 +184,11 @@ desktop:
 
 ## Панель на Quickshell
 
-Вместо Waybar панель может рисовать [Quickshell](https://quickshell.org) (пакет из extra, plove поставит его сам): плавные анимации, свои формы, шрифты по ролям. В мастере это строка «Программа панели», в файле райса:
+Панель рисует [Quickshell](https://quickshell.org) (пакет из extra, plove поставит его сам): плавные анимации, свои формы, шрифты по ролям. Это выбор по умолчанию в готовых райсах и в райсах из своей картинки; Waybar остаётся запасным вариантом. В мастере это строка «Программа панели», в файле райса:
 
 ```yaml
 components:
-  bar: quickshell        # waybar — как раньше, он и по умолчанию
+  bar: quickshell        # или waybar — прежняя панель
 overrides:
   quickshell:
     style: island        # segments | rail | island | dock

@@ -12,8 +12,12 @@ use plove_core::spec::RiceSpec;
 use plove_core::state;
 use plove_core::system::Env;
 
+/// tokyo-night с панелью Waybar: многие тесты проверяют её конфиг.
+/// Панель Quickshell (по умолчанию в готовых райсах) — в своих тестах.
 fn example_spec() -> RiceSpec {
-    presets::get("tokyo-night").unwrap().unwrap()
+    let mut spec = presets::get("tokyo-night").unwrap().unwrap();
+    spec.components.insert("bar".into(), "waybar".into());
+    spec
 }
 
 #[test]
