@@ -12,17 +12,19 @@ Chip {
 
     shown: ready
     onClicked: mouse => {
-        if (mouse.button === Qt.RightButton)
-            Config.run("sh ~/.local/share/plove/popups.sh mixer");
-        else if (mouse.button === Qt.MiddleButton)
+        if (mouse.button === Qt.MiddleButton)
             sink.audio.muted = !sink.audio.muted;
+        else if (mouse.button === Qt.RightButton)
+            Config.run("command -v pavucontrol >/dev/null && pavucontrol || " + Config.terminal("wpctl status; read _"));
         else
-            Config.popup("volume", group);
+            Config.toggle("volume");
     }
     onScrolled: delta => {
         if (ready)
             sink.audio.volume = Math.max(0, Math.min(1.5, level + delta * 0.05));
     }
+
+    VolumePopup { owner: vol }
 
     PwObjectTracker {
         objects: vol.sink ? [vol.sink] : []

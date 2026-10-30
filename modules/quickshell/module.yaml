@@ -6,7 +6,8 @@
 id: quickshell
 role: bar
 exec: qs -c plove
-packages: [quickshell]
+# qalc — калькулятор на панели (проценты, единицы, валюты), wl-copy — скопировать ответ.
+packages: [quickshell, libqalculate, wl-clipboard]
 compatible_with:
   compositor: [hyprland]
 templates:
@@ -28,11 +29,24 @@ templates:
   - { src: Network.qml, dest: ~/.config/quickshell/plove/Network.qml, copy: true }
   - { src: Battery.qml, dest: ~/.config/quickshell/plove/Battery.qml, copy: true }
   - { src: Label.qml, dest: ~/.config/quickshell/plove/Label.qml, copy: true }
+  - { src: Popup.qml, dest: ~/.config/quickshell/plove/Popup.qml, copy: true }
+  - { src: Slider.qml, dest: ~/.config/quickshell/plove/Slider.qml, copy: true }
+  - { src: Heading.qml, dest: ~/.config/quickshell/plove/Heading.qml, copy: true }
+  - { src: Caption.qml, dest: ~/.config/quickshell/plove/Caption.qml, copy: true }
+  - { src: IconButton.qml, dest: ~/.config/quickshell/plove/IconButton.qml, copy: true }
+  - { src: Choice.qml, dest: ~/.config/quickshell/plove/Choice.qml, copy: true }
+  - { src: VolumePopup.qml, dest: ~/.config/quickshell/plove/VolumePopup.qml, copy: true }
+  - { src: NetworkPopup.qml, dest: ~/.config/quickshell/plove/NetworkPopup.qml, copy: true }
+  - { src: CalendarPopup.qml, dest: ~/.config/quickshell/plove/CalendarPopup.qml, copy: true }
+  - { src: CalcPopup.qml, dest: ~/.config/quickshell/plove/CalcPopup.qml, copy: true }
+  - { src: Calculator.qml, dest: ~/.config/quickshell/plove/Calculator.qml, copy: true }
   - { src: net.sh, dest: ~/.local/share/plove/qs-net.sh, copy: true }
 autostart: true
-# Quickshell сам следит за файлами своей папки, а settings.json панель
-# перечитывает сама. Если процесса нет — запускаем.
-reload: "pgrep -x qs >/dev/null || setsid -f {{ exec }} >/dev/null 2>&1"
+# Quickshell сам перечитывает свои файлы, но первый же записанный файл
+# запускает перезагрузку, когда новых компонентов ещё нет. Поэтому после
+# записи всех файлов просим ещё одну, полную (IpcHandler в shell.qml).
+# Если панель не отвечает или не запущена — запускаем заново.
+reload: "qs -c plove ipc call plove reload >/dev/null 2>&1 || { pkill -x qs; setsid -f {{ exec }} >/dev/null 2>&1; }"
 process: "qs -c plove"
 stops: [waybar]
 settings:
@@ -50,19 +64,19 @@ settings:
   - id: modules_left
     group: Модули
     title: Слева
-    about: "У rail — сверху, у island и dock всё идёт подряд: левые, центральные, правые."
-    items: [workspaces, clock, tray, volume, network, battery]
+    about: "У rail — сверху, у island и dock всё идёт подряд: левые, центральные, правые. Щелчок по часам, звуку, сети и калькулятору открывает их меню."
+    items: [workspaces, clock, tray, volume, network, battery, calculator]
     default: [workspaces]
   - id: modules_center
     group: Модули
     title: По центру
-    items: [workspaces, clock, tray, volume, network, battery]
+    items: [workspaces, clock, tray, volume, network, battery, calculator]
     default: [clock]
   - id: modules_right
     group: Модули
     title: Справа
-    items: [workspaces, clock, tray, volume, network, battery]
-    default: [tray, volume, network, battery]
+    items: [workspaces, clock, tray, volume, network, battery, calculator]
+    default: [tray, calculator, volume, network, battery]
   - id: workspace_count
     group: Рабочие столы
     title: Всегда показывать столов

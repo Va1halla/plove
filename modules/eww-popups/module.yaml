@@ -12,7 +12,8 @@ aur: [eww]
 packages: [libqalculate, wl-clipboard]
 compatible_with:
   compositor: [hyprland]
-  bar: [waybar, quickshell]
+  # У панели Quickshell свои меню.
+  bar: [waybar]
 templates:
   - src: eww.yuck.tera
     dest: ~/.config/eww-popups/eww.yuck

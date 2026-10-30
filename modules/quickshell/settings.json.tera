@@ -1,14 +1,5 @@
 {#- Сгенерировано plove из райса. Настройки панели: Config.qml следит за
     этим файлом и применяет изменения сразу, без перезапуска. -#}
-{%- set popups = apps.popups | default(value="") != "" %}
-{%- if options.style == "dock" %}{% set v = "bottom" %}{% else %}{% set v = "top" %}{% endif %}
-{%- if options.style == "rail" %}
-{%- set a_left = "top " ~ options.rail_side %}{% set a_center = "center " ~ options.rail_side %}{% set a_right = "bottom " ~ options.rail_side %}
-{%- elif options.style == "segments" %}
-{%- set a_left = v ~ " left" %}{% set a_center = v ~ " center" %}{% set a_right = v ~ " right" %}
-{%- else %}
-{%- set a_left = v ~ " center" %}{% set a_center = a_left %}{% set a_right = a_left %}
-{%- endif %}
 {%- set time = "HH:mm" %}{% if options.clock_seconds %}{% set time = "HH:mm:ss" %}{% endif %}
 {
   "rice": {{ name | json_encode() }},
@@ -20,8 +11,6 @@
   "workspaces": {{ options.workspace_count }},
   "time": {{ time | json_encode() }},
   "date": {{ options.clock_date }},
-  "popups": {{ popups }},
-  "lua": {{ hypr_lua }},
-  "anchors": { "left": {{ a_left | json_encode() }}, "center": {{ a_center | json_encode() }}, "right": {{ a_right | json_encode() }} },
-  "offset": "{{ geometry.gaps }}x{{ geometry.gaps }}"
+  "terminal": {{ run_in | json_encode() }},
+  "lua": {{ hypr_lua }}
 }

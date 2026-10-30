@@ -15,7 +15,8 @@ Grid {
         tray: "Tray.qml",
         volume: "Volume.qml",
         network: "Network.qml",
-        battery: "Battery.qml"
+        battery: "Battery.qml",
+        calculator: "Calculator.qml"
     })
 
     flow: vertical ? Grid.TopToBottom : Grid.LeftToRight

@@ -4,7 +4,9 @@ import QtQuick
 Chip {
     id: net
 
-    onClicked: Config.popup("network", group)
+    onClicked: Config.toggle("network")
+
+    NetworkPopup { owner: net }
 
     Label {
         vertical: net.vertical

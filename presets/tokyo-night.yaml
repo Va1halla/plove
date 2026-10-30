@@ -22,7 +22,6 @@ components:
   notifications: mako
   power: wlogout
   widgets: eww
-  popups: eww-popups
   lock: hyprlock
   idle: hypridle
   screenshot: grim

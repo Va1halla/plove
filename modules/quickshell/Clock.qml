@@ -8,7 +8,9 @@ Chip {
 
     readonly property bool showDate: !vertical && (Config.s.date || (Config.style === "island" && hovered))
 
-    onClicked: Config.popup("clock", group)
+    onClicked: Config.toggle("calendar")
+
+    CalendarPopup { owner: c }
 
     SystemClock {
         id: clock

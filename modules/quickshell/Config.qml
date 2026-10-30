@@ -15,12 +15,33 @@ Singleton {
     readonly property bool vertical: adapter.style === "rail"
     readonly property alias s: adapter
 
-    // Выпадающие меню panel → eww-popups (звук, сеть, календарь), если они в райсе.
-    function popup(menu, group) {
-        if (!adapter.popups)
-            return;
-        const anchor = adapter.anchors[group] || "top right";
-        Quickshell.execDetached(["sh", Quickshell.env("HOME") + "/.local/share/plove/popups.sh", "toggle", menu, anchor, adapter.offset]);
+    // Открытое выпадающее меню: volume, network, calendar, calculator или "".
+    property string popup: ""
+    function toggle(name) {
+        if (popup === name) {
+            popup = "";
+        } else if (popup !== "") {
+            // Wayland не даёт открыть меню, пока открыто другое с захватом
+            // фокуса: сначала закрываем старое, новое — чуть позже.
+            popup = "";
+            next.name = name;
+            next.restart();
+        } else {
+            popup = name;
+        }
+    }
+
+    Timer {
+        id: next
+        property string name: ""
+        interval: 60
+        onTriggered: root.popup = name
+    }
+
+    // Команда в терминале райса (у терминала свой префикс: kitty -e …).
+    function terminal(command) {
+        const shell = "sh -c " + JSON.stringify(command);
+        return adapter.terminal ? "setsid -f " + adapter.terminal + " " + shell : shell;
     }
 
     // Перейти на рабочий стол: номер или «e+1». Hyprland 0.57+ принимает
@@ -52,10 +73,8 @@ Singleton {
             property int workspaces: 5
             property string time: "HH:mm"
             property bool date: false
-            property bool popups: false
+            property string terminal: ""
             property bool lua: false
-            property var anchors: ({})
-            property string offset: "8x8"
         }
     }
 }

@@ -12,11 +12,13 @@ use plove_core::spec::RiceSpec;
 use plove_core::state;
 use plove_core::system::Env;
 
-/// tokyo-night с панелью Waybar: многие тесты проверяют её конфиг.
+/// tokyo-night с панелью Waybar и её меню eww-popups: многие тесты
+/// проверяют их конфиги.
 /// Панель Quickshell (по умолчанию в готовых райсах) — в своих тестах.
 fn example_spec() -> RiceSpec {
     let mut spec = presets::get("tokyo-night").unwrap().unwrap();
     spec.components.insert("bar".into(), "waybar".into());
+    spec.components.insert("popups".into(), "eww-popups".into());
     spec
 }
 
@@ -470,6 +472,8 @@ fn quickshell_bar() {
     let registry = Registry::builtin().unwrap();
     let mut spec = example_spec();
     spec.components.insert("bar".into(), "quickshell".into());
+    // У панели Quickshell свои выпадающие меню.
+    spec.components.remove("popups");
     spec.overrides.remove("waybar");
     for style in ["segments", "rail", "island", "dock"] {
         spec.overrides.insert(
@@ -496,6 +500,11 @@ fn quickshell_bar() {
         );
         // QML копируется как есть, с фигурными скобками.
         assert!(text("quickshell/plove/Bar.qml").contains("PanelWindow {"));
+        // Свои выпадающие меню вместо eww-popups.
+        for popup in ["VolumePopup", "NetworkPopup", "CalendarPopup", "CalcPopup"] {
+            assert!(text(&format!("quickshell/plove/{popup}.qml")).contains("Popup {"));
+        }
+        assert!(plan.packages.iter().any(|p| p.name == "libqalculate"));
         let hypr = text("hypr/hyprland.conf");
         assert!(hypr.contains("exec-once = qs -c plove"));
         assert!(!hypr.contains("exec-once = waybar"));
