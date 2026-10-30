@@ -31,11 +31,15 @@ Grid {
         model: grp.names
         Loader {
             required property string modelData
-            source: grp.files[modelData] || ""
+            // Свой виджет райса — по имени из widgets.
+            readonly property bool custom: !grp.files[modelData] && Config.s.widgets[modelData] !== undefined
+            source: grp.files[modelData] || (custom ? "CustomWidget.qml" : "")
             // Модуль сам решает, есть ли что показать (батарея, трей).
             visible: item !== null && item.shown
             onLoaded: {
                 item.group = grp.group;
+                if (custom)
+                    item.widgetId = modelData;
                 item.vertical = Qt.binding(() => grp.vertical);
                 item.big = Qt.binding(() => grp.big);
             }

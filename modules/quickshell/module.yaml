@@ -48,6 +48,7 @@ templates:
   - { src: Media.qml, dest: ~/.config/quickshell/plove/Media.qml, copy: true }
   - { src: SidePanel.qml, dest: ~/.config/quickshell/plove/SidePanel.qml, copy: true }
   - { src: Bell.qml, dest: ~/.config/quickshell/plove/Bell.qml, copy: true }
+  - { src: CustomWidget.qml, dest: ~/.config/quickshell/plove/CustomWidget.qml, copy: true }
   - { src: Osd.qml, dest: ~/.config/quickshell/plove/Osd.qml, copy: true }
   - { src: Desk.qml, dest: ~/.config/quickshell/plove/Desk.qml, copy: true }
   - { src: Sys.qml, dest: ~/.config/quickshell/plove/Sys.qml, copy: true }
@@ -96,7 +97,7 @@ settings:
   - id: modules_left
     group: Модули
     title: Слева
-    about: "У rail — сверху, у island и dock всё идёт подряд: левые, центральные, правые. Щелчок по часам, звуку, сети и калькулятору открывает их меню, по колокольчику (bell) — боковую панель с уведомлениями и быстрыми настройками."
+    about: "У rail — сверху, у island и dock всё идёт подряд: левые, центральные, правые. Сюда же — свои виджеты из widgets райса, по имени. Щелчок по часам, звуку, сети и калькулятору открывает их меню, по колокольчику (bell) — боковую панель с уведомлениями и быстрыми настройками."
     items: [workspaces, clock, tray, volume, network, battery, calculator, bell]
     default: [workspaces]
   - id: modules_center

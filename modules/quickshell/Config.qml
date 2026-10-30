@@ -79,6 +79,7 @@ Singleton {
             property bool notifications: false
             property bool desktop: false
             property string wallpaper: ""
+            property var widgets: ({})
             property bool lua: false
         }
     }

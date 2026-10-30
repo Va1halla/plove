@@ -691,3 +691,37 @@ fn quickshell_lock() {
         .iter()
         .any(|f| f.path.ends_with("hypr/hyprlock.conf") && f.status != FileStatus::Remove));
 }
+
+/// Свои виджеты райса на панели Quickshell: имя в списке модулей,
+/// команда и подпись — в settings.json.
+#[test]
+fn quickshell_custom_widget() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let mut spec = presets::get("tokyo-night").unwrap().unwrap();
+    spec.widgets.insert(
+        "vpn".into(),
+        serde_yaml::from_str(
+            "{command: \"echo on\", icon: X, text: \"VPN {value}\", color: green}",
+        )
+        .unwrap(),
+    );
+    spec.overrides.insert(
+        "quickshell".into(),
+        serde_yaml::from_str("{modules_right: [vpn, clock]}").unwrap(),
+    );
+    let plan = plan::build(spec.clone(), &registry, &env).unwrap();
+    let file = plan
+        .files
+        .iter()
+        .find(|f| f.path.ends_with("quickshell/plove/settings.json"))
+        .unwrap();
+    let settings: serde_json::Value = serde_json::from_slice(&file.content).unwrap();
+    assert_eq!(settings["right"], serde_json::json!(["vpn", "clock"]));
+    assert_eq!(settings["widgets"]["vpn"]["text"], "VPN {value}");
+    assert_eq!(
+        settings["widgets"]["vpn"]["color"],
+        spec.theme.palette.named("green").unwrap().hex().as_str()
+    );
+}
