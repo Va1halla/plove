@@ -49,7 +49,7 @@ PanelWindow {
         height: parent.height - Theme.gap * 2
         y: Theme.gap
         // Выезжает справа.
-        x: panel.open ? Theme.gap : panel.width
+        x: panel.open ? Theme.gap : width + Theme.gap * 2
         Behavior on x { NumberAnimation { id: slide; duration: Theme.slow; easing.type: Theme.easing } }
         radius: Theme.radius
         color: Theme.fade(Theme.bg, Math.max(Theme.alpha, 0.95))

@@ -48,6 +48,7 @@ templates:
   - { src: Media.qml, dest: ~/.config/quickshell/plove/Media.qml, copy: true }
   - { src: SidePanel.qml, dest: ~/.config/quickshell/plove/SidePanel.qml, copy: true }
   - { src: Bell.qml, dest: ~/.config/quickshell/plove/Bell.qml, copy: true }
+  - { src: Osd.qml, dest: ~/.config/quickshell/plove/Osd.qml, copy: true }
   - { src: net.sh, dest: ~/.local/share/plove/qs-net.sh, copy: true }
   - { src: reload.sh, dest: ~/.local/share/plove/qs-reload.sh, copy: true }
 autostart: true

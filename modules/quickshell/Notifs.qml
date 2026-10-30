@@ -18,6 +18,9 @@ Singleton {
     // Всплывающие сейчас (не больше четырёх).
     property var toasts: []
     property int unread: 0
+    property bool started: false
+
+    Timer { interval: 1500; running: true; onTriggered: root.started = true }
 
     function setDnd(on) { state.dnd = on; }
     function hideToast(n) { toasts = toasts.filter(t => t !== n); }
@@ -39,6 +42,10 @@ Singleton {
             persistenceSupported: true
             onNotification: n => {
                 n.tracked = true;
+                // После перезагрузки панели сервер заново присылает старые
+                // уведомления: их — только в список, не всплывающими.
+                if (!root.started)
+                    return;
                 root.unread++;
                 if (!root.dnd || n.urgency === NotificationUrgency.Critical)
                     root.toasts = [n].concat(root.toasts).slice(0, 4);

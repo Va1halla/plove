@@ -14,9 +14,12 @@ ShellRoot {
         function toggle(name: string): void { Config.toggle(name); }
         // Боковая панель: уведомления, быстрые настройки, плеер.
         function panel(): void { Config.panel = !Config.panel; }
+        // Клавиши яркости: перечитать яркость и показать OSD.
+        function brightness(): void { Brightness.refresh(); }
     }
 
     Toasts {}
+    Osd {}
     SidePanel {}
 
     Variants {

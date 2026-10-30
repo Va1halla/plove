@@ -11,9 +11,15 @@ Singleton {
 
     property bool available: false
     property real value: 0          // 0…1
+    // Яркость поменялась (клавишей или ползунком): для OSD.
+    signal changed()
+
+    // Клавиши яркости зовут через IPC (refresh): sysfs о переменах не сообщает.
+    function refresh() { probe.running = true; }
 
     function set(v) {
         value = Math.max(0.01, Math.min(1, v));
+        changed();
         Quickshell.execDetached(["brightnessctl", "-c", "backlight", "set", Math.round(value * 100) + "%"]);
     }
 
@@ -26,8 +32,13 @@ Singleton {
                 // backlight,acpi_video0,…,45%,…
                 const f = text.trim().split(",");
                 root.available = f.length > 3;
-                if (root.available)
-                    root.value = parseInt(f[3]) / 100;
+                if (!root.available)
+                    return;
+                const v = parseInt(f[3]) / 100;
+                if (Math.abs(v - root.value) > 0.001) {
+                    root.value = v;
+                    root.changed();
+                }
             }
         }
     }
