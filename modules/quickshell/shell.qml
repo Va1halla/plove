@@ -16,8 +16,13 @@ ShellRoot {
         function panel(): void { Config.panel = !Config.panel; }
         // Клавиши яркости: перечитать яркость и показать OSD.
         function brightness(): void { Brightness.refresh(); }
+        // Лаунчер: программы и калькулятор.
+        function launcher(): void { launcher.open ? launcher.close("") : launcher.show(); }
+        // dmenu: строки из файла, выбор — в <файл>.out (qs-dmenu.sh).
+        function dmenu(path: string, prompt: string): void { launcher.dmenu(path, prompt); }
     }
 
+    Launcher { id: launcher }
     Toasts {}
     Osd {}
     SidePanel {}

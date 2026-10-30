@@ -1,0 +1,15 @@
+# Модуль qs-launcher: лаунчер рисует панель Quickshell — программы с
+# поиском и калькулятор в строке поиска. Он же dmenu для меню выхода и
+# истории буфера обмена (qs-dmenu.sh): их списки — в том же окне.
+id: qs-launcher
+role: launcher
+exec: qs -c plove ipc call plove launcher
+# Как `fuzzel --dmenu`: строки со stdin, выбранная — в stdout.
+dmenu: sh ~/.local/share/plove/qs-dmenu.sh
+# qalc — калькулятор в строке поиска, wl-copy — скопировать ответ.
+packages: [libqalculate, wl-clipboard]
+compatible_with:
+  compositor: [hyprland]
+  bar: [quickshell]
+binds:
+  - "$mod, D, exec, {{ exec }}"

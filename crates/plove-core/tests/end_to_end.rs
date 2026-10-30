@@ -638,3 +638,31 @@ fn quickshell_desktop() {
     let error = spec.validate().unwrap_err().to_string();
     assert!(error.contains("source «gpu»"), "{error}");
 }
+
+/// Лаунчер Quickshell: Super+D через IPC панели, dmenu для меню выхода
+/// и истории буфера — qs-dmenu.sh.
+#[test]
+fn quickshell_launcher() {
+    let home = tempfile::tempdir().unwrap();
+    let env = Env::sandbox(home.path().to_path_buf());
+    let registry = Registry::builtin().unwrap();
+    let mut spec = presets::get("tokyo-night").unwrap().unwrap();
+    spec.components
+        .insert("launcher".into(), "qs-launcher".into());
+    spec.components.remove("emoji");
+    spec.components.insert("power".into(), "power-menu".into());
+    let plan = plan::build(spec, &registry, &env).unwrap();
+    let file = plan
+        .files
+        .iter()
+        .find(|f| f.path.ends_with("hypr/hyprland.conf"))
+        .unwrap();
+    let hypr = String::from_utf8(file.content.clone()).unwrap();
+    assert!(hypr.contains("$mod, D, exec, qs -c plove ipc call plove launcher"));
+    assert!(hypr.contains("cliphist list | sh ~/.local/share/plove/qs-dmenu.sh | cliphist decode"));
+    assert!(hypr.contains("Выключить' | sh ~/.local/share/plove/qs-dmenu.sh)"));
+    assert!(plan
+        .files
+        .iter()
+        .any(|f| f.path.ends_with("plove/qs-dmenu.sh")));
+}

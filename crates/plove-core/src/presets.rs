@@ -57,7 +57,7 @@ components:
   bar: quickshell
   terminal: kitty
   wallpaper: swaybg
-  launcher: fuzzel
+  launcher: qs-launcher
   notifications: qs-notifications
   power: power-menu
   lock: hyprlock

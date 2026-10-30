@@ -11,6 +11,6 @@ exec: >-
   esac
 compatible_with:
   compositor: [hyprland]
-  launcher: [fuzzel, rofi]
+  launcher: [fuzzel, rofi, qs-launcher]
 binds:
   - "$mod SHIFT, E, exec, {{ exec }}"

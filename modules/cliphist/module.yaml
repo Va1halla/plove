@@ -8,7 +8,7 @@ binds:
   - "$mod SHIFT, V, exec, cliphist list | {{ dmenu }} | cliphist decode | wl-copy"
 compatible_with:
   compositor: [hyprland]
-  launcher: [fuzzel, rofi]
+  launcher: [fuzzel, rofi, qs-launcher]
 # Своего конфига нет; при первом применении запускаем сборщик истории.
 reload: "pgrep -f 'wl-paste --watch cliphist' >/dev/null || setsid -f {{ exec }} >/dev/null 2>&1"
 # Фоновый процесс: plove остановит его, если модуль уберут из райса.

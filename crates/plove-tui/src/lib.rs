@@ -1483,6 +1483,8 @@ mod tests {
                 .iter()
                 .position(|p| p.role == "widgets")
                 .unwrap();
+        // Лаунчеры по алфавиту: fuzzel, qs-launcher, rofi (по кругу).
+        settings.change(launcher, true);
         settings.change(launcher, true);
         settings.change(launcher, true);
         settings.change(launcher, false);

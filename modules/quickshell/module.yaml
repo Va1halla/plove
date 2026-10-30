@@ -68,7 +68,9 @@ templates:
   - { src: CardWidget.qml, dest: ~/.config/quickshell/plove/CardWidget.qml, copy: true }
   - { src: CardMetric.qml, dest: ~/.config/quickshell/plove/CardMetric.qml, copy: true }
   - { src: CardSparkline.qml, dest: ~/.config/quickshell/plove/CardSparkline.qml, copy: true }
+  - { src: Launcher.qml, dest: ~/.config/quickshell/plove/Launcher.qml, copy: true }
   - { src: net.sh, dest: ~/.local/share/plove/qs-net.sh, copy: true }
+  - { src: dmenu.sh, dest: ~/.local/share/plove/qs-dmenu.sh, copy: true }
   - { src: reload.sh, dest: ~/.local/share/plove/qs-reload.sh, copy: true }
 autostart: true
 # Quickshell сама перечитывает свои файлы, но уже на первом записанном,
