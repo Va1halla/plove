@@ -14,11 +14,18 @@ packages:
   - playerctl
 # pipewire-pulse заменяет PulseAudio: pacman предложит удалить старый.
 conflicts: [pulseaudio]
+# Hyprland 0.57+ читает только hyprland.lua (hypr_lua — по `Hyprland --version`),
+# старые версии — hyprland.conf. Ненужный из двух plove удаляет.
 templates:
   - src: hyprland.conf.tera
     dest: ~/.config/hypr/hyprland.conf
+    when: not hypr_lua
+  - src: hyprland.lua.tera
+    dest: ~/.config/hypr/hyprland.lua
+    when: hypr_lua
 user_files:
   - ~/.config/hypr/user.conf
+  - ~/.config/hypr/user.lua
 reload: hyprctl reload
 # Настройки: мастер показывает их по группам, `plove modules hyprland` — списком.
 # Менять в райсе: overrides: { hyprland: { blur_size: 10 } }

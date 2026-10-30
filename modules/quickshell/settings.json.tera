@@ -21,6 +21,7 @@
   "time": {{ time | json_encode() }},
   "date": {{ options.clock_date }},
   "popups": {{ popups }},
+  "lua": {{ hypr_lua }},
   "anchors": { "left": {{ a_left | json_encode() }}, "center": {{ a_center | json_encode() }}, "right": {{ a_right | json_encode() }} },
   "offset": "{{ geometry.gaps }}x{{ geometry.gaps }}"
 }

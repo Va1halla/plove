@@ -203,6 +203,29 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         system::virtual_machine()
     };
     base.insert("vm", &vm);
+    // Hyprland 0.57+ читает конфиг на Lua, и `hyprctl dispatch` там тоже
+    // принимает Lua. Готовые команды — чтобы модули не повторяли условие.
+    base.insert("hypr_lua", &env.hyprland_lua);
+    let hyprctl: BTreeMap<&str, &str> = if env.hyprland_lua {
+        BTreeMap::from([
+            ("exit", "hyprctl dispatch 'hl.dsp.exit()'"),
+            (
+                "dpms_on",
+                "hyprctl dispatch 'hl.dsp.dpms({ action = \"on\" })'",
+            ),
+            (
+                "dpms_off",
+                "hyprctl dispatch 'hl.dsp.dpms({ action = \"off\" })'",
+            ),
+        ])
+    } else {
+        BTreeMap::from([
+            ("exit", "hyprctl dispatch exit"),
+            ("dpms_on", "hyprctl dispatch dpms on"),
+            ("dpms_off", "hyprctl dispatch dpms off"),
+        ])
+    };
+    base.insert("hyprctl", &hyprctl);
     // Свои виджеты: цвет уже из палитры, подпись в виде «{}» для Waybar.
     let widgets: BTreeMap<&String, serde_json::Value> = spec
         .widgets
@@ -335,6 +358,24 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
     base.insert("autostart", &autostart);
     base.insert("binds", &binds);
     base.insert("session_env", &session_env);
+    // То же для hyprland.lua: строки уже в кавычках Lua.
+    if env.hyprland_lua {
+        let lua_binds = binds
+            .iter()
+            .map(|b| lua_bind(b))
+            .collect::<Result<Vec<_>>>()?;
+        let lua_env: Vec<[String; 2]> = session_env
+            .iter()
+            .map(|line| {
+                let (name, value) = line.split_once(',').unwrap_or((line, ""));
+                [lua_string(name.trim()), lua_string(value.trim())]
+            })
+            .collect();
+        let lua_autostart: Vec<String> = autostart.iter().map(|c| lua_string(c)).collect();
+        base.insert("lua_binds", &lua_binds);
+        base.insert("lua_env", &lua_env);
+        base.insert("lua_autostart", &lua_autostart);
+    }
 
     // 5. Рендерим конфиги и сравниваем с тем, что сейчас на диске.
     for module in &modules {
@@ -364,10 +405,9 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         .into_iter()
         .flat_map(|g| g.record.files.into_iter().map(|f| f.path))
         .collect();
+    // Сюда же — файлы, которые модуль райса больше не пишет (условие
+    // `when`): например, hyprland.conf после перехода на hyprland.lua.
     for module in registry.iter() {
-        if spec.components.values().any(|c| *c == module.manifest.id) {
-            continue;
-        }
         for entry in &module.manifest.templates {
             let path = env.expand(&entry.dest);
             if path.exists() && written.contains(&path) && !files.iter().any(|f| f.path == path) {
@@ -574,6 +614,47 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
     })
 }
 
+/// Строка в кавычках Lua.
+fn lua_string(text: &str) -> String {
+    let mut out = String::from("\"");
+    for c in text.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            c if c.is_control() => out.push_str(&format!("\\{}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// Клавиша модуля в формате Hyprland (`$mod SHIFT, E, exec, wlogout`) →
+/// `{ keys = "SUPER + SHIFT + E", cmd = "wlogout" }` для hl.bind в Lua.
+/// Модули приносят только запуск программ (exec).
+fn lua_bind(bind: &str) -> Result<serde_json::Value> {
+    let mut parts = bind.splitn(4, ',').map(str::trim);
+    let (mods, key, dispatcher, command) = (
+        parts.next().unwrap_or(""),
+        parts.next().unwrap_or(""),
+        parts.next().unwrap_or(""),
+        parts.next().unwrap_or(""),
+    );
+    if dispatcher != "exec" || key.is_empty() {
+        bail!("клавиша «{bind}»: в hyprland.lua модули могут запускать только программы (exec)");
+    }
+    let mut keys: Vec<&str> = mods
+        .split_whitespace()
+        .map(|m| if m == "$mod" { "SUPER" } else { m })
+        .collect();
+    keys.push(key);
+    Ok(serde_json::json!({
+        "keys": lua_string(&keys.join(" + ")),
+        "cmd": lua_string(command),
+    }))
+}
+
 /// Сравнить новое содержимое файла с тем, что сейчас на диске.
 /// Списки вроде `modules_right` собираются только из известных частей:
 /// опечатка иначе всплыла бы ошибкой уже в самой программе.
@@ -694,6 +775,17 @@ pub fn module_options(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn binds_become_lua() {
+        let bind = lua_bind("$mod SHIFT, E, exec, pidof wlogout || wlogout").unwrap();
+        assert_eq!(bind["keys"], "\"SUPER + SHIFT + E\"");
+        assert_eq!(bind["cmd"], "\"pidof wlogout || wlogout\"");
+        let print = lua_bind(", Print, exec, grim -g \"$(slurp)\" - | wl-copy").unwrap();
+        assert_eq!(print["keys"], "\"Print\"");
+        assert_eq!(print["cmd"], "\"grim -g \\\"$(slurp)\\\" - | wl-copy\"");
+        assert!(lua_bind("$mod, Q, killactive,").is_err());
+    }
 
     #[test]
     fn bind_key_ignores_modifier_order_and_case() {

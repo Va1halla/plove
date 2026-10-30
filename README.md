@@ -331,7 +331,8 @@ rice.yaml ──► spec    разбор и проверка райса
 - **Модуль = папка** в `modules/`: `module.yaml` плюс шаблоны конфигов на [Tera](https://keats.github.io/tera/) (синтаксис как у Jinja2). Новая программа добавляется новой папкой, ядро не меняется.
 - **Сначала план, потом действие.** `plan` ничего не меняет. `apply` показывает план и спрашивает подтверждение.
 - **Безопасный откат.** Перед записью plove сохраняет старые файлы в `~/.local/state/plove/generations/`. `plove rollback` возвращает их.
-- **Ручные правки не теряются.** Сгенерированные файлы перезаписываются, а свои настройки пишите в `~/.config/hypr/user.conf` и `~/.config/kitty/user.conf`: plove создаёт их пустыми и никогда не трогает.
+- **Ручные правки не теряются.** Сгенерированные файлы перезаписываются, а свои настройки пишите в `~/.config/hypr/user.lua` (Hyprland 0.57+; на старых версиях — `user.conf`) и `~/.config/kitty/user.conf`: plove создаёт их пустыми и никогда не трогает.
+- **Hyprland 0.57 и новее** читает только `~/.config/hypr/hyprland.lua`, старый `hyprland.conf` он не понимает. plove смотрит `Hyprland --version` и пишет нужный файл, а ненужный удаляет; команды `hyprctl dispatch` в меню выхода, hypridle и панели Quickshell тоже в синтаксисе версии (`hyprctl dispatch 'hl.dsp.exit()'`). Формат можно задать и вручную: `PLOVE_HYPRLAND_CONFIG=lua` или `conf`. Если Hyprland ещё не стоит, plove пишет Lua: pacman поставит версию из репозитория. В песочнице (`--root`) по умолчанию старый формат. Проверить конфиг без запуска: `Hyprland --verify-config -c ~/.config/hypr/hyprland.lua`.
 
 ## Где что лежит
 

@@ -232,6 +232,10 @@ pub struct TemplateEntry {
     /// значат своё.
     #[serde(default)]
     pub copy: bool,
+    /// Условие Tera, например `hypr_lua`: файл пишется, только если оно
+    /// истинно. Иначе plove удалит этот файл, если писала его раньше.
+    #[serde(default)]
+    pub when: Option<String>,
 }
 
 pub struct Module {

@@ -1,0 +1,175 @@
+-- Сгенерировано plove из райса «{{ name }}».
+-- Этот файл перезаписывается при каждом `plove apply`.
+-- Свои настройки пишите в ~/.config/hypr/user.lua, plove его не трогает.
+-- Формат Hyprland 0.57+: https://wiki.hypr.land/configuring/
+{#- Строки в Lua: json_encode даёт строку в двойных кавычках с теми же
+    экранированиями, что и в Lua, для обычных символов. #}
+
+{% for monitor in options.monitors -%}
+{% if monitor is string -%}
+{#- Строка Hyprland как есть: «имя, режим, место, масштаб». #}
+{%- set f = monitor | split(pat=",") -%}
+{%- set n = f | length -%}
+hl.monitor({ output = {{ f | first | trim | json_encode() }}
+{%- if n > 1 %}, mode = {{ f | nth(n=1) | trim | json_encode() }}{% endif %}
+{%- if n > 2 %}, position = {{ f | nth(n=2) | trim | json_encode() }}{% endif %}
+{%- if n > 3 %}, scale = {{ f | nth(n=3) | trim | json_encode() }}{% endif %} })
+{% else -%}
+{% set position = monitor.position | default(value="right") -%}
+{% if position == "right" %}{% set position = "auto-right" -%}
+{% elif position == "left" %}{% set position = "auto-left" -%}
+{% elif position == "above" %}{% set position = "auto-up" -%}
+{% elif position == "below" %}{% set position = "auto-down" %}{% endif -%}
+{% set rotate = monitor.rotate | default(value=0) -%}
+hl.monitor({ output = {{ monitor.name | json_encode() }}, mode = {{ monitor.mode | default(value="preferred") | json_encode() }}, position = {{ position | json_encode() }}, scale = {{ monitor.scale | default(value=options.scale) | json_encode() }}{% if rotate != 0 %}, transform = {{ rotate / 90 | round }}{% endif %} })
+{% endif -%}
+{% endfor -%}
+hl.monitor({ output = "", mode = "preferred", position = "auto", scale = {{ options.scale | json_encode() }} })
+{% if vm == "vmware" %}
+-- VMware: 3D-драйвер виртуалки ломает OpenGL-программы (kitty падает
+-- с «unknown object … attach»). Пусть они рисуют программно.
+hl.env("LIBGL_ALWAYS_SOFTWARE", "1")
+{% endif %}
+-- Переменные окружения от модулей: тема Qt, курсор и т. д.
+{% for pair in lua_env -%}
+hl.env({{ pair.0 }}, {{ pair.1 }})
+{% endfor %}
+-- Фоновые программы: обои, панель, уведомления и т. д. (autostart в module.yaml).
+hl.on("hyprland.start", function()
+{%- for command in lua_autostart %}
+    hl.exec_cmd({{ command }})
+{%- endfor %}
+end)
+{% if style.borders == "gradient" -%}
+{%- if ansi | length == 16 %}{% set second = ansi.5.raw %}{% else %}{% set second = colors.muted.raw %}{% endif %}
+{%- set active = '{ colors = { "rgb(' ~ colors.accent.raw ~ ')", "rgb(' ~ second ~ ')" }, angle = 45 }' %}
+{%- elif style.borders == "thin" %}{% set active = '"rgb(' ~ colors.muted.raw ~ ')"' %}
+{%- else %}{% set active = '"rgb(' ~ colors.accent.raw ~ ')"' %}{% endif %}
+hl.config({
+    general = {
+        gaps_in = {{ geometry.gaps_in }},
+        gaps_out = {{ geometry.gaps }},
+        border_size = {{ style.border }},
+        col = {
+            active_border = {{ active }},
+            inactive_border = "rgb({{ colors.surface.raw }})",
+        },
+        layout = {{ options.layout | json_encode() }},
+        resize_on_border = {{ options.resize_on_border }},
+    },
+    decoration = {
+        rounding = {{ style.radius_window }},
+        active_opacity = {{ geometry.opacity }},
+        inactive_opacity = {{ geometry.opacity_inactive }},
+        dim_inactive = {{ options.dim_inactive }},
+        dim_strength = {{ options.dim_strength }},
+        blur = {
+            enabled = {{ style.blur }},
+            size = {{ options.blur_size }},
+            passes = {{ style.blur_passes }},
+            vibrancy = {{ options.blur_vibrancy }},
+            noise = {{ options.blur_noise }},
+            xray = {{ options.blur_xray }},
+            popups = true,
+        },
+        shadow = {
+            enabled = {{ options.shadows }},
+            range = {{ options.shadow_range }},
+            render_power = 3,
+            offset = "0 {{ options.shadow_offset }}",
+            color = "rgba({{ colors.bg.raw }}cc)",
+        },
+    },
+    input = {
+        kb_layout = {{ options.kb_layout | json_encode() }},
+        kb_options = {{ options.kb_options | json_encode() }},
+        follow_mouse = {% if options.follow_mouse %}1{% else %}0{% endif %},
+        sensitivity = {{ options.sensitivity }},
+        touchpad = {
+            natural_scroll = {{ options.natural_scroll }},
+            tap_to_click = {{ options.tap_to_click }},
+        },
+    },
+    misc = {
+        -- Без обоев-заставки и надписей Hyprland поверх наших обоев.
+        disable_hyprland_logo = true,
+        disable_splash_rendering = true,
+    },
+})
+
+-- Размытие под панелью, лаунчером, уведомлениями и меню выхода.
+-- ignore_alpha 0 — не размывать полностью прозрачные места (края панели-островов).
+hl.layer_rule({ match = { namespace = "^(waybar|plove-bar|rofi|launcher)$" }, blur = true, ignore_alpha = 0 })
+hl.layer_rule({ match = { namespace = "^(swaync-control-center|swaync-notification-window|notifications|logout_dialog)$" }, blur = true })
+
+{% if options.animations == "none" -%}
+hl.config({ animations = { enabled = false } })
+{%- else -%}
+{%- if options.animations == "smooth" %}{% set speed = 6 %}{% else %}{% set speed = 3 %}{% endif -%}
+hl.config({ animations = { enabled = true } })
+hl.curve("ease", { type = "bezier", points = { { 0.25, 0.1 }, { 0.25, 1.0 } } })
+hl.curve("overshot", { type = "bezier", points = { { 0.05, 0.9 }, { 0.1, 1.05 } } })
+hl.animation({ leaf = "windows", enabled = true, speed = {{ speed }}, bezier = "ease", style = "{{ options.window_animation }}{% if options.window_animation == "popin" %} 85%{% endif %}" })
+hl.animation({ leaf = "fade", enabled = true, speed = {{ speed }}, bezier = "ease" })
+hl.animation({ leaf = "layers", enabled = true, speed = {{ speed }}, bezier = "overshot", style = "{{ options.layer_animation }}{% if options.layer_animation == "popin" %} 90%{% endif %}" })
+hl.animation({ leaf = "border", enabled = true, speed = {{ speed * 2 }}, bezier = "ease" })
+{%- if style.borders == "gradient" %}
+-- Градиент рамки медленно вращается по кругу.
+hl.animation({ leaf = "borderangle", enabled = true, speed = 60, bezier = "ease", style = "loop" })
+{%- endif %}
+hl.animation({ leaf = "workspaces", enabled = true, speed = {{ speed }}, bezier = "ease", style = "{{ options.workspace_animation }}" })
+{%- endif %}
+{% if options.workspace_swipe %}
+-- Три пальца по тачпаду — соседний рабочий стол.
+hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
+{% endif %}
+-- Клавиши программ: каждый модуль приносит свои (binds в module.yaml).
+{% for bind in lua_binds -%}
+hl.bind({{ bind.keys }}, hl.dsp.exec_cmd({{ bind.cmd }}))
+{% endfor -%}
+hl.bind("SUPER + Q", hl.dsp.window.close())
+{% if not apps.power %}hl.bind("SUPER + SHIFT + E", hl.dsp.exit())
+{% endif -%}
+hl.bind("SUPER + V", hl.dsp.window.float({ action = "toggle" }))
+hl.bind("SUPER + F", hl.dsp.window.fullscreen())
+
+-- Окно — в сторону (и на соседний монитор), рабочий стол — на монитор.
+{% for dir in ["left", "right", "up", "down"] -%}
+{% set short = dir | truncate(length=1, end="") -%}
+hl.bind("SUPER + {{ dir }}", hl.dsp.focus({ direction = "{{ dir }}" }))
+hl.bind("SUPER + SHIFT + {{ dir }}", hl.dsp.window.move({ direction = "{{ dir }}" }))
+hl.bind("SUPER + CTRL + {{ dir }}", hl.dsp.workspace.move({ monitor = "{{ short }}" }))
+{% endfor -%}
+for i = 1, 9 do
+    hl.bind("SUPER + " .. i, hl.dsp.focus({ workspace = i }))
+    hl.bind("SUPER + SHIFT + " .. i, hl.dsp.window.move({ workspace = i }))
+end
+
+-- Громкость, яркость и музыка с мультимедийных клавиш: работают и на
+-- заблокированном экране, громкость и яркость — при удержании.
+local held = { locked = true, repeating = true }
+hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 5%+"), held)
+hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"), held)
+hl.bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), { locked = true })
+hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), { locked = true })
+hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%+"), held)
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%-"), held)
+hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
+hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
+hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"), { locked = true })
+hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true })
+
+-- Мышь: Super + левая кнопка двигает окно, правая — меняет размер.
+hl.bind("SUPER + mouse:272", hl.dsp.window.drag(), { mouse = true })
+hl.bind("SUPER + mouse:273", hl.dsp.window.resize(), { mouse = true })
+
+-- Свои настройки поверх райса. Ошибка в них не ломает конфиг plove.
+local user = os.getenv("HOME") .. "/.config/hypr/user.lua"
+local file = io.open(user)
+if file then
+    file:close()
+    local ok, err = pcall(dofile, user)
+    if not ok then
+        hl.notification.create({ text = "user.lua: " .. tostring(err), timeout = 10000 })
+    end
+end

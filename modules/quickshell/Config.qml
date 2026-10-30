@@ -6,6 +6,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 
 Singleton {
     id: root
@@ -20,6 +21,15 @@ Singleton {
             return;
         const anchor = adapter.anchors[group] || "top right";
         Quickshell.execDetached(["sh", Quickshell.env("HOME") + "/.local/share/plove/popups.sh", "toggle", menu, anchor, adapter.offset]);
+    }
+
+    // Перейти на рабочий стол: номер или «e+1». Hyprland 0.57+ принимает
+    // в dispatch только Lua, старые версии — прежний синтаксис.
+    function workspace(target) {
+        if (adapter.lua)
+            Hyprland.dispatch("hl.dsp.focus({ workspace = " + JSON.stringify(target) + " })");
+        else
+            Hyprland.dispatch("workspace " + target);
     }
 
     function run(command) {
@@ -43,6 +53,7 @@ Singleton {
             property string time: "HH:mm"
             property bool date: false
             property bool popups: false
+            property bool lua: false
             property var anchors: ({})
             property string offset: "8x8"
         }

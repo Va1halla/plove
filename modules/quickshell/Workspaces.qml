@@ -26,7 +26,7 @@ Chip {
         return w !== undefined && w.toplevels.values.length > 0;
     }
 
-    onScrolled: delta => Hyprland.dispatch(delta > 0 ? "workspace e-1" : "workspace e+1")
+    onScrolled: delta => Config.workspace(delta > 0 ? "e-1" : "e+1")
 
     Grid {
         flow: ws.vertical ? Grid.TopToBottom : Grid.LeftToRight
@@ -53,7 +53,7 @@ Chip {
                 MouseArea {
                     anchors.fill: parent
                     anchors.margins: -Math.round(ws.dot / 2)
-                    onClicked: Hyprland.dispatch("workspace " + mark.modelData)
+                    onClicked: Config.workspace(mark.modelData)
                 }
             }
         }

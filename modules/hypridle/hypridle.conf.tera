@@ -5,7 +5,7 @@ general {
     # Не запускать второй экран блокировки поверх первого.
     lock_cmd = pidof hyprlock || {{ apps.lock | default(value="hyprlock") }}
     before_sleep_cmd = loginctl lock-session
-    after_sleep_cmd = hyprctl dispatch dpms on
+    after_sleep_cmd = {{ hyprctl.dpms_on }}
 }
 
 listener {
@@ -15,6 +15,6 @@ listener {
 
 listener {
     timeout = {{ options.screen_off_after * 60 }}
-    on-timeout = hyprctl dispatch dpms off
-    on-resume = hyprctl dispatch dpms on
+    on-timeout = {{ hyprctl.dpms_off }}
+    on-resume = {{ hyprctl.dpms_on }}
 }

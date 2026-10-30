@@ -510,3 +510,60 @@ fn quickshell_bar() {
     );
     assert!(plan::build(spec, &registry, &env).is_err());
 }
+
+/// Hyprland 0.57+: hyprland.lua вместо hyprland.conf, старый файл plove
+/// убирает, hyprctl в модулях — в синтаксисе Lua. Если Hyprland стоит,
+/// он сам проверяет получившийся конфиг.
+#[test]
+fn hyprland_lua_config() {
+    let home = tempfile::tempdir().unwrap();
+    let mut env = Env::sandbox(home.path().to_path_buf());
+    env.hyprland_lua = false;
+    let registry = Registry::builtin().unwrap();
+    let options = ApplyOptions {
+        skip_packages: true,
+        no_confirm: true,
+    };
+    let mut spec = example_spec();
+    spec.components.insert("power".into(), "power-menu".into());
+    // Сначала старый Hyprland: только hyprland.conf.
+    let old = plan::build(spec.clone(), &registry, &env).unwrap();
+    assert!(old
+        .files
+        .iter()
+        .any(|f| f.path.ends_with("hypr/hyprland.conf")));
+    assert!(!old
+        .files
+        .iter()
+        .any(|f| f.path.ends_with("hypr/hyprland.lua")));
+    apply(&old, &env, &options).unwrap();
+
+    env.hyprland_lua = true;
+    let plan = plan::build(spec, &registry, &env).unwrap();
+    let file = |end: &str| plan.files.iter().find(|f| f.path.ends_with(end)).unwrap();
+    assert_eq!(file("hypr/hyprland.conf").status, FileStatus::Remove);
+    let lua = String::from_utf8(file("hypr/hyprland.lua").content.clone()).unwrap();
+    assert!(lua.contains("hl.on(\"hyprland.start\", function()"));
+    assert!(
+        lua.contains("hl.bind(\"SUPER + Return\", hl.dsp.exec_cmd(\"kitty\"))"),
+        "{lua}"
+    );
+    assert!(lua.contains("hl.bind(\"SUPER + 1\"") || lua.contains("for i = 1, 9 do"));
+    assert!(lua.contains("Выйти) hyprctl dispatch 'hl.dsp.exit()'"));
+    assert!(lua.contains("pcall(dofile, user)"));
+    let idle = String::from_utf8(file("hypr/hypridle.conf").content.clone()).unwrap();
+    assert!(idle.contains("hyprctl dispatch 'hl.dsp.dpms({ action = \"off\" })'"));
+    apply(&plan, &env, &options).unwrap();
+    let path = home.path().join(".config/hypr/hyprland.lua");
+    assert!(path.exists() && !home.path().join(".config/hypr/hyprland.conf").exists());
+
+    if let Ok(out) = std::process::Command::new("Hyprland")
+        .arg("--verify-config")
+        .arg("-c")
+        .arg(&path)
+        .output()
+    {
+        let text = String::from_utf8_lossy(&out.stdout);
+        assert!(text.contains("config ok"), "{text}");
+    }
+}

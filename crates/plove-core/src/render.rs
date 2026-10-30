@@ -48,8 +48,14 @@ pub fn render_module(
 
     let mut files = Vec::new();
     for entry in &module.manifest.templates {
-        let source = module.template(&entry.src)?;
         let what = format!("{}/{}", module.manifest.id, entry.src);
+        if let Some(condition) = &entry.when {
+            let test = format!("{{% if {condition} %}}yes{{% endif %}}");
+            if render_str(&test, &context, &format!("{what} (when)"))? != "yes" {
+                continue;
+            }
+        }
+        let source = module.template(&entry.src)?;
         let content = if entry.copy {
             source.to_string()
         } else {

@@ -16,6 +16,9 @@ pub struct Env {
     /// Режим песочницы: `home` — это тестовая папка,
     /// пакеты не ставятся, программы не перезагружаются.
     pub sandbox: bool,
+    /// Hyprland 0.57+: конфиг на Lua (hyprland.lua), старый hyprland.conf
+    /// он не читает. См. [`hyprland_uses_lua`].
+    pub hyprland_lua: bool,
 }
 
 impl Env {
@@ -35,14 +38,18 @@ impl Env {
         Ok(Env {
             home: PathBuf::from(home),
             sandbox: false,
+            hyprland_lua: hyprland_uses_lua(),
         })
     }
 
     /// Песочница: всё пишется в `root`, систему не трогаем.
     pub fn sandbox(root: PathBuf) -> Env {
+        // В песочнице результат не зависит от машины: старый формат,
+        // если не попросили другой через PLOVE_HYPRLAND_CONFIG.
         Env {
             home: root,
             sandbox: true,
+            hyprland_lua: config_override().unwrap_or(false),
         }
     }
 
@@ -195,6 +202,39 @@ pub fn font_families() -> Vec<String> {
     families.sort();
     families.dedup();
     families
+}
+
+/// `PLOVE_HYPRLAND_CONFIG=lua` или `conf`: формат конфига Hyprland
+/// без определения версии.
+fn config_override() -> Option<bool> {
+    match std::env::var("PLOVE_HYPRLAND_CONFIG").ok()?.as_str() {
+        "lua" => Some(true),
+        "conf" => Some(false),
+        _ => None,
+    }
+}
+
+/// Hyprland 0.57 и новее читает только hyprland.lua. Версию берём из
+/// `Hyprland --version`. Если Hyprland ещё не стоит, его поставит pacman,
+/// а в репозитории уже версия с Lua.
+pub fn hyprland_uses_lua() -> bool {
+    if let Some(lua) = config_override() {
+        return lua;
+    }
+    let Ok(out) = Command::new("Hyprland").arg("--version").output() else {
+        return true;
+    };
+    hyprland_version(&String::from_utf8_lossy(&out.stdout)).is_none_or(|v| v >= (0, 57))
+}
+
+/// «Hyprland 0.57.0 built from branch…» → (0, 57).
+fn hyprland_version(text: &str) -> Option<(u32, u32)> {
+    let version = text
+        .split_whitespace()
+        .skip_while(|w| *w != "Hyprland")
+        .nth(1)?;
+    let mut parts = version.split('.').map(|p| p.parse::<u32>());
+    Some((parts.next()?.ok()?, parts.next()?.ok()?))
 }
 
 /// Скачать файлы шрифта в `dir` и обновить кэш fontconfig.
@@ -359,6 +399,14 @@ mod tests {
 
     /// Так выглядит `$XDG_RUNTIME_DIR` с запущенным Hyprland и папкой
     /// от прошлого, упавшего запуска (без сокета).
+    #[test]
+    fn reads_hyprland_version() {
+        let text = "Hyprland 0.57.0 built from branch v0.57.0 at commit 0aa6745 clean";
+        assert_eq!(hyprland_version(text), Some((0, 57)));
+        assert_eq!(hyprland_version("Hyprland 0.56.2 built"), Some((0, 56)));
+        assert_eq!(hyprland_version("command not found"), None);
+    }
+
     #[test]
     fn finds_hyprland_from_another_tty() {
         let runtime = tempfile::tempdir().unwrap();

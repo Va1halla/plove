@@ -5,7 +5,7 @@ role: power
 exec: >-
   case $(printf 'Заблокировать\nВыйти\nПерезагрузить\nВыключить' | {{ dmenu }}) in
   Заблокировать) pidof hyprlock || hyprlock ;;
-  Выйти) hyprctl dispatch exit ;;
+  Выйти) {{ hyprctl.exit }} ;;
   Перезагрузить) systemctl reboot ;;
   Выключить) systemctl poweroff ;;
   esac
