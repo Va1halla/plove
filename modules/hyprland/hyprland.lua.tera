@@ -99,10 +99,12 @@ hl.config({
 
 -- Размытие под панелью, лаунчером, уведомлениями и меню выхода.
 -- ignore_alpha 0 — не размывать полностью прозрачные места (края панели-островов).
-hl.layer_rule({ match = { namespace = "^(waybar|plove-bar|plove-panel|rofi|launcher)$" }, blur = true, blur_popups = true, ignore_alpha = 0 })
+hl.layer_rule({ match = { namespace = "^(waybar|plove-bar|plove-panel|rofi|launcher)$" }, blur = true, blur_popups = true, ignore_alpha = 0.2 })
 hl.layer_rule({ match = { namespace = "^(swaync-control-center|swaync-notification-window|notifications|logout_dialog)$" }, blur = true })
 -- Карточки рабочего стола (стекло): размывать только под самими карточками.
-hl.layer_rule({ match = { namespace = "^plove-desktop$" }, blur = true, ignore_alpha = 0.1 })
+-- Порог 0.28 — ниже заливки стекла (0.42) и выше теней (до 0.2): иначе
+-- тень тоже размывается и вокруг карточки встаёт мутный прямоугольник.
+hl.layer_rule({ match = { namespace = "^plove-desktop$" }, blur = true, ignore_alpha = 0.28 })
 
 {% if options.animations == "none" -%}
 hl.config({ animations = { enabled = false } })

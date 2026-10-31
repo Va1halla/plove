@@ -10,11 +10,25 @@ Item {
     anchors.fill: parent
     property var report: null
 
-    // Коды погоды WWO → значки Nerd Font.
-    function icon(code) {
+    // Ночь: между закатом и восходом (время из прогноза, «07:35 AM»).
+    function minutes(t) {
+        const m = (t || "").match(/(\d+):(\d+)\s*(AM|PM)/);
+        return m ? (parseInt(m[1]) % 12 + (m[3] === "PM" ? 12 : 0)) * 60 + parseInt(m[2]) : -1;
+    }
+    readonly property bool night: {
+        const a = report ? report.weather[0].astronomy[0] : null;
+        if (!a) return false;
+        const now = clock.date.getHours() * 60 + clock.date.getMinutes();
+        const rise = minutes(a.sunrise), set = minutes(a.sunset);
+        return rise >= 0 && set >= 0 && (now < rise || now >= set);
+    }
+    SystemClock { id: clock; precision: SystemClock.Minutes }
+
+    // Коды погоды WWO → значки Nerd Font; ясно и облачно ночью — луна.
+    function icon(code, dark) {
         const c = parseInt(code);
-        if (c === 113) return "󰖙";
-        if (c === 116) return "󰖕";
+        if (c === 113) return dark ? "󰖔" : "󰖙";
+        if (c === 116) return dark ? "󰼱" : "󰖕";
         if (c === 119 || c === 122) return "󰖐";
         if ([143, 248, 260].indexOf(c) >= 0) return "󰖑";
         if ([200, 386, 389, 392, 395].indexOf(c) >= 0) return "󰙾";
@@ -44,7 +58,7 @@ Item {
         Text {
             id: glyph
             anchors.verticalCenter: parent.verticalCenter
-            text: root.now ? root.icon(root.now.weatherCode) : "󰖪"
+            text: root.now ? root.icon(root.now.weatherCode, root.night) : "󰖪"
             color: root.card ? root.card.accent : Theme.accent
             font.family: Theme.fontIcons
             font.pixelSize: root.card ? root.card.px(52) : 52
@@ -71,11 +85,18 @@ Item {
                 font.pixelSize: root.card ? root.card.px(15) : 15
                 font.weight: Font.DemiBold
             }
+            // Две короткие строки вместо одной обрезанной.
             CardLabel {
                 width: root.width - glyph.width - temp.width - top.spacing * 2
                 elide: Text.ElideRight
                 card: root.card
-                text: root.now ? "ощущается " + root.now.FeelsLikeC + "° · " + root.now.humidity + "%" : ""
+                text: root.now ? "ощущается " + root.now.FeelsLikeC + "°" : ""
+            }
+            CardLabel {
+                width: root.width - glyph.width - temp.width - top.spacing * 2
+                elide: Text.ElideRight
+                card: root.card
+                text: root.now ? "влажность " + root.now.humidity + "%" : ""
             }
         }
     }
@@ -93,7 +114,7 @@ Item {
                 spacing: root.card ? root.card.px(3) : 3
                 CardLabel {
                     card: root.card
-                    text: index === 0 ? "сегодня" : new Date(modelData.date + "T12:00:00").toLocaleDateString(Qt.locale(), "dddd")
+                    text: index === 0 ? "сегодня" : new Date(modelData.date + "T12:00:00").toLocaleDateString(Qt.locale(), "ddd")
                 }
                 Row {
                     spacing: root.card ? root.card.px(6) : 6

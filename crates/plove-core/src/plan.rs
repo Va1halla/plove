@@ -251,7 +251,22 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         .collect::<Result<_>>()?;
     base.insert("widgets", &widgets);
     // Карточки рабочего стола из `plove studio`.
-    base.insert("desk", &crate::desk::context(&spec));
+    let mut desk = crate::desk::context(&spec);
+    // Цвет обоев под карточками: для текста прямо на обоях (часы без фона).
+    if let Some(Wallpaper::File(file)) = &spec.theme.wallpaper {
+        if !desk.is_empty() {
+            if let Ok(image) = image::open(env.expand(file)) {
+                let small = image.thumbnail(640, 640).to_rgb8();
+                let screen = if env.sandbox {
+                    (1920.0, 1080.0)
+                } else {
+                    system::screen_size().unwrap_or((1920.0, 1080.0))
+                };
+                crate::desk::add_backdrops(&mut desk, &small, screen, &spec.theme.palette);
+            }
+        }
+    }
+    base.insert("desk", &desk);
     // Домашняя папка: для программ, которые не понимают ~ в путях.
     base.insert("home", &env.home.display().to_string());
     // Режим «выбрать из списка» у лаунчера. Нужен до команд запуска:

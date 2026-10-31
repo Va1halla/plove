@@ -517,6 +517,99 @@ fn round2(x: f64) -> f64 {
     (x * 100.0).round() / 100.0
 }
 
+/// Относительная яркость цвета по WCAG.
+fn luminance(c: Color) -> f64 {
+    let ch = |v: u8| {
+        let v = v as f64 / 255.0;
+        if v <= 0.03928 {
+            v / 12.92
+        } else {
+            ((v + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b)
+}
+
+/// Контраст двух цветов по WCAG: от 1 до 21.
+pub fn contrast(a: Color, b: Color) -> f64 {
+    let (la, lb) = (luminance(a), luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+}
+
+/// Что лежит под каждой карточкой: средний цвет обоев в её прямоугольнике
+/// (обои растянуты на экран с обрезкой, как swaybg -m fill) и цвет для
+/// текста прямо на обоях — акцент, если он читается (контраст от 3),
+/// иначе светлый или тёмный цвет палитры, что контрастнее. Нужно часам
+/// без фона: розовые цифры на голубых обоях иначе не читаются.
+pub fn add_backdrops(
+    cards: &mut [serde_json::Value],
+    wallpaper: &image::RgbImage,
+    screen: (f64, f64),
+    palette: &Palette,
+) {
+    let screen_aspect = screen.0 / screen.1;
+    let (iw, ih) = (wallpaper.width() as f64, wallpaper.height() as f64);
+    if iw < 1.0 || ih < 1.0 {
+        return;
+    }
+    // Видимая часть картинки при заполнении экрана с обрезкой.
+    let (vw, vh) = if iw / ih > screen_aspect {
+        (ih * screen_aspect, ih)
+    } else {
+        (iw, iw / screen_aspect)
+    };
+    let (ox, oy) = ((iw - vw) / 2.0, (ih - vh) / 2.0);
+    for card in cards.iter_mut() {
+        let (Some(x), Some(y)) = (card["x"].as_f64(), card["y"].as_f64()) else {
+            continue;
+        };
+        // Ширина и высота карточки в долях экрана.
+        let w = card["w"].as_f64().unwrap_or(300.0) / screen.0;
+        let h = card["h"].as_f64().unwrap_or(100.0) / screen.1;
+        let x0 = (ox + vw * x / 100.0) as u32;
+        let y0 = (oy + vh * y / 100.0) as u32;
+        let x1 = ((ox + vw * (x / 100.0 + w)) as u32).min(wallpaper.width());
+        let y1 = ((oy + vh * (y / 100.0 + h)) as u32).min(wallpaper.height());
+        let (mut sum, mut n) = ([0u64; 3], 0u64);
+        for py in (y0..y1).step_by(2) {
+            for px in (x0..x1).step_by(2) {
+                let p = wallpaper.get_pixel(px, py);
+                sum[0] += p[0] as u64;
+                sum[1] += p[1] as u64;
+                sum[2] += p[2] as u64;
+                n += 1;
+            }
+        }
+        if n == 0 {
+            continue;
+        }
+        let under = Color {
+            r: (sum[0] / n) as u8,
+            g: (sum[1] / n) as u8,
+            b: (sum[2] / n) as u8,
+        };
+        let ink = if contrast(palette.accent, under) >= 3.0 {
+            palette.accent
+        } else if contrast(palette.fg, under) >= contrast(palette.bg, under) {
+            palette.fg
+        } else {
+            palette.bg
+        };
+        // Тень — противоположная по яркости.
+        let shade = if luminance(ink) > 0.4 {
+            palette.bg
+        } else {
+            palette.fg
+        };
+        card["backdrop"] = json!({
+            "under": under.hex(),
+            "ink": ink.hex(),
+            "shade": shade.hex(),
+            "contrast": round2(contrast(ink, under)),
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -526,6 +619,37 @@ mod tests {
             "version: 1\nname: x\ntheme: {{palette: {{bg: '#000000', fg: '#ffffff', accent: '#ff0000'}}, fonts: {{ui: a, mono: b}}}}\ncomponents: {{compositor: hyprland}}\nwidgets: {{vpn: {{command: 'echo on'}}}}\ndesktop: {desktop}\n"
         );
         RiceSpec::from_yaml(&yaml)
+    }
+
+    /// Цвет текста на обоях: акцент, если читается, иначе светлый или
+    /// тёмный цвет палитры — что контрастнее. Область — под карточкой.
+    #[test]
+    fn ink_on_wallpaper_is_readable() {
+        let spec = spec("[{kind: clock, at: [0, 0]}, {kind: clock, at: [50, 0]}]").unwrap();
+        let mut cards = context(&spec);
+        // Левая половина светло-голубая, правая почти чёрная.
+        let image = image::RgbImage::from_fn(160, 90, |x, _| {
+            if x < 80 {
+                image::Rgb([111, 182, 201])
+            } else {
+                image::Rgb([10, 10, 12])
+            }
+        });
+        add_backdrops(&mut cards, &image, (1920.0, 1080.0), &spec.theme.palette);
+        for card in &cards {
+            let under = Color::parse(card["backdrop"]["under"].as_str().unwrap()).unwrap();
+            let ink = Color::parse(card["backdrop"]["ink"].as_str().unwrap()).unwrap();
+            assert!(contrast(ink, under) >= 3.0, "{card}");
+        }
+        assert_ne!(cards[0]["backdrop"]["ink"], cards[1]["backdrop"]["ink"]);
+        assert!(
+            (contrast(
+                Color::parse("#000000").unwrap(),
+                Color::parse("#ffffff").unwrap()
+            ) - 21.0)
+                .abs()
+                < 0.01
+        );
     }
 
     #[test]

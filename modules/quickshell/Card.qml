@@ -37,11 +37,20 @@ Item {
     // Подписи-заголовки: капителями, с разрядкой.
     readonly property bool caps: style !== "classic"
 
+    // Под карточкой на обоях (plove считает при apply): средний цвет и
+    // читаемый на нём цвет текста — для часов без рамки.
+    readonly property var backdrop: data_.backdrop || null
+    readonly property color wallInk: look.accent || look.text || (backdrop ? backdrop.ink : Theme.fg)
+    readonly property color wallShade: backdrop ? backdrop.shade : Theme.bg
+    // Тень — только под светлым текстом: под тёмным светлая тень читается
+    // как двойная печать.
+    readonly property real wallShadow: wallInk.hslLightness > 0.5 ? 0.3 : 0
+
     // Часы без рамки в classic и glass: только цифры с тенью.
     readonly property bool frameless: (data_.kind === "clock" || data_.kind === "dotclock") && (style === "classic" || style === "glass") && !look.fill_argb
     readonly property color fill: look.fill_argb ? look.fill_argb
         : frameless ? "transparent"
-        : style === "glass" ? Theme.fade(Theme.bg, 0.30)
+        : style === "glass" ? Theme.fade(Theme.bg, 0.42)
         : style === "dots" ? Qt.rgba(0.055, 0.055, 0.055, 0.94)
         : style === "soft" ? Theme.fade(darkTheme ? Qt.tint(Theme.fg, Theme.fade(Theme.accent, 0.06)) : Theme.bg, 0.95)
         : Theme.glass ? Theme.fade(Theme.bg, Math.max(0.15, Theme.alpha - 0.25)) : "transparent"
@@ -81,9 +90,12 @@ Item {
             anchors.fill: frame
             radius: card.radius
             offset.y: hover.hovered ? card.px(14) : card.px(8)
-            blur: card.style === "glass" ? card.px(40) : card.px(28)
+            blur: card.style === "glass" ? card.px(30) : card.px(24)
             spread: 0
-            color: Qt.rgba(0, 0, 0, card.style === "glass" ? 0.32 : (card.darkTheme ? 0.35 : 0.14))
+            // Слабее порога размытия Hyprland (ignore_alpha 0.28 для
+            // plove-desktop): иначе тень тоже размывается и вокруг
+            // карточки встаёт мутный прямоугольник.
+            color: Qt.rgba(0, 0, 0, card.style === "glass" ? 0.2 : (card.darkTheme ? 0.24 : 0.12))
             Behavior on offset.y { NumberAnimation { duration: 220 } }
         }
 
@@ -93,23 +105,15 @@ Item {
             radius: card.radius
             color: card.fill
             clip: true
-            border.width: look.border ? look.border
-                : card.frameless ? 0
-                : card.style === "glass" ? 1
-                : card.style === "dots" ? 1 : 0
-            border.color: look.border ? card.accent
-                : card.style === "glass" ? Qt.rgba(1, 1, 1, 0.16)
-                : Qt.rgba(1, 1, 1, 0.07)
-
-            // Стекло: блик сверху.
+            // Стекло: блик сверху — на всю карточку, тот же радиус, без
+            // своей рамки (иначе у края выходила двойная линия).
             Rectangle {
                 visible: card.style === "glass" && !card.frameless
-                anchors { left: parent.left; right: parent.right; top: parent.top; margins: 1 }
-                height: parent.height * 0.55
+                anchors.fill: parent
                 radius: card.radius
                 gradient: Gradient {
-                    GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 0.13) }
-                    GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 0) }
+                    GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 0.12) }
+                    GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0) }
                 }
             }
             // Точки: сетка по всей карточке.
@@ -129,6 +133,19 @@ Item {
                         }
                 }
             }
+        }
+
+        // Рамка — одна, поверх всего.
+        Rectangle {
+            anchors.fill: frame
+            radius: card.radius
+            color: "transparent"
+            border.width: look.border ? look.border
+                : card.frameless ? 0
+                : card.style === "glass" || card.style === "dots" ? 1 : 0
+            border.color: look.border ? card.accent
+                : card.style === "glass" ? Qt.rgba(1, 1, 1, 0.18)
+                : Qt.rgba(1, 1, 1, 0.07)
         }
 
         readonly property var files: ({

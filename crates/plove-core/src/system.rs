@@ -237,6 +237,21 @@ fn hyprland_version(text: &str) -> Option<(u32, u32)> {
     Some((parts.next()?.ok()?, parts.next()?.ok()?))
 }
 
+/// Размер первого монитора в логических точках (с масштабом и
+/// поворотом) из `hyprctl monitors -j`. `None` — Hyprland не отвечает.
+pub fn screen_size() -> Option<(f64, f64)> {
+    let out = Command::new("hyprctl")
+        .args(["monitors", "-j"])
+        .output()
+        .ok()?;
+    let monitors: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
+    let m = monitors.get(0)?;
+    let scale = m["scale"].as_f64().unwrap_or(1.0).max(0.1);
+    let (w, h) = (m["width"].as_f64()? / scale, m["height"].as_f64()? / scale);
+    let rotated = m["transform"].as_u64().unwrap_or(0) % 2 == 1;
+    Some(if rotated { (h, w) } else { (w, h) })
+}
+
 /// Скачать файлы шрифта в `dir` и обновить кэш fontconfig.
 pub fn download_font(urls: &[String], dir: &Path) -> Result<()> {
     let parent = dir.parent().context("у папки шрифта нет родителя")?;

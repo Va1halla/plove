@@ -23,17 +23,20 @@ Column {
             id: big
             visible: !root.card || root.card.style !== "dots"
             text: root.time
-            color: root.card ? (root.card.style === "soft" ? root.card.ink : root.card.accent) : Theme.accent
+            // На обоях — цвет, читаемый на них; на карточке soft — тёмный.
+            color: !root.card ? Theme.accent : root.card.frameless ? root.card.wallInk : root.card.style === "soft" ? root.card.ink : root.card.accent
             font.family: root.card ? root.card.display : Theme.fontDisplay
             font.pixelSize: root.card ? root.card.px(root.card.style === "classic" ? 96 : 104) : 96
             font.weight: root.card && root.card.style === "soft" ? Font.Black : root.card && root.card.style === "glass" ? Font.DemiBold : Font.Bold
             font.letterSpacing: root.card && root.card.style !== "classic" ? -root.card.px(4) : 0
+            // Тень плотная и короткая: широкая размывала цифры.
             layer.enabled: root.card !== undefined && root.card.frameless
             layer.effect: MultiEffect {
                 shadowEnabled: true
-                shadowColor: root.card && root.card.style === "glass" ? Theme.fade(Theme.bg, 0.8) : Theme.fade(Theme.bg, 0.6)
-                shadowBlur: 0.8
-                shadowVerticalOffset: 4
+                shadowColor: root.card ? root.card.wallShade : Theme.bg
+                shadowBlur: 0.12
+                shadowOpacity: root.card ? root.card.wallShadow : 0.25
+                shadowVerticalOffset: 2
                 shadowHorizontalOffset: 0
             }
         }
@@ -54,13 +57,21 @@ Column {
             const t = clock.date.toLocaleDateString(Qt.locale(), root.card && root.card.style === "dots" ? "ddd · d MMMM" : "dddd, d MMMM");
             return t.charAt(0).toUpperCase() + t.slice(1);
         }
-        color: root.card ? (root.card.style === "dots" ? root.card.muted : root.card.ink) : Theme.fg
+        color: !root.card ? Theme.fg : root.card.frameless ? root.card.wallInk : root.card.style === "dots" ? root.card.muted : root.card.ink
         opacity: root.card && root.card.style === "soft" ? 0.7 : 1
         font.family: root.card ? root.card.font : Theme.fontText
-        font.pixelSize: root.card ? root.card.px(root.card.style === "dots" ? 14 : 20) : 20
+        font.pixelSize: root.card ? root.card.px(root.card.style === "dots" ? 14 : 23) : 20
+        font.weight: Font.Medium
         font.capitalization: root.card && root.card.style === "dots" ? Font.AllUppercase : Font.MixedCase
         font.letterSpacing: root.card && root.card.style === "dots" ? 2 : 0
-        style: root.card && root.card.frameless ? Text.Raised : Text.Normal
-        styleColor: Theme.fade(Theme.bg, 0.6)
+        layer.enabled: root.card !== undefined && root.card.frameless
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowColor: root.card ? root.card.wallShade : Theme.bg
+            shadowBlur: 0.1
+            shadowOpacity: root.card ? root.card.wallShadow : 0.25
+            shadowVerticalOffset: 1
+            shadowHorizontalOffset: 0
+        }
     }
 }

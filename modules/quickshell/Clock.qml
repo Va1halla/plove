@@ -25,13 +25,43 @@ Chip {
             id: row
             visible: !c.vertical
             spacing: date.width > 0 ? Theme.pad : 0
-            Text {
-                text: Qt.formatDateTime(clock.date, Config.s.time)
-                color: Theme.fg
-                font.family: Theme.fontDisplay
-                font.pixelSize: Math.round(Theme.fontSize * (c.big ? 1.35 : 1.1))
-                font.bold: true
+            // Двоеточие рисуем сами: у шрифтов-табло (Doto) свой знак
+            // «:» похож на «⁝».
+            Row {
+                id: time
                 anchors.verticalCenter: parent.verticalCenter
+                spacing: Math.round(Theme.fontSize * 0.12)
+                readonly property real size: Math.round(Theme.fontSize * (c.big ? 1.35 : 1.1))
+                Repeater {
+                    model: Qt.formatDateTime(clock.date, Config.s.time).split(":")
+                    Row {
+                        required property string modelData
+                        required property int index
+                        spacing: time.spacing
+                        Column {
+                            visible: index > 0
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: time.size * 0.22
+                            Repeater {
+                                model: 2
+                                Rectangle {
+                                    width: Math.max(2, Math.round(time.size * 0.14))
+                                    height: width
+                                    radius: width / 2
+                                    color: Theme.fg
+                                }
+                            }
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: modelData
+                            color: Theme.fg
+                            font.family: Theme.fontDisplay
+                            font.pixelSize: time.size
+                            font.bold: true
+                        }
+                    }
+                }
             }
             Text {
                 id: date

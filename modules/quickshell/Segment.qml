@@ -13,10 +13,27 @@ Rectangle {
     readonly property bool empty: groups.every(g => !g || g.length === 0)
     visible: !empty
 
-    color: Theme.fade(Theme.bg, Theme.alpha)
+    // Панель в том же виде, что карточки стола (glass, dots), если они есть.
+    readonly property string look: Desk.enabled ? Desk.style : ""
+    color: look === "glass" ? Theme.fade(Theme.bg, 0.42)
+        : look === "dots" ? Qt.rgba(0.055, 0.055, 0.055, 0.94)
+        : Theme.fade(Theme.bg, Theme.alpha)
     radius: Math.min(Theme.radius, (vertical ? width : height) / 2)
-    border.width: Theme.border
-    border.color: Theme.fade(Theme.surface, 0.9)
+    border.width: look === "glass" || look === "dots" ? 1 : Theme.border
+    border.color: look === "glass" ? Qt.rgba(1, 1, 1, 0.18)
+        : look === "dots" ? Qt.rgba(1, 1, 1, 0.07)
+        : Theme.fade(Theme.surface, 0.9)
+
+    // Стекло: блик сверху, как у карточек.
+    Rectangle {
+        visible: seg.look === "glass"
+        anchors.fill: parent
+        radius: parent.radius
+        gradient: Gradient {
+            GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 0.12) }
+            GradientStop { position: 0.6; color: Qt.rgba(1, 1, 1, 0) }
+        }
+    }
 
     // По ширине содержимого; у rail ширину задаёт панель.
     implicitWidth: row.implicitWidth + Theme.pad * 2
