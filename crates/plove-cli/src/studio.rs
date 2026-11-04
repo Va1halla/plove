@@ -25,6 +25,8 @@ use plove_core::theme;
 use serde_json::json;
 
 const PAGE: &str = include_str!("studio.html");
+/// Страница «Оболочка»: панели и блоки Quickshell мышью.
+const SHELL_PAGE: &str = include_str!("shell.html");
 
 /// Что редактируем и куда сохраняем.
 struct Studio<'a> {
@@ -34,6 +36,8 @@ struct Studio<'a> {
     registry: &'a Registry,
     /// Картинка рабочего стола без карточек, PNG.
     desktop_png: Vec<u8>,
+    /// Те же обои без панели — для страницы «Оболочка», где панели рисует она.
+    bare_png: Vec<u8>,
     /// Размер экрана в логических точках: в них считаются размеры окон eww.
     screen: (u32, u32),
 }
@@ -47,12 +51,14 @@ pub fn run(rice: &str, registry: &Registry, env: &Env, port: u16, open: bool) ->
         spec.desktop = from_eww_settings(&spec, registry, screen)?;
     }
     let desktop_png = desktop_png(&spec, registry, env)?;
+    let bare_png = bare_png(&spec, registry, env)?;
     let mut studio = Studio {
         spec,
         file,
         env,
         registry,
         desktop_png,
+        bare_png,
         screen,
     };
 
@@ -99,6 +105,16 @@ fn desktop_png(spec: &RiceSpec, registry: &Registry, env: &Env) -> Result<Vec<u8
     background.desktop.clear();
     background.components.remove("widgets");
     background.components.remove("terminal");
+    plove_preview::render_png(&background, registry, env)
+}
+
+/// Только обои: ни панели, ни карточек, ни окон.
+fn bare_png(spec: &RiceSpec, registry: &Registry, env: &Env) -> Result<Vec<u8>> {
+    let mut background = spec.clone();
+    background.desktop.clear();
+    for role in ["widgets", "terminal", "bar"] {
+        background.components.remove(role);
+    }
     plove_preview::render_png(&background, registry, env)
 }
 
@@ -264,7 +280,14 @@ impl Studio<'_> {
         }
         match (method.as_str(), path.as_str()) {
             ("GET", "/") => respond(stream, 200, "text/html; charset=utf-8", PAGE.as_bytes()),
+            ("GET", "/shell") => respond(
+                stream,
+                200,
+                "text/html; charset=utf-8",
+                SHELL_PAGE.as_bytes(),
+            ),
             ("GET", "/desktop.png") => respond(stream, 200, "image/png", &self.desktop_png),
+            ("GET", "/bare.png") => respond(stream, 200, "image/png", &self.bare_png),
             ("GET", "/api/state") => respond_json(stream, 200, &self.state()),
             ("POST", "/api/save") => {
                 let result = self.save(&body);
@@ -346,17 +369,50 @@ impl Studio<'_> {
                 .unwrap_or("glass"),
             "colors": colors,
             "fonts": self.fonts(),
+            "blocks": plove_core::layout::catalog_json(),
+            "shell": self.spec.shell,
+            "bar_style": self.quickshell_option("style").unwrap_or_else(|| json!("segments")),
+            "modules": {
+                "left": self.quickshell_option("modules_left").unwrap_or_else(|| json!(["workspaces"])),
+                "center": self.quickshell_option("modules_center").unwrap_or_else(|| json!(["clock"])),
+                "right": self.quickshell_option("modules_right")
+                    .unwrap_or_else(|| json!(["tray", "volume", "network", "battery"])),
+            },
         })
+    }
+
+    /// Настройка панели Quickshell из райса: overrides, иначе умолчание модуля.
+    fn quickshell_option(&self, key: &str) -> Option<serde_json::Value> {
+        if let Some(v) = self
+            .spec
+            .overrides
+            .get("quickshell")
+            .and_then(|o| o.get(key))
+        {
+            return serde_json::to_value(v).ok();
+        }
+        let module = self.registry.get("quickshell")?;
+        serde_json::to_value(module.manifest.defaults.get(key)?).ok()
     }
 
     /// Записать раскладку со страницы в файл райса (старый — рядом, .bak).
     fn save(&mut self, body: &[u8]) -> Result<()> {
         let request: serde_json::Value =
             serde_json::from_slice(body).context("страница прислала не JSON")?;
-        let cards: Vec<DeskCard> = serde_json::from_value(request["desktop"].clone())
-            .context("страница прислала карточки в неверном виде")?;
         let mut spec = self.spec.clone();
-        spec.desktop = cards;
+        // Страница стола присылает карточки, страница оболочки — поверхности.
+        if !request["desktop"].is_null() {
+            spec.desktop = serde_json::from_value(request["desktop"].clone())
+                .context("страница прислала карточки в неверном виде")?;
+        }
+        if !request["shell"].is_null() {
+            spec.shell = serde_json::from_value(request["shell"].clone())
+                .context("страница прислала оболочку в неверном виде")?;
+            // Свою оболочку строит только панель Quickshell.
+            if !spec.shell.is_empty() {
+                spec.components.insert("bar".into(), "quickshell".into());
+            }
+        }
         // Вид карточек — настройка style модуля qs-desktop.
         if let Some(style) = request["card_style"].as_str() {
             if desk_engine(&spec) == "qs-desktop" {

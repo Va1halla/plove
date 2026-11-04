@@ -32,6 +32,8 @@
     border-bottom: 1px solid var(--ui-line);
   }
   header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header nav a { color: var(--ui-muted); text-decoration: none; margin-right: 10px; }
+  header nav a.on { color: var(--ui-text); border-bottom: 2px solid var(--accent); }
   header .file { color: var(--ui-muted); font-size: 13px; }
   header .spacer { flex: 1; }
   #status { color: var(--ui-muted); font-size: 13px; max-width: 40ch; text-align: right; }
@@ -115,6 +117,7 @@
 <body>
 <header>
   <h1>plove studio</h1>
+  <nav><a href="/" class="on">Рабочий стол</a><a href="/shell">Оболочка</a></nav>
   <span class="file" id="file"></span>
   <span class="spacer"></span>
   <span id="status"></span>

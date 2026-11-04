@@ -267,6 +267,7 @@ pub fn build(spec: RiceSpec, registry: &Registry, env: &Env) -> Result<Plan> {
         }
     }
     base.insert("desk", &desk);
+    base.insert("shell", &crate::layout::context(&spec));
     // Домашняя папка: для программ, которые не понимают ~ в путях.
     base.insert("home", &env.home.display().to_string());
     // Режим «выбрать из списка» у лаунчера. Нужен до команд запуска:

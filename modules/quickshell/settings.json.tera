@@ -16,5 +16,6 @@
   "widgets": {{ widgets | json_encode() }},
   "notifications": {{ components.notifications | default(value="") == "qs-notifications" }},
   "desktop": {{ components.widgets | default(value="") == "qs-desktop" }},
-  "lua": {{ hypr_lua }}
+  "lua": {{ hypr_lua }},
+  "shell": {{ shell | json_encode() }}
 }

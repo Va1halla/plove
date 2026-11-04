@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>plove studio — оболочка</title>
+<style>
+  :root {
+    --ui-bg: #15161c;
+    --ui-panel: #1d1f27;
+    --ui-line: #2c2f3a;
+    --ui-text: #d8dae3;
+    --ui-muted: #8b90a0;
+    --accent: #7aa2f7;
+    --icons: "Symbols Nerd Font", "JetBrainsMono Nerd Font", "Symbols Nerd Font Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--ui-bg); color: var(--ui-text);
+    font: 14px/1.4 system-ui, sans-serif;
+    display: grid; grid-template-rows: auto 1fr; grid-template-columns: 250px 1fr 290px;
+    grid-template-areas: "top top top" "left stage props";
+    user-select: none;
+  }
+  header {
+    grid-area: top; display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; border-bottom: 1px solid var(--ui-line);
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header nav a { color: var(--ui-muted); text-decoration: none; margin-right: 10px; }
+  header nav a.on { color: var(--ui-text); border-bottom: 2px solid var(--accent); }
+  header .spacer { flex: 1; }
+  #status { color: var(--ui-muted); font-size: 13px; max-width: 40ch; text-align: right; }
+  #status.error { color: #f7768e; }
+  button {
+    font: inherit; color: var(--ui-text); background: var(--ui-panel);
+    border: 1px solid var(--ui-line); border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 600; }
+  button.danger:hover { border-color: #f7768e; color: #f7768e; }
+  aside { background: var(--ui-panel); overflow-y: auto; padding: 12px; }
+  #left { grid-area: left; border-right: 1px solid var(--ui-line); }
+  #props { grid-area: props; border-left: 1px solid var(--ui-line); }
+  aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ui-muted); margin: 14px 0 8px; }
+  aside h2:first-child { margin-top: 4px; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .tile {
+    border: 1px solid var(--ui-line); border-radius: 8px; padding: 8px; cursor: pointer;
+    background: #191b22; font-size: 12px; text-align: center;
+  }
+  .tile:hover { border-color: var(--accent); }
+  .tile svg { display: block; margin: 0 auto 4px; }
+  .palette .item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px;
+    cursor: grab; border: 1px solid transparent; margin-bottom: 2px;
+  }
+  .palette .item:hover { border-color: var(--ui-line); background: #23262f; }
+  .palette .item.off { opacity: .35; }
+  .palette .item i, .chip i { font-style: normal; font-family: var(--icons); color: var(--accent); width: 18px; text-align: center; }
+  .palette .item small { display: block; color: var(--ui-muted); font-size: 11px; line-height: 1.25; }
+  #stage-wrap {
+    grid-area: stage; display: flex; align-items: center; justify-content: center;
+    padding: 16px; overflow: hidden; min-width: 0; min-height: 0;
+  }
+  #stage {
+    position: relative; background: #333 center / cover;
+    box-shadow: 0 10px 40px rgba(0,0,0,.5); border-radius: 6px; overflow: hidden;
+  }
+  .surface {
+    position: absolute; display: flex; gap: 6px; padding: 4px;
+    background: var(--plate); border: 1px solid rgba(255,255,255,.14); border-radius: 12px;
+    outline: 2px dashed transparent; outline-offset: 2px; cursor: pointer;
+    backdrop-filter: blur(8px);
+  }
+  .surface.selected { outline-color: var(--accent); }
+  .surface.v { flex-direction: column; }
+  .surface.drawer { flex-direction: column; padding: 12px; gap: 8px; }
+  .surface.fill .zone:nth-child(2) { margin: 0 auto; }
+  .surface.fill.v .zone:nth-child(2) { margin: auto 0; }
+  .zone {
+    display: flex; gap: 4px; align-items: center; min-width: 26px; min-height: 26px;
+    border-radius: 8px; border: 1px dashed rgba(255,255,255,.18); padding: 2px;
+  }
+  .surface.v .zone { flex-direction: column; }
+  .surface.v:not(.drawer) .chip { padding: 3px 2px; font-size: 10px; }
+  .surface.drawer .zone { flex-direction: column; align-items: stretch; flex: 1; }
+  .zone.over { border-color: var(--accent); background: rgba(122,162,247,.15); }
+  .chip {
+    display: flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 7px;
+    color: var(--fg); font-size: 12px; white-space: nowrap; cursor: grab;
+    border: 1px solid transparent;
+  }
+  .chip:hover { background: rgba(255,255,255,.08); }
+  .chip.selected { border-color: var(--accent); background: rgba(122,162,247,.18); }
+  .surface.drawer .chip { padding: 8px 10px; background: rgba(255,255,255,.05); font-size: 13px; }
+  .chip.heading { font-size: 16px; font-weight: 600; background: none !important; }
+  .chip .bar { flex: 1; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accentc) 55%, rgba(255,255,255,.15) 55%); }
+  .drawer-tab {
+    position: absolute; font-size: 11px; padding: 2px 8px; border-radius: 6px;
+    background: rgba(0,0,0,.55); color: #fff; cursor: pointer; z-index: 5;
+  }
+  #props label { display: block; margin: 10px 0 4px; color: var(--ui-muted); font-size: 12px; }
+  #props input[type=text], #props input[type=number], #props select {
+    width: 100%; font: inherit; color: var(--ui-text); background: var(--ui-bg);
+    border: 1px solid var(--ui-line); border-radius: 6px; padding: 6px 8px;
+  }
+  #props .check { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  #props .about { color: var(--ui-muted); font-size: 12px; margin: 0 0 8px; }
+  #props .actions { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .seg { display: flex; gap: 4px; flex-wrap: wrap; }
+  .seg button { padding: 4px 10px; font-size: 13px; }
+  .seg button.on { border-color: var(--accent); background: rgba(122,162,247,.18); }
+  .hint { color: var(--ui-muted); font-size: 12px; margin-top: 14px; }
+  kbd { background: #2a2d38; border-radius: 4px; padding: 0 5px; font-size: 11px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>plove studio</h1>
+  <nav><a href="/">Рабочий стол</a><a href="/shell" class="on">Оболочка</a></nav>
+  <span class="spacer"></span>
+  <span id="status"></span>
+  <button id="save">Сохранить</button>
+  <button id="apply" class="primary">Применить</button>
+</header>
+<aside id="left">
+  <h2>Начать с шаблона</h2>
+  <div class="tiles" id="templates"></div>
+  <h2>Добавить поверхность</h2>
+  <div class="tiles" id="surfaces"></div>
+  <h2>Блоки</h2>
+  <div class="palette" id="palette"></div>
+  <p class="hint">Перетащите блок в панель. Порядок меняется тоже перетаскиванием. <kbd>Del</kbd> удаляет выбранное.</p>
+</aside>
+<main id="stage-wrap"><div id="stage"></div></main>
+<aside id="props"><h2 id="props-title">Свойства</h2><div id="form"></div></aside>
+
+<script>
+"use strict";
+let state = null;      // ответ /api/state
+let shell = [];        // поверхности: {id, kind, edge, align, size, sections:[[{kind, with}]]}
+let sel = null;        // {s} — поверхность или {s, z, i} — блок
+let openDrawer = "";   // какая выезжающая панель раскрыта на картинке
+let ratio = 1;
+let dirty = false;
+let drag = null;       // что тащим: {kind} из палитры или {s, z, i} блок
+
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+};
+const block = id => state.blocks.find(b => b.id === id);
+const sectionsOf = kind => kind === "drawer" ? 1 : 3;
+
+// Шаблоны: с чего начать, чтобы не собирать с нуля.
+const TEMPLATES = [
+  { title: "Полоса сверху", shell: () => [
+    bar("top", "top", "fill", [["workspaces"], ["clock"], ["tray", "volume", "network", "battery"]]),
+  ]},
+  { title: "Островок", shell: () => [
+    bar("top", "top", "center", [["workspaces"], ["clock"], ["volume", "network", "bell"]]),
+  ]},
+  { title: "Док и полоса", shell: () => [
+    bar("top", "top", "fill", [["workspaces"], ["clock"], ["tray", "volume", "network"]]),
+    bar("dock", "bottom", "center", [[], [btn("", "kitty"), btn("󰈹", "firefox"), btn("󰉋", "thunar")], []]),
+  ]},
+  { title: "Сбоку + панель", shell: () => [
+    bar("rail", "left", "fill", [["workspaces"], ["clock"], ["volume", "network", { kind: "button", with: { icon: "󰍜", opens: "side" } }]]),
+    { id: "side", kind: "drawer", edge: "right", align: "fill", size: 0,
+      sections: [[{ kind: "clockbig", with: {} }, { kind: "slider", with: { what: "volume" } },
+                  { kind: "slider", with: { what: "brightness" } }, { kind: "media", with: {} }, { kind: "calendar", with: {} }]] },
+  ]},
+];
+function bar(id, edge, align, sections) {
+  return { id, kind: "bar", edge, align, size: 0,
+    sections: sections.map(z => z.map(b => typeof b === "string" ? { kind: b, with: {} } : b)) };
+}
+function btn(icon, command) { return { kind: "button", with: { icon, command } }; }
+
+// Шаблоны поверхностей для кнопок «Добавить».
+const NEW_SURFACES = [
+  { title: "Панель сверху", make: () => bar(freeId("top"), "top", "fill", [[], [], []]) },
+  { title: "Панель снизу", make: () => bar(freeId("bottom"), "bottom", "fill", [[], [], []]) },
+  { title: "Панель слева", make: () => bar(freeId("left"), "left", "fill", [[], [], []]) },
+  { title: "Док снизу", make: () => bar(freeId("dock"), "bottom", "center", [[], [], []]) },
+  { title: "Выезжающая справа", make: () => ({ id: freeId("side"), kind: "drawer", edge: "right", align: "fill", size: 0, sections: [[]] }) },
+  { title: "Выезжающая слева", make: () => ({ id: freeId("menu"), kind: "drawer", edge: "left", align: "fill", size: 0, sections: [[]] }) },
+];
+function freeId(base) {
+  let id = base, n = 2;
+  while (shell.some(s => s.id === id)) id = base + "-" + n++;
+  return id;
+}
+
+function mini(edge, align, drawer) {
+  // Значок поверхности: экран и где на нём плашка.
+  const W = 54, H = 34, t = 6;
+  let x = 0, y = 0, w = W, h = t;
+  if (edge === "bottom") y = H - t;
+  if (edge === "left" || edge === "right") { w = drawer ? 18 : t; h = H; x = edge === "right" ? W - w : 0; }
+  if (edge !== "left" && edge !== "right" && align === "center") { w = 24; x = (W - w) / 2; }
+  return `<svg width="${W}" height="${H}"><rect width="${W}" height="${H}" rx="4" fill="#2a2d38"/><rect x="${x + 1}" y="${y + 1}" width="${w - 2}" height="${h - 2}" rx="2" fill="#7aa2f7"/></svg>`;
+}
+
+async function load() {
+  state = await (await fetch("/api/state")).json();
+  shell = (state.shell || []).map(s => ({
+    ...s, align: s.align || "fill", size: s.size || 0,
+    sections: Array.from({ length: sectionsOf(s.kind) }, (_, i) =>
+      (s.sections[i] || []).map(b => typeof b === "string" ? { kind: b, with: {} } : { kind: b.kind, with: b.with || {} })),
+  }));
+  // Своей оболочки ещё нет — начинаем с того, что сейчас на панели.
+  if (!shell.length) {
+    shell = [bar("top", "top", state.bar_style === "island" ? "center" : "fill",
+      [state.modules.left, state.modules.center, state.modules.right])];
+    dirty = true;
+  }
+  const t = state.theme || {};
+  document.documentElement.style.setProperty("--fg", (state.colors && state.colors.fg) || "#eee");
+  document.documentElement.style.setProperty("--accentc", (state.colors && state.colors.accent) || "#7aa2f7");
+  document.documentElement.style.setProperty("--plate", hexA((state.colors && state.colors.bg) || "#111111", 0.72));
+
+  TEMPLATES.forEach(tp => {
+    const s = tp.shell();
+    const tile = el("div", "tile");
+    tile.innerHTML = mini(s[0].edge, s[0].align, false);
+    tile.append(tp.title);
+    tile.onclick = () => {
+      if (dirty && !confirm("Заменить текущую оболочку шаблоном?")) return;
+      shell = tp.shell(); sel = null; openDrawer = ""; touch();
+    };
+    $("templates").append(tile);
+  });
+  NEW_SURFACES.forEach(ns => {
+    const probe = ns.make();
+    const tile = el("div", "tile");
+    tile.innerHTML = mini(probe.edge, probe.align, probe.kind === "drawer");
+    tile.append(ns.title);
+    tile.onclick = () => {
+      const s = ns.make();
+      shell.push(s);
+      sel = { s: shell.length - 1 };
+      if (s.kind === "drawer") openDrawer = s.id;
+      touch();
+    };
+    $("surfaces").append(tile);
+  });
+  window.addEventListener("resize", render);
+  render();
+}
+
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+}
+
+function touch() { dirty = true; setStatus("Есть несохранённые изменения"); render(); }
+function setStatus(text, error) { $("status").textContent = text; $("status").classList.toggle("error", !!error); }
+
+function selectedSurface() { return sel ? shell[sel.s] : null; }
+
+function renderPalette() {
+  const pal = $("palette");
+  pal.innerHTML = "";
+  const target = selectedSurface();
+  const items = state.blocks.map(b => ({ id: b.id, title: b.title, icon: b.icon, about: b.about, fits: b.fits }));
+  // Свои виджеты райса — тоже блоки панели.
+  Object.entries(state.widgets || {}).forEach(([id, w]) =>
+    items.push({ id, title: id, icon: w.icon || "", about: "Свой виджет райса", fits: ["bar"] }));
+  items.forEach(b => {
+    const it = el("div", "item");
+    if (target && !b.fits.includes(target.kind)) it.classList.add("off");
+    it.draggable = true;
+    it.innerHTML = `<i></i><div><b></b><small></small></div>`;
+    it.querySelector("i").textContent = b.icon;
+    it.querySelector("b").textContent = b.title;
+    it.querySelector("small").textContent = b.about;
+    it.title = b.fits.includes("drawer") && !b.fits.includes("bar") ? "Только в выезжающую панель"
+      : !b.fits.includes("drawer") ? "Только на панель" : "";
+    it.ondragstart = e => { drag = { kind: b.id, fits: b.fits }; e.dataTransfer.setData("text/plain", b.id); };
+    // Щелчок — добавить в выбранную поверхность, если блок туда подходит.
+    it.onclick = () => {
+      const s = selectedSurface();
+      if (!s) return setStatus("Сначала выберите панель на картинке", true);
+      if (!b.fits.includes(s.kind)) return setStatus(`«${b.title}» сюда не ставится`, true);
+      const z = s.kind === "drawer" ? 0 : (sel.z !== undefined ? sel.z : 2);
+      s.sections[z].push(newBlock(b.id));
+      sel = { s: sel.s, z, i: s.sections[z].length - 1 };
+      touch();
+    };
+    pal.append(it);
+  });
+}
+
+function newBlock(kind) {
+  const info = block(kind);
+  const w = {};
+  // Сразу с понятными значениями, чтобы блок было видно.
+  if (info) info.params.forEach(p => { if (p.type === "text" && p.default) w[p.id] = p.default; });
+  return { kind, with: w };
+}
+
+function preview(b) {
+  // Что примерно покажет блок: значок и текст.
+  const info = block(b.kind);
+  const w = b.with || {};
+  const now = new Date();
+  const hm = now.toTimeString().slice(0, 5);
+  switch (b.kind) {
+    case "workspaces": return ["", "● ● ○ ○"];
+    case "clock": return ["", hm];
+    case "volume": return [info.icon, "45%"];
+    case "network": return [info.icon, "wifi"];
+    case "battery": return [info.icon, "80%"];
+    case "text": return ["", w.text || ""];
+    case "button": return [w.icon || info.icon, w.label || ""];
+    case "command": return [w.icon || info.icon, w.command || ""];
+    case "spacer": return ["", "·  ·  ·"];
+    case "heading": return ["", w.text || "Раздел"];
+    case "slider": return [w.what === "brightness" ? "󰃠" : "󰕾", ""];
+    case "clockbig": return ["", hm];
+    default: return [info ? info.icon : ((state.widgets[b.kind] || {}).icon || ""), info ? info.title : b.kind];
+  }
+}
+
+function render() {
+  renderPalette();
+  const stage = $("stage");
+  const [sw, sh] = state.screen;
+  const wrap = $("stage-wrap");
+  ratio = Math.min((wrap.clientWidth - 32) / sw, (wrap.clientHeight - 32) / sh);
+  stage.style.width = sw * ratio + "px";
+  stage.style.height = sh * ratio + "px";
+  stage.style.backgroundImage = "url(/bare.png)";
+  stage.innerHTML = "";
+  const gap = 6;
+  shell.forEach((s, si) => {
+    const drawer = s.kind === "drawer";
+    const v = s.edge === "left" || s.edge === "right";
+    if (drawer && openDrawer !== s.id) {
+      // Закрытая выезжающая панель — ярлычок у её края.
+      const tab = el("div", "drawer-tab", "▸ " + s.id);
+      tab.style[s.edge] = "4px";
+      tab.style[v ? "top" : "left"] = "50%";
+      tab.onclick = e => { e.stopPropagation(); openDrawer = s.id; sel = { s: si }; render(); };
+      stage.append(tab);
+      return;
+    }
+    const d = el("div", "surface" + (v ? " v" : "") + (drawer ? " drawer" : "") + (s.align === "fill" && !drawer ? " fill" : ""));
+    if (sel && sel.s === si && sel.i === undefined) d.classList.add("selected");
+    // Тонкую панель на маленькой картинке всё равно должно быть видно.
+    const thick = Math.max(drawer ? 160 : 30, (s.size || (drawer ? 380 : 40)) * ratio);
+    const st = d.style;
+    st[s.edge] = gap + "px";
+    if (v) {
+      st.width = thick + "px";
+      if (drawer || s.align === "fill") { st.top = gap + "px"; st.bottom = gap + "px"; }
+      else if (s.align === "start") st.top = gap + "px";
+      else if (s.align === "end") st.bottom = gap + "px";
+      else { st.top = "50%"; st.transform = "translateY(-50%)"; }
+    } else {
+      st.height = drawer ? thick + "px" : "auto";
+      if (!drawer) st.minHeight = Math.max(30, thick) + "px";
+      if (drawer || s.align === "fill") { st.left = gap + "px"; st.right = gap + "px"; }
+      else if (s.align === "start") st.left = gap + "px";
+      else if (s.align === "end") st.right = gap + "px";
+      else { st.left = "50%"; st.transform = "translateX(-50%)"; }
+    }
+    d.onclick = e => { if (e.target === d) { sel = { s: si }; render(); } };
+    s.sections.forEach((zone, zi) => {
+      const z = el("div", "zone");
+      z.title = drawer ? "Блоки" : ["Начало", "Середина", "Конец"][zi];
+      z.onclick = e => { if (e.target === z) { sel = { s: si, z: zi }; render(); } };
+      z.ondragover = e => {
+        if (!drag) return;
+        const fits = drag.fits || (block(shell[drag.s].sections[drag.z][drag.i].kind) || { fits: ["bar"] }).fits;
+        if (!fits.includes(s.kind)) return;
+        e.preventDefault(); z.classList.add("over");
+      };
+      z.ondragleave = () => z.classList.remove("over");
+      z.ondrop = e => {
+        e.preventDefault(); z.classList.remove("over");
+        const at = dropIndex(z, e, v || drawer);
+        if (drag.kind) {
+          zone.splice(at, 0, newBlock(drag.kind));
+          sel = { s: si, z: zi, i: at };
+        } else {
+          const from = shell[drag.s].sections[drag.z];
+          const [moved] = from.splice(drag.i, 1);
+          const shift = drag.s === si && drag.z === zi && drag.i < at ? 1 : 0;
+          zone.splice(at - shift, 0, moved);
+          sel = { s: si, z: zi, i: at - shift };
+        }
+        drag = null; touch();
+      };
+      zone.forEach((b, bi) => {
+        const [icon, text] = preview(b);
+        const c = el("div", "chip" + (b.kind === "heading" ? " heading" : ""));
+        if (sel && sel.s === si && sel.z === zi && sel.i === bi) c.classList.add("selected");
+        c.draggable = true;
+        if (icon) { const i = el("i"); i.textContent = icon; c.append(i); }
+        // На боковой панели — только значок, как и на настоящей.
+        if (text && !(v && !drawer && icon)) c.append(el("span", "", v && !drawer ? text.slice(0, 5) : text));
+        if (b.kind === "slider") c.append(el("span", "bar"));
+        c.ondragstart = e => { drag = { s: si, z: zi, i: bi }; e.dataTransfer.setData("text/plain", b.kind); e.stopPropagation(); };
+        c.onclick = e => { e.stopPropagation(); sel = { s: si, z: zi, i: bi }; render(); };
+        z.append(c);
+      });
+      d.append(z);
+    });
+    stage.append(d);
+  });
+  renderProps();
+}
+
+function dropIndex(zone, e, vertical) {
+  const chips = [...zone.querySelectorAll(".chip")];
+  for (let i = 0; i < chips.length; i++) {
+    const r = chips[i].getBoundingClientRect();
+    if (vertical ? e.clientY < r.top + r.height / 2 : e.clientX < r.left + r.width / 2) return i;
+  }
+  return chips.length;
+}
+
+function renderProps() {
+  const form = $("form");
+  form.innerHTML = "";
+  if (!sel) {
+    $("props-title").textContent = "Свойства";
+    form.append(el("p", "about", "Выберите панель или блок на картинке. Начните с шаблона слева или добавьте поверхность."));
+    return;
+  }
+  const s = shell[sel.s];
+  if (sel.i !== undefined && s.sections[sel.z][sel.i]) return blockProps(s, s.sections[sel.z][sel.i]);
+  surfaceProps(s);
+}
+
+function seg(label, value, options, names, onPick) {
+  form().append(el("label", "", label));
+  const row = el("div", "seg");
+  options.forEach((o, i) => {
+    const b = el("button", o === value ? "on" : "", names[i]);
+    b.onclick = () => onPick(o);
+    row.append(b);
+  });
+  form().append(row);
+}
+const form = () => $("form");
+
+function surfaceProps(s) {
+  const drawer = s.kind === "drawer";
+  $("props-title").textContent = drawer ? "Выезжающая панель" : "Панель";
+  form().append(el("label", "", "Имя"));
+  const name = el("input");
+  name.type = "text"; name.value = s.id;
+  name.onchange = () => {
+    const id = name.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");
+    if (!id || shell.some(o => o !== s && o.id === id)) return setStatus("Имя пустое или уже занято", true);
+    // Кнопки, которые открывали эту панель, — на новое имя.
+    shell.forEach(o => o.sections.flat().forEach(b => { if (b.with && b.with.opens === s.id) b.with.opens = id; }));
+    if (openDrawer === s.id) openDrawer = id;
+    s.id = id; touch();
+  };
+  form().append(name);
+  seg("Край", s.edge, ["top", "bottom", "left", "right"], ["Сверху", "Снизу", "Слева", "Справа"], v => { s.edge = v; touch(); });
+  if (!drawer)
+    seg("Длина", s.align, ["fill", "center", "start", "end"], ["Во всю", "Островок", "В начале", "В конце"], v => { s.align = v; touch(); });
+  form().append(el("label", "", drawer ? "Ширина, px" : "Толщина, px"));
+  const size = el("input");
+  size.type = "range"; size.min = drawer ? 240 : 24; size.max = drawer ? 700 : 96;
+  size.value = s.size || (drawer ? 380 : 40);
+  size.oninput = () => { s.size = +size.value; touch(); };
+  form().append(size);
+  if (drawer) form().append(el("p", "about", `Открывается кнопкой с «Открыть панель: ${s.id}» или командой qs -c plove ipc call plove drawer ${s.id}.`));
+  const actions = el("div", "actions");
+  if (drawer) {
+    const toggle = el("button", "", openDrawer === s.id ? "Свернуть на картинке" : "Показать на картинке");
+    toggle.onclick = () => { openDrawer = openDrawer === s.id ? "" : s.id; render(); };
+    actions.append(toggle);
+  }
+  const del = el("button", "danger", "Удалить");
+  del.onclick = removeSelected;
+  actions.append(del);
+  form().append(actions);
+}
+
+function blockProps(s, b) {
+  const info = block(b.kind);
+  $("props-title").textContent = info ? info.title : b.kind;
+  form().append(el("p", "about", info ? info.about : "Свой виджет райса: команду и вид меняют в разделе widgets."));
+  (info ? info.params : []).forEach(p => {
+    const cur = b.with[p.id] !== undefined ? b.with[p.id] : p.default;
+    const set = v => { if (v === p.default || v === "") delete b.with[p.id]; else b.with[p.id] = v; touch(); };
+    if (p.type === "switch") {
+      const l = el("label", "check");
+      const c = el("input"); c.type = "checkbox"; c.checked = !!cur;
+      c.onchange = () => set(c.checked);
+      l.append(c, p.title);
+      return form().append(l);
+    }
+    form().append(el("label", "", p.title));
+    let input;
+    if (p.id === "opens") {
+      // Какую выезжающую панель открыть — выбор из существующих.
+      input = el("select");
+      input.append(new Option("— никакую, выполнить команду —", ""));
+      shell.filter(o => o.kind === "drawer").forEach(o => input.append(new Option(o.id, o.id)));
+      input.value = cur || "";
+      input.onchange = () => set(input.value);
+    } else if (p.type === "choice") {
+      input = el("select");
+      p.choices.forEach(c => input.append(new Option({ volume: "Громкость", brightness: "Яркость" }[c] || c, c)));
+      input.value = cur;
+      input.onchange = () => set(input.value);
+    } else if (p.type === "number") {
+      input = el("input"); input.type = "number"; input.min = p.min; input.max = p.max; input.value = cur;
+      input.onchange = () => set(Math.max(p.min, Math.min(p.max, +input.value || p.default)));
+    } else {
+      input = el("input"); input.type = "text"; input.value = cur;
+      if (p.id === "icon") input.style.fontFamily = "var(--icons)";
+      input.onchange = () => set(input.value);
+    }
+    form().append(input);
+  });
+  const actions = el("div", "actions");
+  const del = el("button", "danger", "Удалить блок");
+  del.onclick = removeSelected;
+  actions.append(del);
+  form().append(actions);
+}
+
+function removeSelected() {
+  if (!sel) return;
+  const s = shell[sel.s];
+  if (sel.i !== undefined) {
+    s.sections[sel.z].splice(sel.i, 1);
+    sel = { s: sel.s, z: sel.z };
+  } else {
+    shell.splice(sel.s, 1);
+    // Кнопки, открывавшие удалённую панель, теперь ничего не открывают.
+    shell.forEach(o => o.sections.flat().forEach(b => { if (b.with && b.with.opens === s.id) delete b.with.opens; }));
+    sel = null;
+  }
+  touch();
+}
+
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === "Delete" || e.key === "Backspace") { removeSelected(); e.preventDefault(); }
+  if (e.key === "Escape") { sel = null; render(); }
+});
+document.addEventListener("dragend", () => { drag = null; });
+
+function payload() {
+  return JSON.stringify({ shell: shell.map(s => ({
+    id: s.id, kind: s.kind, edge: s.edge, align: s.align, size: s.size || 0,
+    sections: s.sections.map(z => z.map(b => ({ kind: b.kind, with: b.with || {} }))),
+  })) });
+}
+
+async function send(url, okText) {
+  setStatus("…");
+  const res = await fetch(url, { method: "POST", headers: { "X-Plove": "1", "Content-Type": "application/json" }, body: payload() });
+  const out = await res.json();
+  if (out.ok) { dirty = false; setStatus(out.message || okText); } else setStatus(out.error, true);
+}
+$("save").onclick = () => send("/api/save", "Сохранено");
+$("apply").onclick = () => send("/api/apply", "Применено");
+window.addEventListener("beforeunload", e => { if (dirty) e.preventDefault(); });
+
+load();
+</script>
+</body>
+</html>

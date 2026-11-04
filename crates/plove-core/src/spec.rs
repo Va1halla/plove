@@ -42,6 +42,10 @@ pub struct RiceSpec {
     /// из настроек модуля eww (cards, anchor).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub desktop: Vec<crate::desk::DeskCard>,
+    /// Своя оболочка на Quickshell из поверхностей и блоков, собранная в
+    /// `plove studio` на странице «Оболочка». Пусто — обычная панель.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shell: Vec<crate::layout::Surface>,
 }
 
 /// Свой виджет: что показывает команда, раз в сколько секунд, как выглядит.
@@ -466,6 +470,7 @@ impl RiceSpec {
                 .with_context(|| format!("виджет «{id}»"))?;
         }
         crate::desk::validate(self)?;
+        crate::layout::validate(self)?;
         Ok(())
     }
 }

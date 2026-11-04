@@ -75,6 +75,16 @@ templates:
   - { src: CardLabel.qml, dest: ~/.config/quickshell/plove/CardLabel.qml, copy: true }
   - { src: BigValue.qml, dest: ~/.config/quickshell/plove/BigValue.qml, copy: true }
   - { src: Meter.qml, dest: ~/.config/quickshell/plove/Meter.qml, copy: true }
+  - { src: Surface.qml, dest: ~/.config/quickshell/plove/Surface.qml, copy: true }
+  - { src: Section.qml, dest: ~/.config/quickshell/plove/Section.qml, copy: true }
+  - { src: Block.qml, dest: ~/.config/quickshell/plove/Block.qml, copy: true }
+  - { src: BlockText.qml, dest: ~/.config/quickshell/plove/BlockText.qml, copy: true }
+  - { src: BlockButton.qml, dest: ~/.config/quickshell/plove/BlockButton.qml, copy: true }
+  - { src: BlockCommand.qml, dest: ~/.config/quickshell/plove/BlockCommand.qml, copy: true }
+  - { src: BlockSpacer.qml, dest: ~/.config/quickshell/plove/BlockSpacer.qml, copy: true }
+  - { src: BlockHeading.qml, dest: ~/.config/quickshell/plove/BlockHeading.qml, copy: true }
+  - { src: BlockSlider.qml, dest: ~/.config/quickshell/plove/BlockSlider.qml, copy: true }
+  - { src: BlockClock.qml, dest: ~/.config/quickshell/plove/BlockClock.qml, copy: true }
   - { src: net.sh, dest: ~/.local/share/plove/qs-net.sh, copy: true }
   - { src: dmenu.sh, dest: ~/.local/share/plove/qs-dmenu.sh, copy: true }
   - { src: reload.sh, dest: ~/.local/share/plove/qs-reload.sh, copy: true }

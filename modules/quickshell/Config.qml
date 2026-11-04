@@ -19,6 +19,11 @@ Singleton {
     property string popup: ""
     // Боковая панель открыта.
     property bool panel: false
+    // Открытая выезжающая панель конструктора оболочки (её имя) или "".
+    property string drawer: ""
+    function toggleDrawer(id) {
+        drawer = drawer === id ? "" : id;
+    }
     function toggle(name) {
         if (popup === name) {
             popup = "";
@@ -81,6 +86,8 @@ Singleton {
             property string wallpaper: ""
             property var widgets: ({})
             property bool lua: false
+            // Поверхности конструктора оболочки (раздел shell райса).
+            property var shell: []
         }
     }
 }

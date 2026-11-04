@@ -23,6 +23,8 @@ ShellRoot {
         // Заблокировать экран (модуль qs-lock) и посмотреть экран блокировки без блокировки.
         function lock(): void { lock.locked = true; }
         function lockPreview(): void { lock.preview = !lock.preview; }
+        // Открыть или закрыть выезжающую панель конструктора по имени.
+        function drawer(name: string): void { Config.toggleDrawer(name); }
     }
 
     Launcher { id: launcher }
@@ -31,9 +33,23 @@ ShellRoot {
     Osd {}
     SidePanel {}
 
+    // Обычная панель — если в райсе нет своей оболочки (раздел shell).
+    Variants {
+        model: Config.s.shell.length > 0 ? [] : Quickshell.screens
+        Bar {}
+    }
+
+    // Своя оболочка: каждая поверхность на каждом мониторе.
     Variants {
         model: Quickshell.screens
-        Bar {}
+        Scope {
+            id: perScreen
+            required property var modelData
+            Variants {
+                model: Config.s.shell
+                Surface { screenData: perScreen.modelData }
+            }
+        }
     }
 
     // Карточки рабочего стола (модуль qs-desktop).
