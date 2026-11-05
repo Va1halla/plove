@@ -9,6 +9,7 @@ Loader {
     property bool vertical: false
     property bool inDrawer: false
     property string group: "right"
+    property string edge: "top"
 
     readonly property string kind: block ? block.kind : ""
     readonly property var files: ({
@@ -40,12 +41,15 @@ Loader {
             item.opts = Qt.binding(() => host.block ? (host.block.opts || {}) : {});
         if ("group" in item)
             item.group = host.group;
+        if ("edge" in item)
+            item.edge = host.edge;
+        // Отступ в выезжающей панели — по высоте, столбик идёт сверху вниз.
         if ("vertical" in item)
-            item.vertical = Qt.binding(() => host.vertical);
+            item.vertical = Qt.binding(() => host.vertical || (host.inDrawer && host.kind === "spacer"));
         if (host.custom)
             item.widgetId = host.kind;
-        // В выезжающей панели блок во всю её ширину.
-        if (host.inDrawer && "width" in item && host.kind !== "spacer")
-            item.width = Qt.binding(() => host.width);
+        // Месяц в выезжающей панели — на всю её ширину.
+        if (host.inDrawer && host.kind === "calendar")
+            item.cell = Qt.binding(() => Math.floor(host.width / 7));
     }
 }

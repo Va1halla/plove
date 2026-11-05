@@ -6,6 +6,8 @@ Item {
     id: chip
 
     property string group: "right"
+    // Край поверхности конструктора: туда меню не открывается. "" — обычная панель.
+    property string edge: ""
     property bool vertical: false
     property bool big: false
     // Показывать ли модуль: батарея без батареи и пустой трей прячутся.

@@ -15,7 +15,6 @@ templates:
     dest: ~/.config/quickshell/plove/Theme.qml
   - src: settings.json.tera
     dest: ~/.config/quickshell/plove/settings.json
-  - { src: shell.qml, dest: ~/.config/quickshell/plove/shell.qml, copy: true }
   - { src: Config.qml, dest: ~/.config/quickshell/plove/Config.qml, copy: true }
   - { src: Net.qml, dest: ~/.config/quickshell/plove/Net.qml, copy: true }
   - { src: Bar.qml, dest: ~/.config/quickshell/plove/Bar.qml, copy: true }
@@ -85,6 +84,8 @@ templates:
   - { src: BlockHeading.qml, dest: ~/.config/quickshell/plove/BlockHeading.qml, copy: true }
   - { src: BlockSlider.qml, dest: ~/.config/quickshell/plove/BlockSlider.qml, copy: true }
   - { src: BlockClock.qml, dest: ~/.config/quickshell/plove/BlockClock.qml, copy: true }
+  # shell.qml последним: Quickshell перечитает его, когда новые компоненты уже на месте.
+  - { src: shell.qml, dest: ~/.config/quickshell/plove/shell.qml, copy: true }
   - { src: net.sh, dest: ~/.local/share/plove/qs-net.sh, copy: true }
   - { src: dmenu.sh, dest: ~/.local/share/plove/qs-dmenu.sh, copy: true }
   - { src: reload.sh, dest: ~/.local/share/plove/qs-reload.sh, copy: true }

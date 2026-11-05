@@ -29,5 +29,6 @@ Chip {
         vertical: chip.vertical
         icon: chip.opts.icon || ""
         value: chip.value
+        turned: true
     }
 }

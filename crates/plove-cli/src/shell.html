@@ -96,6 +96,7 @@
   .chip.selected { border-color: var(--accent); background: rgba(122,162,247,.18); }
   .surface.drawer .chip { padding: 8px 10px; background: rgba(255,255,255,.05); font-size: 13px; }
   .chip.heading { font-size: 16px; font-weight: 600; background: none !important; }
+  .surface.v:not(.drawer) .chip span { white-space: pre; line-height: 1.1; }
   .chip .bar { flex: 1; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accentc) 55%, rgba(255,255,255,.15) 55%); }
   .drawer-tab {
     position: absolute; font-size: 11px; padding: 2px 8px; border-radius: 6px;
@@ -167,7 +168,7 @@ const TEMPLATES = [
   ]},
   { title: "Док и полоса", shell: () => [
     bar("top", "top", "fill", [["workspaces"], ["clock"], ["tray", "volume", "network"]]),
-    bar("dock", "bottom", "center", [[], [btn("", "kitty"), btn("󰈹", "firefox"), btn("󰉋", "thunar")], []]),
+    bar("dock", "bottom", "center", [[], [btn("󰆍", "kitty"), btn("󰈹", "firefox"), btn("󰉋", "thunar")], []]),
   ]},
   { title: "Сбоку + панель", shell: () => [
     bar("rail", "left", "fill", [["workspaces"], ["clock"], ["volume", "network", { kind: "button", with: { icon: "󰍜", opens: "side" } }]]),
@@ -222,6 +223,7 @@ async function load() {
   }
   const t = state.theme || {};
   document.documentElement.style.setProperty("--fg", (state.colors && state.colors.fg) || "#eee");
+  if (state.colors && state.colors.accent) document.documentElement.style.setProperty("--accent", state.colors.accent);
   document.documentElement.style.setProperty("--accentc", (state.colors && state.colors.accent) || "#7aa2f7");
   document.documentElement.style.setProperty("--plate", hexA((state.colors && state.colors.bg) || "#111111", 0.72));
 
@@ -405,7 +407,7 @@ function render() {
         c.draggable = true;
         if (icon) { const i = el("i"); i.textContent = icon; c.append(i); }
         // На боковой панели — только значок, как и на настоящей.
-        if (text && !(v && !drawer && icon)) c.append(el("span", "", v && !drawer ? text.slice(0, 5) : text));
+        if (text && !(v && !drawer && icon)) c.append(el("span", "", !v || drawer ? text : b.kind === "workspaces" ? "●\n●\n○" : text.slice(0, 5)));
         if (b.kind === "slider") c.append(el("span", "bar"));
         c.ondragstart = e => { drag = { s: si, z: zi, i: bi }; e.dataTransfer.setData("text/plain", b.kind); e.stopPropagation(); };
         c.onclick = e => { e.stopPropagation(); sel = { s: si, z: zi, i: bi }; render(); };

@@ -11,7 +11,10 @@ Rectangle {
     readonly property var players: Mpris.players.values
     readonly property var player: players.find(p => p.isPlaying) || players[0] || null
 
-    visible: player !== null
+    // Block прячет блок выезжающей панели по shown.
+    readonly property bool shown: player !== null
+    visible: shown
+    implicitHeight: height
     width: 352
     height: visible ? row.height + Theme.pad * 3 : 0
     radius: Math.min(Theme.radius, 22)
@@ -53,7 +56,7 @@ Rectangle {
         }
 
         Column {
-            width: 352 - 76 - Theme.pad * 4.5
+            width: media.width - 76 - Theme.pad * 4.5
             spacing: 4
             Text {
                 width: parent.width

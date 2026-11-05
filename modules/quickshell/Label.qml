@@ -9,6 +9,8 @@ Item {
     property string value: ""
     property bool dim: false
     property bool alert: false
+    // У rail показать значение под значком, повёрнутым вдоль полосы.
+    property bool turned: false
 
     readonly property color tint: alert ? Theme.red : dim ? Theme.muted : Theme.fg
     width: vertical ? column.width : row.width
@@ -33,6 +35,8 @@ Item {
             font.pixelSize: Theme.fontSize
             elide: Text.ElideRight
             width: Math.min(implicitWidth, Theme.fontSize * 9)
+            // Без подписи значок по центру, без пустого промежутка справа.
+            visible: label.value !== ""
         }
     }
 
@@ -45,6 +49,23 @@ Item {
             color: label.alert ? Theme.red : Theme.accent
             font.family: Theme.fontIcons
             font.pixelSize: Math.round(Theme.fontSize * 1.15)
+        }
+        Item {
+            visible: label.turned && label.value !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: along.height
+            height: along.width + Theme.pad
+            Text {
+                id: along
+                anchors.centerIn: parent
+                rotation: 90
+                text: label.value
+                color: label.tint
+                font.family: Theme.fontMono
+                font.pixelSize: Theme.fontSize
+                elide: Text.ElideRight
+                width: Math.min(implicitWidth, Theme.fontSize * 12)
+            }
         }
     }
 }

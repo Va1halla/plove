@@ -7,6 +7,7 @@ Grid {
     property var blocks: []
     property bool vertical: false
     property string group: "right"
+    property string edge: "top"
 
     flow: vertical ? Grid.TopToBottom : Grid.LeftToRight
     columns: vertical ? 1 : Math.max(1, blocks.length)
@@ -22,6 +23,7 @@ Grid {
             block: modelData
             vertical: sec.vertical
             group: sec.group
+            edge: sec.edge
         }
     }
 }

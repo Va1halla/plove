@@ -11,8 +11,13 @@ PopupWindow {
     required property string name
     default property alias content: body.data
     readonly property bool open: Config.popup === name
-    // С какой стороны от модуля: у дока — сверху, у rail — сбоку.
-    readonly property int side: Config.style === "dock" ? Edges.Top
+    // С какой стороны от модуля: у дока — сверху, у rail — сбоку,
+    // в конструкторе оболочки — от края, где стоит поверхность.
+    readonly property int side: owner.edge === "top" ? Edges.Bottom
+        : owner.edge === "bottom" ? Edges.Top
+        : owner.edge === "left" ? Edges.Right
+        : owner.edge === "right" ? Edges.Left
+        : Config.style === "dock" ? Edges.Top
         : Config.style === "rail" ? (Config.s.side === "right" ? Edges.Left : Edges.Right)
         : Edges.Bottom
     readonly property bool across: side === Edges.Left || side === Edges.Right
